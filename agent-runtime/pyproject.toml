@@ -2,7 +2,7 @@
 name = "codelab-agent-runtime"
 version = "0.1.0"
 description = "CodeLab Agent Runtime Service - Основная AI логика"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 license = {text = "MIT"}
 authors = [
     {name = "Sergey Penkovsky", email = "sergey.penkovsky@gmail.com"},
@@ -19,6 +19,12 @@ dependencies = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "ty"
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
@@ -38,3 +44,13 @@ select = [
 [tool.pytest]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+
+[tool.ty]
+src = "pyproject.toml"
+out = "requirements.txt"
+
+[tool.ty.rules]
+unused-ignore-comment = "warn"
+redundant-cast = "ignore"
+possibly-missing-attribute = "error"
+possibly-missing-import = "error"
