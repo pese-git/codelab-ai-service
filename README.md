@@ -170,6 +170,37 @@ pip install -e '.[dev]'
 
 Подробнее: [Документация Ruff](https://docs.astral.sh/ruff/) и [Документация Ty](https://docs.astral.sh/ty/)
 
+---
+
+## ⚙️ Пример настройки VSCode (.vscode/settings.json)
+
+Рекомендуется создать в каждом сервисе файл `.vscode/settings.json` со следующим содержимым:
+
+```json
+{
+    "python.linting.enabled": true,
+    "python.linting.ruffEnabled": true,
+    "python.linting.ruffPath": ".venv/bin/ruff",
+    "python.formatting.provider": "none", // если используете только ruff для форматирования
+    //"python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+    "python.pythonPath": "${workspaceFolder}/.venv/bin/python",
+    "python.languageServer": "None",
+    "python.envFile": "${workspaceFolder}/.venv",
+    "editor.codeActionsOnSave": {
+        "source.fixAll": "explicit"
+    },
+    "editor.formatOnSave": true,
+    "ty.disableLanguageServices": true,
+    "ty.diagnosticMode": "workspace",
+    "ty.inlayHints.variableTypes": true,
+    "ty.inlayHints.callArgumentNames": true,
+    "ty.experimental.rename": true,
+    "ty.importStrategy": "useBundled"
+}
+```
+
+> 💡 Этот конфиг позволяет сразу работать с Ruff и Ty, код-линтингом и автоформатированием, а также автоматически подхватывает виртуальное окружение сервиса.
+
 ## 📝 Лицензия
 
 MIT License - см. [LICENSE](LICENSE) файл для деталей.

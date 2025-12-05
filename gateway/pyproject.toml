@@ -51,7 +51,8 @@ src = "pyproject.toml"
 out = "requirements.txt"
 
 [tool.ty.rules]
-unused-ignore-comment = "warn"
-redundant-cast = "ignore"
-possibly-missing-attribute = "error"
-possibly-missing-import = "error"
+unused-ignore-comment      = "warn"   # Предупреждать, если ignore-комментарий не используется
+redundant-cast            = "ignore" # Не сообщать о лишних cast()
+possibly-missing-attribute= "error"  # Всегда считать ошибкой отсутствие атрибута
+possibly-missing-import   = "error"  # Всегда считать ошибкой отсутствие зависимости
+unresolved-import         = "ignore" # Игнорировать неразрешённые импорты (иногда нужно для динамических импортов, которые намеренно не всегда присутствуют)
