@@ -1,4 +1,4 @@
-FROM python:3.11-slim as builder
+FROM python:3.12-slim as builder
 
 WORKDIR /app
 
@@ -20,7 +20,7 @@ RUN uv venv .venv && \
     uv pip install -e .
 
 # Основной образ
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
