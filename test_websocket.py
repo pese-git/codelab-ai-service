@@ -1,13 +1,13 @@
 import asyncio
-import websockets
 import json
 import sys
+from websockets import connect, exceptions
 
 
 async def test_websocket():
     uri = "ws://localhost:8000/ws/test123"
     try:
-        async with websockets.connect(uri) as websocket:
+        async with connect(uri) as websocket:
             # Отправляем тестовое сообщение
             message = {"type": "user_message", "content": "Hello from Docker test!"}
             print(f"Sending message: {message}")
@@ -17,7 +17,7 @@ async def test_websocket():
             response = await websocket.recv()
             print(f"Received response: {response}")
 
-    except websockets.exceptions.ConnectionRefused:
+    except exceptions.ConnectionClosed:
         print("Connection refused. Make sure the Gateway service is running.")
         sys.exit(1)
     except Exception as e:

@@ -23,17 +23,17 @@ class LLMModel(BaseModel):
 
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
-    return HealthResponse(status="healthy", service="llm-proxy", version="0.1.0")
+    return HealthResponse.model_construct(status="healthy", service="llm-proxy", version="0.1.0")
 
 
 @app.get("/llm/models", response_model=List[LLMModel])
 async def list_models():
     # Mock data for now
     return [
-        LLMModel(
+        LLMModel.model_construct(
             id="gpt-4", name="GPT-4", provider="OpenAI", context_length=8192, is_available=True
         ),
-        LLMModel(
+        LLMModel.model_construct(
             id="claude-2",
             name="Claude 2",
             provider="Anthropic",

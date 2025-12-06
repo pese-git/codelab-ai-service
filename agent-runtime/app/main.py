@@ -23,14 +23,17 @@ class MessageResponse(BaseModel):
 
 
 @app.get("/health", response_model=HealthResponse)
-async def health_check():
-    return HealthResponse(status="healthy", service="agent-runtime", version="0.1.0")
+async def health_check() -> HealthResponse:
+    return HealthResponse.model_construct(
+        status="healthy", service="agent-runtime", version="0.1.0"
+    )
 
 
 @app.post("/agent/message", response_model=MessageResponse)
-async def process_message(message: Message):
-    # Echo mode for now
-    return MessageResponse(status="success", message=f"Echo from agent: {message.content}")
+async def process_message(message: Message) -> MessageResponse:
+    return MessageResponse.model_construct(
+        status="success", message=f"Echo from agent: {message.content}"
+    )
 
 
 if __name__ == "__main__":

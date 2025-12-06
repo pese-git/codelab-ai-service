@@ -1,6 +1,7 @@
 import uvicorn
 from fastapi import FastAPI, WebSocket
 from pydantic import BaseModel
+from starlette.websockets import WebSocketDisconnect
 
 app = FastAPI(title="Gateway Service")
 
@@ -13,19 +14,25 @@ class HealthResponse(BaseModel):
 
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
-    return HealthResponse(status="healthy", service="gateway", version="0.1.0")
+    return HealthResponse.model_construct(status="healthy", service="gateway", version="0.1.0")
 
 
 @app.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
     await websocket.accept()
+    print(f"WebSocket connection opened for session: {session_id}")
+    
     try:
         while True:
             data = await websocket.receive_text()
-            # Echo mode for now
+            print(f"Received message in session {session_id}: {data}")
             await websocket.send_text(f"Echo from gateway: {data}")
-    except Exception:
-        await websocket.close()
+            
+    except WebSocketDisconnect as disconnect:
+        print(f"WebSocket disconnected normally for session: {session_id}, code: {disconnect.code}")
+        
+    except Exception as e:
+        print(f"Error in WebSocket connection for session {session_id}: {str(e)}")
 
 
 if __name__ == "__main__":
