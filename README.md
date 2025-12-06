@@ -178,28 +178,42 @@ pip install -e '.[dev]'
 
 ```json
 {
-    "python.linting.enabled": true,
-    "python.linting.ruffEnabled": true,
-    "python.linting.ruffPath": ".venv/bin/ruff",
-    "python.formatting.provider": "none", // если используете только ruff для форматирования
-    //"python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
-    "python.pythonPath": "${workspaceFolder}/.venv/bin/python",
+    // Python settings
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
     "python.languageServer": "None",
-    "python.envFile": "${workspaceFolder}/.venv",
-    "editor.codeActionsOnSave": {
-        "source.fixAll": "explicit"
-    },
-    "editor.formatOnSave": true,
-    "ty.disableLanguageServices": true,
+    
+    // Ty settings (основной language server)
+    "ty.disableLanguageServices": false,
     "ty.diagnosticMode": "workspace",
     "ty.inlayHints.variableTypes": true,
     "ty.inlayHints.callArgumentNames": true,
     "ty.experimental.rename": true,
-    "ty.importStrategy": "useBundled"
+    "ty.importStrategy": "useBundled",
+    
+    // Ruff settings (форматирование и линтинг)
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.fixAll": "explicit"
+        }
+    },
+    
+    // Editor settings
+    "editor.formatOnSave": true,
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/.pytest_cache": true,
+        "**/.ruff_cache": true
+    }
 }
 ```
 
-> 💡 Этот конфиг позволяет сразу работать с Ruff и Ty, код-линтингом и автоформатированием, а также автоматически подхватывает виртуальное окружение сервиса.
+> 💡 Этот конфиг настраивает:
+> - Ty как основной language server для Python
+> - Ruff для форматирования и линтинга
+> - Автоматическое форматирование при сохранении
+> - Исключение временных файлов из отображения
 
 ## 📝 Лицензия
 
