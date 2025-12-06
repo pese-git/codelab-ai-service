@@ -1,29 +1,44 @@
 import asyncio
 import json
-import sys
-from websockets import connect, exceptions
+import websockets
 
 
-async def test_websocket():
-    uri = "ws://localhost:8000/ws/test123"
-    try:
-        async with connect(uri) as websocket:
-            # Отправляем тестовое сообщение
-            message = {"type": "user_message", "content": "Hello from Docker test!"}
-            print(f"Sending message: {message}")
-            await websocket.send(json.dumps(message))
+async def ws_client():
+    session_id = "test123"
+    url = f"ws://localhost:8000/ws/{session_id}"
 
-            # Получаем ответ
-            response = await websocket.recv()
-            print(f"Received response: {response}")
+    async with websockets.connect(url) as ws:
+        # Отправляем сообщение
+        message = {
+            "type": "user_message",
+            "content": "Hello! Can you stream this message word by word?",
+        }
+        await ws.send(json.dumps(message))
+        print("Sent:", message["content"])
 
-    except exceptions.ConnectionClosed:
-        print("Connection refused. Make sure the Gateway service is running.")
-        sys.exit(1)
-    except Exception as e:
-        print(f"Error: {e}")
-        sys.exit(1)
+        # Читаем токены
+        full_message = ""
+        try:
+            while True:
+                data = await ws.recv()
+                msg = json.loads(data)
+
+                if msg.get("type") == "assistant_message":
+                    token = msg.get("token", "")
+                    is_final = msg.get("is_final", False)
+                    full_message += token
+                    print(token, end="", flush=True)
+
+                    if is_final:
+                        print("\n[Stream complete]")
+                        break
+
+                elif msg.get("type") == "error":
+                    print("\n[Error]:", msg.get("content"))
+                    break
+
+        except websockets.ConnectionClosed:
+            print("\nWebSocket disconnected")
 
 
-if __name__ == "__main__":
-    asyncio.run(test_websocket())
+asyncio.run(ws_client())
