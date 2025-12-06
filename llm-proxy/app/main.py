@@ -6,6 +6,16 @@ from pydantic import BaseModel
 
 app = FastAPI(title="LLM Proxy Service")
 
+class ChatRequest(BaseModel):
+    model: str = "gpt-4"  # default model
+    messages: List[dict]
+    stream: bool = False
+
+
+class ChatResponse(BaseModel):
+    message: str
+    model: str
+
 
 class HealthResponse(BaseModel):
     status: str
@@ -41,6 +51,16 @@ async def list_models():
             is_available=True,
         ),
     ]
+
+
+@app.post("/llm/chat", response_model=ChatResponse)
+async def chat(request: ChatRequest):
+    # Echo mode - just return the last message content
+    last_message = request.messages[-1] if request.messages else {"content": ""}
+    return ChatResponse.model_construct(
+        message=f"Echo from LLM: {last_message.get('content', '')}",
+        model=request.model
+    )
 
 
 if __name__ == "__main__":
