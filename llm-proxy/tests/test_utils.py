@@ -1,5 +1,6 @@
 import pytest
-from llm_proxy.app.main import fake_token_generator
+
+from app.main import fake_token_generator  # ty:ignore[unresolved-import]
 
 
 @pytest.mark.asyncio

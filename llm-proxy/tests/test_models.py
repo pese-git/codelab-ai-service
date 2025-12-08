@@ -1,8 +1,8 @@
-from llm_proxy.app.main import ChatRequest, ChatResponse, LLMModel, TokenChunk
+from app.main import ChatRequest, ChatResponse, LLMModel, TokenChunk  # ty:ignore[unresolved-import]
 
 
 def test_chatrequest_valid():
-    r = ChatRequest(model="gpt-4", messages=[{"role": "user", "content": "hi"}])
+    r = ChatRequest.model_construct(model="gpt-4", messages=[{"role": "user", "content": "hi"}])
     assert r.model == "gpt-4"
     assert r.messages[0]["content"] == "hi"
 
@@ -14,7 +14,7 @@ def test_chatresponse_valid():
 
 
 def test_tokenchunk_valid():
-    c = TokenChunk(token="foo", is_final=False)
+    c = TokenChunk.model_construct(token="foo", is_final=False)
     assert c.type == "assistant_message"
     assert c.token == "foo"
     assert c.is_final is False

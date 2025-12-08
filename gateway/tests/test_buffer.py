@@ -1,4 +1,4 @@
-from gateway.app.main import BUFFER_SIZE, token_buffers
+from app.main import BUFFER_SIZE, token_buffers  # ty:ignore[unresolved-import]
 
 
 def test_token_buffers_behavior():
