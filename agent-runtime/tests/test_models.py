@@ -1,5 +1,6 @@
 import pytest
-from agent_runtime.app.main import Message, SSEToken, parse_sse_line
+
+from app.main import Message, SSEToken, parse_sse_line
 
 
 def test_message_valid():
@@ -10,7 +11,8 @@ def test_message_valid():
 
 
 def test_message_invalid_missing_fields():
-    with pytest.raises(TypeError):
+    import pydantic
+    with pytest.raises(pydantic.ValidationError):
         Message()  # Все поля обязательны
 
 
@@ -22,7 +24,8 @@ def test_ssetoken_valid():
 
 
 def test_ssetoken_invalid_wrong_type():
-    with pytest.raises(TypeError):
+    import pydantic
+    with pytest.raises(pydantic.ValidationError):
         SSEToken(token=123, is_final="nope")
 
 
