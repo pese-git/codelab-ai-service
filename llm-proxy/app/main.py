@@ -42,7 +42,7 @@ def sse(event: str, payload: BaseModel) -> dict:
 # Models
 # ---------------------------------------------------------------------
 class ChatRequest(BaseModel):
-    model: str = "gpt-4"
+    model: str
     messages: List[dict]
     stream: bool = False
 
