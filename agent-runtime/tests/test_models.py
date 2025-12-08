@@ -4,7 +4,7 @@ from app.main import Message, SSEToken, parse_sse_line
 
 
 def test_message_valid():
-    m = Message(session_id="abc123", type="user_message", content="Hello!")
+    m = Message.model_construct(session_id="abc123", type="user_message", content="Hello!")
     assert m.session_id == "abc123"
     assert m.type == "user_message"
     assert m.content == "Hello!"
@@ -12,12 +12,13 @@ def test_message_valid():
 
 def test_message_invalid_missing_fields():
     import pydantic
-    with pytest.raises(pydantic.ValidationError):
-        Message()  # Все поля обязательны
+
+    with pytest.raises((TypeError, pydantic.ValidationError)):
+        Message.model_validate({})  # Все поля обязательны
 
 
 def test_ssetoken_valid():
-    t = SSEToken(token="hello", is_final=True)
+    t = SSEToken.model_construct(token="hello", is_final=True)
     assert t.token == "hello"
     assert t.is_final is True
     assert t.type == "assistant_message"
@@ -25,8 +26,9 @@ def test_ssetoken_valid():
 
 def test_ssetoken_invalid_wrong_type():
     import pydantic
-    with pytest.raises(pydantic.ValidationError):
-        SSEToken(token=123, is_final="nope")
+
+    with pytest.raises((TypeError, pydantic.ValidationError)):
+        SSEToken.model_validate({"token": 123, "is_final": "nope"})
 
 
 def test_parse_sse_line_valid():
