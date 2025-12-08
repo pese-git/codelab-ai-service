@@ -1,6 +1,8 @@
-import pytest
-import httpx
 import json
+
+import httpx
+import pytest
+
 
 @pytest.mark.asyncio
 async def test_health():
@@ -11,6 +13,7 @@ async def test_health():
         assert data["status"] == "healthy"
         assert data["service"] == "llm-proxy"
 
+
 @pytest.mark.asyncio
 async def test_llm_models():
     async with httpx.AsyncClient() as client:
@@ -20,12 +23,13 @@ async def test_llm_models():
         assert isinstance(models, list)
         assert any(m["id"] == "gpt-4" for m in models)
 
+
 @pytest.mark.asyncio
 async def test_llm_chat_echo():
     payload = {
         "model": "gpt-4",
         "messages": [{"role": "user", "content": "Echo test"}],
-        "stream": False
+        "stream": False,
     }
     async with httpx.AsyncClient() as client:
         r = await client.post("http://localhost:8002/llm/chat", json=payload)
@@ -33,12 +37,13 @@ async def test_llm_chat_echo():
         data = r.json()
         assert "Echo test" in data["message"]
 
+
 @pytest.mark.asyncio
 async def test_llm_stream():
     payload = {
         "model": "gpt-4",
         "messages": [{"role": "user", "content": "stream this sentence"}],
-        "stream": True
+        "stream": True,
     }
     async with httpx.AsyncClient(timeout=10) as client:
         async with client.stream("POST", "http://localhost:8002/llm/stream", json=payload) as resp:
@@ -52,6 +57,7 @@ async def test_llm_stream():
                         break
     assert any(t.strip() for t in seen_tokens)
     assert seen_tokens[-1] == ""  # финальный токен
+
 
 @pytest.mark.asyncio
 async def test_llm_chat_validation():

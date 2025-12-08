@@ -1,8 +1,9 @@
-import asyncio
 import json
-import pytest
+
 import httpx
+import pytest
 import websockets
+
 
 @pytest.mark.asyncio
 async def test_health():
@@ -13,15 +14,13 @@ async def test_health():
         assert data["status"] == "healthy"
         assert data["service"] == "gateway"
 
+
 @pytest.mark.asyncio
 async def test_gateway_websocket_stream():
     session_id = "test_py_gateway"
     uri = f"ws://localhost:8000/ws/{session_id}"
     async with websockets.connect(uri) as ws:
-        await ws.send(json.dumps({
-            "type": "user_message",
-            "content": "pytest streaming websocket"
-        }))
+        await ws.send(json.dumps({"type": "user_message", "content": "pytest streaming websocket"}))
         tokens, got_final = [], False
         while True:
             msg = json.loads(await ws.recv())
@@ -32,6 +31,7 @@ async def test_gateway_websocket_stream():
                     break
     assert any(t.strip() for t in tokens)
     assert got_final
+
 
 @pytest.mark.asyncio
 async def test_gateway_websocket_error():
