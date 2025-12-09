@@ -1,14 +1,16 @@
+import logging
+from typing import List
+
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 from sse_starlette.sse import EventSourceResponse
-import logging
-from typing import List
 
 from app.models.schemas import ChatRequest, ChatResponse, HealthResponse, LLMModel, TokenChunk
 from app.services.llm_service import fake_token_generator, sse
 
 router = APIRouter()
 logger = logging.getLogger("llm-proxy")
+
 
 @router.get("/health", response_model=HealthResponse)
 async def health_check():
@@ -36,6 +38,7 @@ async def list_models():
         ),
     ]
 
+
 @router.post("/llm/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     last_message = request.messages[-1] if request.messages else {"content": ""}
@@ -52,6 +55,7 @@ async def chat(request: ChatRequest):
         message=f"Echo from LLM: {content}",
         model=request.model,
     )
+
 
 @router.post("/llm/stream")
 async def stream_chat(request: ChatRequest, raw_request: Request):

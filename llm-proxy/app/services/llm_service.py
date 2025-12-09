@@ -1,9 +1,11 @@
 import asyncio
 import logging
 from typing import AsyncGenerator
+
 from app.models.schemas import BaseModel
 
 logger = logging.getLogger("llm-proxy")
+
 
 async def fake_token_generator(message: str) -> AsyncGenerator[str, None]:
     """Имитация потоковой генерации токенов."""
