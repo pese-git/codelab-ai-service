@@ -1,4 +1,4 @@
-from app.main import BUFFER_SIZE, token_buffers  # ty:ignore[unresolved-import]
+from app.services.stream_service import BUFFER_SIZE, token_buffers
 
 
 def test_token_buffers_behavior():
