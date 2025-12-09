@@ -31,8 +31,9 @@ async def test_llm_chat_echo():
         "messages": [{"role": "user", "content": "Echo test"}],
         "stream": False,
     }
+    headers = {"x-internal-auth": "my-super-secret-key"}
     async with httpx.AsyncClient() as client:
-        r = await client.post("http://localhost:8002/llm/chat", json=payload)
+        r = await client.post("http://localhost:8002/llm/chat", json=payload, headers=headers)
         assert r.status_code == 200
         data = r.json()
         assert "Echo test" in data["message"]
@@ -45,8 +46,9 @@ async def test_llm_stream():
         "messages": [{"role": "user", "content": "stream this sentence"}],
         "stream": True,
     }
+    headers = {"x-internal-auth": "my-super-secret-key"}
     async with httpx.AsyncClient(timeout=10) as client:
-        async with client.stream("POST", "http://localhost:8002/llm/stream", json=payload) as resp:
+        async with client.stream("POST", "http://localhost:8002/llm/stream", json=payload, headers=headers) as resp:
             assert resp.status_code == 200
             seen_tokens = []
             async for line in resp.aiter_lines():
@@ -63,12 +65,13 @@ async def test_llm_stream():
 async def test_llm_chat_validation():
     # Нет messages
     payload = {"model": "gpt-4"}
+    headers = {"x-internal-auth": "my-super-secret-key"}
     async with httpx.AsyncClient() as client:
-        r = await client.post("http://localhost:8002/llm/chat", json=payload)
+        r = await client.post("http://localhost:8002/llm/chat", json=payload, headers=headers)
         assert r.status_code == 422
 
     # Нет model
     payload = {"messages": [{"role": "user", "content": "fail"}]}
     async with httpx.AsyncClient() as client:
-        r = await client.post("http://localhost:8002/llm/chat", json=payload)
+        r = await client.post("http://localhost:8002/llm/chat", json=payload, headers=headers)
         assert r.status_code == 422

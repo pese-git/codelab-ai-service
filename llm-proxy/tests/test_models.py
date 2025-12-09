@@ -1,4 +1,4 @@
-from app.main import ChatRequest, ChatResponse, LLMModel, TokenChunk  # ty:ignore[unresolved-import]
+from app.models.schemas import ChatRequest, ChatResponse, LLMModel, TokenChunk
 
 
 def test_chatrequest_valid():

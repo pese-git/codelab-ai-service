@@ -1,6 +1,6 @@
 import pytest
 
-from app.main import fake_token_generator  # ty:ignore[unresolved-import]
+from app.services.llm_service import fake_token_generator
 
 
 @pytest.mark.asyncio
