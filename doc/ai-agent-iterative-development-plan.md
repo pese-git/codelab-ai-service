@@ -124,14 +124,14 @@ ws.onmessage = (event) => {
 }
 ```
 
-## Iteration 2.2: Inter-Service Authentication
+## ✅ Iteration 2.2: Inter-Service Authentication (РЕАЛИЗОВАНО)
 **Goal:** Базовая безопасность между сервисами
 
 **All Services Tasks:**
-- [ ] API key validation middleware
-- [ ] Internal service keys (X-Internal-Auth)
-- [ ] Request context propagation
-- [ ] Unauthorized error handling
+- [x] API key validation middleware
+- [x] Internal service keys (X-Internal-Auth)
+- [x] Request context propagation
+- [x] Unauthorized error handling
 
 **Deliverable:**
 ```bash
