@@ -1,6 +1,7 @@
 import pytest
 
-from app.main import Message, SSEToken, parse_sse_line
+from app.models.schemas import Message, SSEToken
+from app.services.llm_stream_service import parse_sse_line
 
 
 def test_message_valid():
