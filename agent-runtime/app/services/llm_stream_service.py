@@ -1,8 +1,10 @@
 import logging
-import httpx
 from typing import Any, AsyncGenerator, Dict, List
-from app.models.schemas import SSEToken
+
+import httpx
+
 from app.core.config import AppConfig
+from app.models.schemas import SSEToken
 
 logger = logging.getLogger("agent-runtime")
 
@@ -23,8 +25,10 @@ def parse_sse_line(line: str) -> SSEToken | None:
         logger.error(f"[Agent] Failed to parse SSE line: {line} ({e})")
         return None
 
+
 def get_sessions():
     return sessions
+
 
 async def llm_stream(session_id: str) -> AsyncGenerator[dict, None]:
     messages = sessions[session_id]
