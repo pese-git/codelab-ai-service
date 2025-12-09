@@ -1,18 +1,42 @@
 import asyncio
 import logging
+import os
 from typing import AsyncGenerator, List
 
 import uvicorn
 from fastapi import FastAPI, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "change-me-internal-key")
 
 # ----------------- Logging -----------------
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("llm-proxy")
 
 app = FastAPI(title="LLM Proxy Service")
+
+
+# --- Internal Auth Middleware --- #
+class InternalAuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        if request.url.path in ("/health", "/llm/models"):
+            return await call_next(request)
+        auth = request.headers.get("x-internal-auth")
+        logger.debug(
+            f"[llm-proxy][AUTH] Incoming X-Internal-Auth: '{auth}', INTERNAL_API_KEY: '{INTERNAL_API_KEY}'"
+        )
+        if auth != INTERNAL_API_KEY:
+            logger.warning(
+                f"[llm-proxy][AUTH_FAIL] Unauthorized: header='{auth}' != key='{INTERNAL_API_KEY}'"
+            )
+            return JSONResponse(status_code=401, content={"detail": "unauthorized"})
+        return await call_next(request)
+
+
+app.add_middleware(InternalAuthMiddleware)
 
 
 # ---------------------------------------------------------------------

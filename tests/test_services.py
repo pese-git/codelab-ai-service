@@ -1,4 +1,3 @@
-import asyncio
 import json
 
 import httpx
@@ -7,11 +6,14 @@ import websockets
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("base_url,service", [
-    ("http://localhost:8000", "gateway"),
-    ("http://localhost:8001", "agent-runtime"),
-    ("http://localhost:8002", "llm-proxy"),
-])
+@pytest.mark.parametrize(
+    "base_url,service",
+    [
+        ("http://localhost:8000", "gateway"),
+        ("http://localhost:8001", "agent-runtime"),
+        ("http://localhost:8002", "llm-proxy"),
+    ],
+)
 async def test_health(base_url, service):
     async with httpx.AsyncClient() as client:
         r = await client.get(f"{base_url}/health")
@@ -19,6 +21,7 @@ async def test_health(base_url, service):
         data = r.json()
         assert data["status"] == "healthy"
         assert data["service"] == service
+
 
 @pytest.mark.asyncio
 async def test_llm_models():
@@ -29,18 +32,38 @@ async def test_llm_models():
         assert isinstance(models, list)
         assert any(m["id"] == "gpt-4" for m in models)
 
+
 @pytest.mark.asyncio
-async def test_llm_stream_sse():
+async def test_llm_stream_auth():
     payload = {
         "model": "gpt-4",
         "messages": [{"role": "user", "content": "stream please"}],
-        "stream": True
+        "stream": True,
     }
+    # Получаем корректный ключ (должен быть таким же, как в .env llm-proxy)
+    correct_key = "my-super-secret-key"
+    wrong_key = "wrong-key"
     async with httpx.AsyncClient(timeout=10) as client:
-        async with client.stream("POST", "http://localhost:8002/llm/stream", json=payload) as resp:
-            assert resp.status_code == 200
+        # Проверка без заголовка
+        resp = await client.post("http://localhost:8002/llm/stream", json=payload)
+        assert resp.status_code == 401
+        # Проверка с неверным ключом
+        resp = await client.post(
+            "http://localhost:8002/llm/stream",
+            json=payload,
+            headers={"X-Internal-Auth": wrong_key},
+        )
+        assert resp.status_code == 401
+        # Проверка с правильным ключом
+        async with client.stream(
+            "POST",
+            "http://localhost:8002/llm/stream",
+            json=payload,
+            headers={"X-Internal-Auth": correct_key},
+        ) as resp2:
+            assert resp2.status_code == 200
             tokens = []
-            async for line in resp.aiter_lines():
+            async for line in resp2.aiter_lines():
                 if line.startswith("data:"):
                     data = json.loads(line[5:].strip())
                     tokens.append(data["token"])
@@ -48,12 +71,60 @@ async def test_llm_stream_sse():
                         break
     assert any(t.strip() for t in tokens)
 
+
+@pytest.mark.asyncio
+async def test_agent_message_stream_auth():
+    payload = {
+        "session_id": "auth_sess",
+        "type": "user_message",
+        "content": "pytest auth",
+    }
+    correct_key = "my-super-secret-key"
+    wrong_key = "wrong-key"
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.post(
+            "http://localhost:8001/agent/message/stream", json=payload
+        )
+        assert resp.status_code == 401
+        resp = await client.post(
+            "http://localhost:8001/agent/message/stream",
+            json=payload,
+            headers={"X-Internal-Auth": wrong_key},
+        )
+        assert resp.status_code == 401
+        async with client.stream(
+            "POST",
+            "http://localhost:8001/agent/message/stream",
+            json=payload,
+            headers={"X-Internal-Auth": correct_key},
+        ) as resp2:
+            assert resp2.status_code == 200
+            got_final = False
+            async for line in resp2.aiter_lines():
+                if line.startswith("data:"):
+                    data = json.loads(line[5:].strip())
+                    if data.get("is_final"):
+                        got_final = True
+                        break
+    assert got_final
+
+
 @pytest.mark.asyncio
 async def test_agent_message_stream():
+    correct_key = "my-super-secret-key"
     session_id = "test_py_agent"
-    payload = {"session_id": session_id, "type": "user_message", "content": "pytest streaming"}
+    payload = {
+        "session_id": session_id,
+        "type": "user_message",
+        "content": "pytest streaming",
+    }
     async with httpx.AsyncClient(timeout=10) as client:
-        async with client.stream("POST", "http://localhost:8001/agent/message/stream", json=payload) as resp:
+        async with client.stream(
+            "POST",
+            "http://localhost:8001/agent/message/stream",
+            json=payload,
+            headers={"X-Internal-Auth": correct_key},
+        ) as resp:
             assert resp.status_code == 200
             got_final = False
             async for line in resp.aiter_lines():
@@ -64,15 +135,17 @@ async def test_agent_message_stream():
                         break
     assert got_final
 
+
 @pytest.mark.asyncio
 async def test_gateway_websocket_stream():
     session_id = "test_websocket_py"
     uri = f"ws://localhost:8000/ws/{session_id}"
     async with websockets.connect(uri) as ws:
-        await ws.send(json.dumps({
-            "type": "user_message",
-            "content": "pytest streaming websocket"
-        }))
+        await ws.send(
+            json.dumps(
+                {"type": "user_message", "content": "pytest streaming websocket"}
+            )
+        )
         tokens, got_final = [], False
         while True:
             msg = json.loads(await ws.recv())

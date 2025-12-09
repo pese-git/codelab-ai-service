@@ -4,9 +4,14 @@ from typing import Any, AsyncGenerator, Dict, List
 
 import httpx
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+
+LLM_PROXY_URL = os.getenv("LLM_PROXY_URL", "http://localhost:8002")
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "change-me-internal-key")
 
 # ----------------- Logging -----------------
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
@@ -14,7 +19,26 @@ logger = logging.getLogger("agent-runtime")
 
 app = FastAPI(title="Agent Runtime Service")
 
-LLM_PROXY_URL = os.getenv("LLM_PROXY_URL", "http://localhost:8002")
+
+# --- Internal Auth Middleware --- #
+class InternalAuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        if request.url.path in ("/health",):
+            return await call_next(request)
+        auth = request.headers.get("x-internal-auth")
+        logger.debug(
+            f"[agent-runtime][AUTH] Incoming X-Internal-Auth: '{auth}', INTERNAL_API_KEY: '{INTERNAL_API_KEY}'"
+        )
+        if auth != INTERNAL_API_KEY:
+            logger.warning(
+                f"[agent-runtime][AUTH_FAIL] Unauthorized: header='{auth}' != key='{INTERNAL_API_KEY}'"
+            )
+            return JSONResponse(status_code=401, content={"detail": "unauthorized"})
+        return await call_next(request)
+
+
+app.add_middleware(InternalAuthMiddleware)
+
 
 # session_id → list(messages)
 sessions: Dict[str, List[Dict[str, Any]]] = {}
@@ -72,7 +96,10 @@ async def llm_stream(session_id: str) -> AsyncGenerator[dict, None]:
             "POST",
             f"{LLM_PROXY_URL}/llm/stream",
             json=llm_request,
-            headers={"Accept": "text/event-stream"},
+            headers={
+                "Accept": "text/event-stream",
+                "X-Internal-Auth": INTERNAL_API_KEY,
+            },
         ) as resp:
             resp.raise_for_status()
             logger.info(f"[Agent] Connected to LLM Proxy, status_code={resp.status_code}")
