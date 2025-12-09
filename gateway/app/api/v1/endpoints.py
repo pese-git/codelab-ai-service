@@ -1,17 +1,22 @@
 import json
+
+import httpx
 from fastapi import APIRouter, WebSocket
 from starlette.websockets import WebSocketDisconnect
-from sse_starlette.sse import EventSourceResponse
-import httpx
-from app.models.schemas import HealthResponse, WSUserMessage, WSErrorResponse
-from app.services.stream_service import stream_agent_sse, get_token_buffers
-from app.core.config import logger, AppConfig
+
+from app.core.config import AppConfig, logger
+from app.models.schemas import HealthResponse, WSErrorResponse, WSUserMessage
+from app.services.stream_service import get_token_buffers, stream_agent_sse
 
 router = APIRouter()
 
+
 @router.get("/health", response_model=HealthResponse)
 async def health_check():
-    return HealthResponse.model_construct(status="healthy", service="gateway", version=AppConfig.VERSION)
+    return HealthResponse.model_construct(
+        status="healthy", service="gateway", version=AppConfig.VERSION
+    )
+
 
 @router.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
@@ -27,7 +32,9 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                     msg = WSUserMessage.model_validate(json.loads(raw_msg))
                     logger.debug(f"[{session_id}] Parsed WSUserMessage: {msg}")
                 except Exception:
-                    err = WSErrorResponse.model_construct(type="error", content="Invalid JSON message")
+                    err = WSErrorResponse.model_construct(
+                        type="error", content="Invalid JSON message"
+                    )
                     await websocket.send_json(err.model_dump())
                     logger.warning(f"[{session_id}] Invalid WS JSON, sent error")
                     continue

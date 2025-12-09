@@ -1,16 +1,19 @@
-import logging
 from typing import Dict, List
+
 import httpx
 from fastapi import WebSocket
-from app.models.schemas import AgentRequest, AgentResponse, WSUserMessage
+
 from app.core.config import AppConfig, logger
+from app.models.schemas import AgentRequest, AgentResponse, WSUserMessage
 
 BUFFER_SIZE = 100
 
 token_buffers: Dict[str, List[str]] = {}
 
+
 def get_token_buffers():
     return token_buffers
+
 
 async def stream_agent_sse(
     client: httpx.AsyncClient,
