@@ -1,4 +1,5 @@
 import abc
+import typing
 from typing import AsyncGenerator
 
 from app.models.schemas import ChatRequest
@@ -6,11 +7,11 @@ from app.models.schemas import ChatRequest
 
 class BaseLLMAdapter(abc.ABC):
     @abc.abstractmethod
-    async def chat(self, request: ChatRequest) -> str:
-        pass
-
-    @abc.abstractmethod
-    async def streaming_generator(self, request: ChatRequest) -> AsyncGenerator[str, None]:
+    async def chat(self, request: ChatRequest) -> typing.Union[str, AsyncGenerator[str, None]]:
+        """
+        Если stream=False: возвращает полный текст (str)
+        Если stream=True: возвращает async-генератор токенов
+        """
         pass
 
     @abc.abstractmethod

@@ -1,5 +1,4 @@
 import asyncio
-from typing import AsyncGenerator
 
 from app.models.schemas import ChatRequest
 
@@ -19,13 +18,16 @@ class FakeLLMAdapter(BaseLLMAdapter):
             }
         ]
 
-    async def chat(self, request: ChatRequest) -> str:
+    async def chat(self, request: ChatRequest):
         last_message = request.messages[-1]["content"] if request.messages else ""
-        return f"Echo from LLM: {last_message}"
+        if not getattr(request, "stream", False):
+            return f"Echo from LLM: {last_message}"
 
-    async def streaming_generator(self, request: ChatRequest) -> AsyncGenerator[str, None]:
-        last_message = request.messages[-1]["content"] if request.messages else ""
-        words = last_message.split()
-        for word in words:
-            yield word + " "
-            await asyncio.sleep(0.2)
+        # stream mode
+        async def token_gen():
+            words = last_message.split()
+            for word in words:
+                yield word + " "
+                await asyncio.sleep(0.2)
+
+        return token_gen()
