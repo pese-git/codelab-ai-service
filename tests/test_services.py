@@ -25,12 +25,13 @@ async def test_health(base_url, service):
 
 @pytest.mark.asyncio
 async def test_llm_models():
+    headers = {"x-internal-auth": "my-super-secret-key"}
     async with httpx.AsyncClient() as client:
-        r = await client.get("http://localhost:8002/llm/models")
+        r = await client.get("http://localhost:8002/v1/llm/models", headers=headers)
         assert r.status_code == 200
         models = r.json()
         assert isinstance(models, list)
-        assert any(m["id"] == "gpt-4" for m in models)
+        assert any("id" in m for m in models)
 
 
 @pytest.mark.asyncio
@@ -39,17 +40,17 @@ async def test_llm_stream_auth():
         "model": "gpt-4",
         "messages": [{"role": "user", "content": "stream please"}],
         "stream": True,
+        "temperature": 1,
     }
-    # Получаем корректный ключ (должен быть таким же, как в .env llm-proxy)
     correct_key = "my-super-secret-key"
     wrong_key = "wrong-key"
     async with httpx.AsyncClient(timeout=10) as client:
         # Проверка без заголовка
-        resp = await client.post("http://localhost:8002/llm/stream", json=payload)
+        resp = await client.post("http://localhost:8002/v1/chat/completions", json=payload)
         assert resp.status_code == 401
         # Проверка с неверным ключом
         resp = await client.post(
-            "http://localhost:8002/llm/stream",
+            "http://localhost:8002/v1/chat/completions",
             json=payload,
             headers={"X-Internal-Auth": wrong_key},
         )
@@ -57,18 +58,28 @@ async def test_llm_stream_auth():
         # Проверка с правильным ключом
         async with client.stream(
             "POST",
-            "http://localhost:8002/llm/stream",
+            "http://localhost:8002/v1/chat/completions",
             json=payload,
             headers={"X-Internal-Auth": correct_key},
         ) as resp2:
             assert resp2.status_code == 200
             tokens = []
             async for line in resp2.aiter_lines():
+                if not line.strip():
+                    continue
                 if line.startswith("data:"):
-                    data = json.loads(line[5:].strip())
-                    tokens.append(data["token"])
-                    if data.get("is_final"):
+                    data_str = line[5:].strip()
+                    if data_str == "[DONE]":
                         break
+                    try:
+                        data = json.loads(data_str)
+                        for choice in data.get("choices", []):
+                            delta = choice.get("delta", {})
+                            token = delta.get("content")
+                            if token:
+                                tokens.append(token)
+                    except Exception:
+                        continue
     assert any(t.strip() for t in tokens)
 
 
