@@ -19,7 +19,7 @@ class FakeLLMAdapter(BaseLLMAdapter):
         ]
 
     async def chat(self, request: ChatCompletionRequest):
-        last_message = request.messages[-1]["content"] if request.messages else ""
+        last_message = request.messages[-1].content if request.messages else ""
         if not getattr(request, "stream", False):
             return f"Echo from LLM: {last_message}"
 
