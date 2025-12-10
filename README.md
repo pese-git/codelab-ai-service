@@ -10,11 +10,20 @@
 - ✅ Итерация 1.1: Настройка всех сервисов (ЗАВЕРШЕНО)
 - 🏗 Итерация 1.2: Базовый поток сообщений (В ПРОЦЕССЕ)
 
-## 🚀 Основные компоненты
+## 🚀 Основные компоненты и схемы интеграции
 
 *Все сервисы масштабируемы и легко расширяются — реализация новых LLM, инструментов, очередей или версий API не требует переписывания других компонентов.*
 
-Подробные инструкции по каждому микросервису и их REST/WebSocket API — смотрите во внутреннем `README.md` соответствующего сервиса (`gateway/README.md`, `agent-runtime/README.md`, `llm-proxy/README.md`).
+Актуальные routes и схемы обмена между сервисами:
+
+| Сервис         | REST/SSE endpoint                         | WebSocket endpoint         | Особенности                       |
+|----------------|:------------------------------------------|----------------------------|------------------------------------|
+| gateway        | /health                                  | /ws/{session_id}           | Через WebSocket проксирует стримовые токены между IDE и agent-runtime |
+| agent-runtime  | /health, /agent/message/stream           |                            | Проксирует SSE к llm-proxy на /v1/chat/completions, нужен x-internal-auth |
+| llm-proxy      | /health, /v1/llm/models, /v1/chat/completions |                            | SSE, REST endpoint, все требуют x-internal-auth |
+
+**Документация по микросервисам и всем актуальным REST/WebSocket API** — см. внутренний  `README.md` соответствующего сервиса ([gateway/README.md](gateway/README.md), [agent-runtime/README.md](agent-runtime/README.md), [llm-proxy/README.md](llm-proxy/README.md)).
+
 
 ### Gateway Service
 - WebSocket прокси между IDE и Agent
@@ -39,14 +48,25 @@
 
 ## 🔑 Внутренняя авторизация между микросервисами
 
-Сервисы используют общий ключ `INTERNAL_API_KEY` для проверки всех внутренних HTTP-запросов (REST/SSE):
-- X-Internal-Auth: my-super-secret-key должен быть одинаковым в .env/.env.example каждого сервиса (и в тестах).
-- Ключ пробрасывается автоматически через Docker Compose.
-- В ходе интеграционного тестирования сервисы и тесты используют этот ключ для авторизации.
+Все внутренние REST/SSE-запросы защищены общим ключом `INTERNAL_API_KEY`:
+- Заголовок X-Internal-Auth: my-super-secret-key (либо ваш ключ из .env) прописан во всех тестах и curl
+- Тот же ключ должен быть в каждом сервисе (.env/.env.example); пробрасывается через docker-compose
+- Без правильного ключа все защищённые endpoint'ы вернут 401 Unauthorized
 
-Пример ручного запроса:
+Пример curl (SSE):
 ```bash
-curl -H "X-Internal-Auth: my-super-secret-key" http://localhost:8001/agent/message/stream
+curl -X POST http://localhost:8001/agent/message/stream \
+    -H "X-Internal-Auth: my-super-secret-key" \
+    -H "Content-Type: application/json" \
+    -d '{"session_id": "demo", "type": "user_message", "content": "Привет!"}'
+```
+
+Запрос к LLM Proxy новым API:
+```bash
+curl -X POST http://localhost:8002/v1/chat/completions \
+    -H "X-Internal-Auth: my-super-secret-key" \
+    -H "Content-Type: application/json" \
+    -d '{"model": "gpt-4", "messages": [{"role": "user", "content": "Say hello!"}], "stream": true, "temperature": 1}'
 ```
 
 ## 🛠 Установка
@@ -89,19 +109,45 @@ docker compose up -d
 
 ## 🔍 Проверка работоспособности
 
-Сервисный статус можно проверить через:
-
-Проверьте статус сервисов:
+Проверьте статус сервисов (health):
 ```bash
-# Gateway Service
-curl http://localhost:8000/health
-
-# Agent Runtime Service
-curl http://localhost:8001/health
-
-# LLM Proxy Service
-curl http://localhost:8002/health
+curl http://localhost:8000/health  # gateway
+curl http://localhost:8001/health  # agent-runtime
+curl http://localhost:8002/health  # llm-proxy
 ```
+
+## 🔌 Примеры работы с актуальными endpoint'ами
+
+### Получить список LLM моделей
+```bash
+curl -X GET http://localhost:8002/v1/llm/models \
+  -H "X-Internal-Auth: my-super-secret-key"
+```
+
+### Потоковое общение через agent-runtime (SSE)
+```bash
+curl -X POST http://localhost:8001/agent/message/stream \
+  -H "X-Internal-Auth: my-super-secret-key" \
+  -H "Content-Type: application/json" \
+  -d '{"session_id": "demo", "type": "user_message", "content": "Тест!"}'
+```
+
+### Прямой запрос к LLM-proxy (SSE, token-by-token, совместимо с OpenAI)
+```bash
+curl -X POST http://localhost:8002/v1/chat/completions \
+  -H "X-Internal-Auth: my-super-secret-key" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "gpt-4", "messages": [{"role": "user", "content": "Say hello!"}], "stream": true, "temperature": 1}'
+```
+
+Формат SSE-ответа:
+```
+data: { ... }
+data: { ... }
+data: [DONE]
+```
+
+---
 
 ## 🔌 WebSocket API
 

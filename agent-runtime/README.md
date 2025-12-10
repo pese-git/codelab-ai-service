@@ -39,17 +39,33 @@ uv run pytest --maxfail=3 --disable-warnings -v tests
 ## API
 
 - `GET /health` — Проверка статуса сервиса
-- `POST /agent/message/stream` — Начать стриминговую сессию (SSE).  
-  Требуется body:  
-  ```json
-  {
-    "session_id": "user-session-1",
-    "type": "user_message",
-    "content": "Some message from user"
-  }
+- `POST /agent/message/stream` — Начать стриминговую сессию (SSE).
+  
+  Требуется заголовок:
   ```
-  Обязательно: заголовок  
-  `X-Internal-Auth: <INTERNAL_API_KEY>`
+  X-Internal-Auth: <INTERNAL_API_KEY>
+  Content-Type: application/json
+  ```
+  
+  Пример запроса:
+  ```bash
+  curl -X POST 'http://localhost:8001/agent/message/stream' \
+    -H 'Content-Type: application/json' \
+    -H 'X-Internal-Auth: your-internal-key' \
+    -d '{
+      "session_id": "user-session-1",
+      "type": "user_message",
+      "content": "Your message here"
+    }'
+  ```
+  Потоковый SSE-ответ поступает порциями, пример:
+  ```
+  data: {"token":"Hello, ","is_final":false,"type": "assistant_message"}
+  data: {"token":"world! ","is_final":false,"type": "assistant_message"}
+  data: {"token":"","is_final":true,"type": "assistant_message"}
+  data: [DONE]
+  ```
+  Используемый потоковый протокол полностью совместим с LLM-proxy и его актуальными endpoint'ами (`/v1/llm/models`, `/v1/chat/completions`).
 
 ---
 

@@ -37,12 +37,43 @@ uv run pytest --maxfail=3 --disable-warnings -v tests
 ## API
 
 - `GET /health` — Проверка статуса сервиса
-- `GET /llm/models` — Список поддерживаемых языковых моделей
-- `POST /llm/chat` — Чат с LLM (может отвечать стримом, опциональный флаг `stream`)
-- `POST /llm/stream` — Стримовое получение токенов (SSE)
+- `GET /v1/llm/models` — Список поддерживаемых языковых моделей
+- `POST /v1/chat/completions` — Основная точка для чат-комплишнов, поддержка SSE (stream), temperature и пр.
 
-> Для защищённых эндпоинтов требуется заголовок:  
-`x-internal-auth: <INTERNAL_API_KEY>`
+> Все защищённые эндпоинты требуют заголовка:  
+`x-internal-auth: <INTERNAL_API_KEY>` (см. .env)
+
+### Пример новых запросов
+
+Получить список доступных LLM-моделей:
+```bash
+curl -X GET \
+  'http://localhost:8002/v1/llm/models' \
+  -H 'accept: application/json' \
+  -H 'x-internal-auth: your-internal-key'
+```
+
+Стриминговый чат-комплишн — ответ идёт в формате Server-Sent Events (SSE):
+```bash
+curl -X POST 'http://localhost:8002/v1/chat/completions' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'x-internal-auth: your-internal-key' \
+  -d '{
+    "messages": [{"content": "Say hello!", "role": "user"}],
+    "model": "gpt-4",
+    "stream": true,
+    "temperature": 1
+  }'
+```
+
+SSE-ответ приходит порциями:
+```
+data: { ... chunk ... }
+data: { ... chunk ... }
+data: [DONE]
+```
+
 
 ---
 

@@ -39,7 +39,12 @@ uv run pytest --maxfail=3 --disable-warnings -v tests
 ## API
 
 - `GET /health` — Статус сервиса
-- `WS /ws/{session_id}` — WebSocket endpoint для общения с LLM-агентом
+- `WS /ws/{session_id}` — WebSocket endpoint для общения с LLM-агентом (live-stream + буферизация).
+  
+  ⚡️ Backend-интеграция: Gateway прозрачно проксирует потоковые сообщения на `/agent/message/stream` сервиса agent-runtime, который далее работает с `/v1/chat/completions` llm-proxy (SSE протокол, токенизация real-time).
+  
+  Все внутренние обращения защищены ключом `X-Internal-Auth`, который обязательно должен совпадать между сервисами (см. .env).
+
   - Сообщения клиента:
     ```json
     {
@@ -47,12 +52,20 @@ uv run pytest --maxfail=3 --disable-warnings -v tests
       "content": "привет, агент!"
     }
     ```
-  - Ответные стримовые сообщения:
+  - Стримовые ответы assistant (один токен за раз!):
     ```json
     {
       "type": "assistant_message",
       "token": "ответ LLM по токенам",
       "is_final": false
+    }
+    ```
+    Финальное сообщение:
+    ```json
+    {
+      "type": "assistant_message",
+      "token": "",
+      "is_final": true
     }
     ```
   - Пример ответа об ошибке:
@@ -62,6 +75,13 @@ uv run pytest --maxfail=3 --disable-warnings -v tests
       "content": "Invalid JSON message"
     }
     ```
+  
+  Пример подключения (JS):
+  ```js
+  const ws = new WebSocket('ws://localhost:8000/ws/demo-session');
+  ws.onmessage = (e) => console.log(JSON.parse(e.data)); // токены приходят по частям
+  ws.onopen = () => ws.send(JSON.stringify({type: "user_message", content: "Привет!"}));
+  ```
 
 ---
 
