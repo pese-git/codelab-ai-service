@@ -1,19 +1,40 @@
 import asyncio
 import logging
 from typing import AsyncGenerator
+import abc
 
 from app.core.config import AppConfig
 from app.models.schemas import BaseModel, ChatRequest
 
 logger = logging.getLogger("llm-proxy")
 
+class BaseLLMAdapter(abc.ABC):
+    @abc.abstractmethod
+    async def chat(self, request: ChatRequest) -> str:
+        pass
+
+    @abc.abstractmethod
+    async def streaming_generator(self, request: ChatRequest) -> AsyncGenerator[str, None]:
+        pass
+
+class FakeLLMAdapter(BaseLLMAdapter):
+    async def chat(self, request: ChatRequest) -> str:
+        last_message = request.messages[-1]["content"] if request.messages else ""
+        return f"Echo from LLM: {last_message}"
+
+    async def streaming_generator(self, request: ChatRequest) -> AsyncGenerator[str, None]:
+        last_message = request.messages[-1]["content"] if request.messages else ""
+        words = last_message.split()
+        for idx, word in enumerate(words):
+            yield word + " "
+            await asyncio.sleep(0.2)
+
 try:
     from openai import AsyncOpenAI
 except ImportError:
     AsyncOpenAI = None
 
-
-class OpenAIAdapter:
+class OpenAIAdapter(BaseLLMAdapter):
     def __init__(self, api_key: str = None, base_url: str = None):
         if not AsyncOpenAI:
             raise ImportError("openai>=1.0.0 package not installed. Run 'pip install openai'.")
@@ -34,7 +55,7 @@ class OpenAIAdapter:
             logger.error(f"[OpenAIAdapter] OpenAI error: {e}")
             return f"[Error] OpenAI unavailable: {e}"
 
-    async def streaming_generator(self, request: ChatRequest):
+    async def streaming_generator(self, request: ChatRequest) -> AsyncGenerator[str, None]:
         messages = request.messages or []
         try:
             stream = await self.client.chat.completions.create(
@@ -53,17 +74,6 @@ class OpenAIAdapter:
         except Exception as e:
             logger.error(f"[OpenAIAdapter][streaming] error: {e}")
             yield f"[Error] OpenAI stream unavailable: {e}"
-
-
-async def fake_token_generator(message: str) -> AsyncGenerator[str, None]:
-    """Имитация потоковой генерации токенов."""
-    logger.info(f"[LLM Proxy] Starting token generation for message: {message}")
-    words = message.split()
-    for idx, word in enumerate(words):
-        logger.debug(f"[LLM Proxy] Yielding token {idx}: {word}")
-        yield word + " "
-        await asyncio.sleep(0.2)
-    logger.info("[LLM Proxy] Token generation completed")
 
 
 def sse(event: str, payload: BaseModel) -> dict:
