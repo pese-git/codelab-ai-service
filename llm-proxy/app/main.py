@@ -1,8 +1,11 @@
+import logging
 from fastapi import FastAPI
+
+logger = logging.getLogger("llm-proxy")
 from fastapi.openapi.utils import get_openapi
 
-from app.api.v1.endpoints import router as v1_router
 from app.middleware.internal_auth import InternalAuthMiddleware
+from app.models.schemas import HealthResponse
 
 app = FastAPI(
     title="LLM Proxy Service",
@@ -36,7 +39,16 @@ app.openapi = custom_openapi  # Переопределить openapi-генер�
 app.add_middleware(InternalAuthMiddleware)
 
 # Подключение эндпоинтов API v1
-app.include_router(v1_router)
+from app.api.v1.endpoints_openai import router as openai_router
+
+app.include_router(openai_router)
+
+
+@app.get("/health", response_model=HealthResponse)
+async def health_check():
+    logger.info("[LLM Proxy] Health check called")
+    return HealthResponse.model_construct(status="healthy", service="llm-proxy", version="0.1.0")
+
 
 if __name__ == "__main__":
     import uvicorn
