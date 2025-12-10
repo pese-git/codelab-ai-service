@@ -1,8 +1,10 @@
 import logging
 import os
+
 from dotenv import load_dotenv
 
 load_dotenv()
+
 
 class AppConfig:
     INTERNAL_API_KEY: str = os.getenv("INTERNAL_API_KEY", "change-me-internal-key")

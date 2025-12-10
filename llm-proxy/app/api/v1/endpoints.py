@@ -6,7 +6,9 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.core.config import AppConfig
 from app.models.schemas import ChatRequest, ChatResponse, HealthResponse, LLMModel, TokenChunk
-from app.services.llm_service import FakeLLMAdapter, OpenAIAdapter, sse
+from app.services.llm_adapters.fake import FakeLLMAdapter
+from app.services.llm_adapters.openai import OpenAIAdapter
+from app.services.llm_service import sse
 
 router = APIRouter()
 logger = logging.getLogger("llm-proxy")

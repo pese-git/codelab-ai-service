@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
-from fastapi.openapi.utils import get_openapi
 
 from app.api.v1.endpoints import router as v1_router
 from app.middleware.internal_auth import InternalAuthMiddleware
