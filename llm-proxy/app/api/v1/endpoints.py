@@ -39,12 +39,31 @@ async def list_models():
     ]
 
 
+from app.core.config import AppConfig
+from app.services.llm_service import OpenAIAdapter
+
+
 @router.post("/llm/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     last_message = request.messages[-1] if request.messages else {"content": ""}
     content = last_message.get("content", "")
     logger.info(f"[LLM Proxy] Chat request received: {content}, stream={request.stream}")
 
+    # Non-streaming OpenAI logic
+    is_openai_model = request.model.lower().startswith("gpt-")
+    have_key = bool(AppConfig.OPENAI_API_KEY)
+    if is_openai_model and have_key and AppConfig.LLM_MODE == "openai":
+        try:
+            adapter = OpenAIAdapter()
+            oa_content = await adapter.chat(request)
+            return ChatResponse.model_construct(message=oa_content, model=request.model)
+        except Exception as e:
+            logger.error(f"[LLM Proxy] OpenAI chat fallback: {str(e)}")
+            return ChatResponse.model_construct(
+                message=f"[OpenAI fallback error]: {e}", model=request.model
+            )
+
+    # fallback: mock echo
     if request.stream:
         return StreamingResponse(
             fake_token_generator(f"Echo from LLM: {content}"),

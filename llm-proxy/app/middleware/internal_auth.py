@@ -7,7 +7,8 @@ from app.core.config import AppConfig, logger
 
 class InternalAuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        if request.url.path in ("/health", "/llm/models"):
+        public_paths = {"/health", "/llm/models", "/docs", "/openapi.json", "/redoc", "/favicon.ico"}
+        if request.url.path in public_paths:
             return await call_next(request)
         auth = request.headers.get("x-internal-auth")
         logger.debug(

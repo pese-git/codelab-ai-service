@@ -8,10 +8,22 @@ class ChatRequest(BaseModel):
     messages: List[dict]
     stream: bool = False
 
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "model": "gpt-4",
+                "messages": [{"role": "user", "content": "Hello, bot!"}],
+                "stream": False,
+            }
+        }
+
 
 class ChatResponse(BaseModel):
     message: str
     model: str
+
+    class Config:
+        json_schema_extra = {"example": {"message": "Echo from LLM: Hello, bot!", "model": "gpt-4"}}
 
 
 class HealthResponse(BaseModel):
