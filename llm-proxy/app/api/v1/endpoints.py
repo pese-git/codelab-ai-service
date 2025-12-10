@@ -23,22 +23,14 @@ async def health_check():
 @router.get("/llm/models", response_model=List[LLMModel])
 async def list_models():
     logger.info("[LLM Proxy] List models called")
-    return [
-        LLMModel.model_construct(
-            id="gpt-4",
-            name="GPT-4",
-            provider="OpenAI",
-            context_length=8192,
-            is_available=True,
-        ),
-        LLMModel.model_construct(
-            id="claude-2",
-            name="Claude 2",
-            provider="Anthropic",
-            context_length=100000,
-            is_available=True,
-        ),
-    ]
+    llm_mode = (getattr(AppConfig, "LLM_MODE", "mock") or "mock").lower()
+    if llm_mode == "openai":
+        adapter = OpenAIAdapter()
+    else:
+        adapter = FakeLLMAdapter()
+    models = await adapter.get_models()
+    # Преобразовать dict -> LLMModel
+    return [LLMModel.model_construct(**model) for model in models]
 
 
 @router.post("/llm/chat", response_model=ChatResponse)

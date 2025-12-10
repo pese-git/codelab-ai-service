@@ -15,6 +15,43 @@ except ImportError:
 
 
 class OpenAIAdapter(BaseLLMAdapter):
+    async def get_models(self) -> list:
+        # Сначала пробуем получить список моделей с OpenAI
+        try:
+            models_resp = await self.client.models.list()
+            models_list = []
+            for model in models_resp.data:
+                # Преобразуем к формату LLMModel-friendly (минимально)
+                if model.id.startswith("gpt-"):
+                    models_list.append({
+                        "id": model.id,
+                        "name": model.id,
+                        "provider": "OpenAI",
+                        "context_length": 8192,
+                        "is_available": True,
+                    })
+            if models_list:
+                return models_list
+        except Exception as e:
+            logger.warning(f"[OpenAIAdapter] Cannot fetch list of models, fallback to defaults: {e}")
+        # fallback (ручной список)
+        return [
+            {
+                "id": "gpt-4",
+                "name": "GPT-4",
+                "provider": "OpenAI",
+                "context_length": 8192,
+                "is_available": True,
+            },
+            {
+                "id": "gpt-3.5-turbo",
+                "name": "GPT-3.5 Turbo",
+                "provider": "OpenAI",
+                "context_length": 4096,
+                "is_available": True,
+            },
+        ]
+
     def __init__(self, api_key: str = None, base_url: str = None):
         if not AsyncOpenAI:
             raise ImportError("openai>=1.0.0 package not installed. Run 'pip install openai'.")

@@ -12,3 +12,8 @@ class BaseLLMAdapter(abc.ABC):
     @abc.abstractmethod
     async def streaming_generator(self, request: ChatRequest) -> AsyncGenerator[str, None]:
         pass
+
+    @abc.abstractmethod
+    async def get_models(self) -> list:
+        """Асинхронно возвращает список поддерживаемых моделей (list of dicts or LLMModel fields)"""
+        pass

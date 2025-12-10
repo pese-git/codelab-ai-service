@@ -7,6 +7,18 @@ from .base import BaseLLMAdapter
 
 
 class FakeLLMAdapter(BaseLLMAdapter):
+    async def get_models(self) -> list:
+        # Можно возвращать структуры, совместимые с LLMModel
+        return [
+            {
+                "id": "mock-llm",
+                "name": "FakeLLM Echo",
+                "provider": "Fake",
+                "context_length": 4096,
+                "is_available": True,
+            }
+        ]
+
     async def chat(self, request: ChatRequest) -> str:
         last_message = request.messages[-1]["content"] if request.messages else ""
         return f"Echo from LLM: {last_message}"
