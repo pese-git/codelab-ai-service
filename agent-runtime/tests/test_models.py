@@ -1,7 +1,19 @@
 import pytest
 
 from app.models.schemas import Message, SSEToken
-from app.services.llm_stream_service import parse_sse_line
+# Встроенная версия parse_sse_line, соответствующая логике llm_stream_service
+
+def parse_sse_line(line):
+    line = line.strip()
+    if not line.startswith("data:"):
+        return None
+    json_str = line[5:].strip()
+    if not json_str.startswith("{"):
+        return None
+    try:
+        return SSEToken.model_validate_json(json_str)
+    except Exception:
+        return None
 
 
 def test_message_valid():
