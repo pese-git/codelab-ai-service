@@ -40,7 +40,7 @@ async def llm_stream(session_id: str) -> AsyncGenerator[dict, None]:
     async with httpx.AsyncClient() as client:
         async with client.stream(
             "POST",
-            f"{AppConfig.LLM_PROXY_URL}/llm/stream",
+            f"{AppConfig.LLM_PROXY_URL}/llm/chat",
             json=llm_request,
             headers={
                 "Accept": "text/event-stream",
