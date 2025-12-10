@@ -76,6 +76,9 @@ async def chat(request: ChatRequest):
     )
 
 
+from app.core.config import AppConfig
+from app.services.llm_service import fake_token_generator, sse, OpenAIAdapter
+
 @router.post("/llm/stream")
 async def stream_chat(request: ChatRequest, raw_request: Request):
     last_message = request.messages[-1]["content"] if request.messages else ""
@@ -84,11 +87,29 @@ async def stream_chat(request: ChatRequest, raw_request: Request):
 
     async def event_generator():
         logger.info("[LLM Proxy] Starting SSE event generator")
+        is_openai_model = request.model.lower().startswith("gpt-")
+        have_key = bool(AppConfig.OPENAI_API_KEY)
+        if is_openai_model and have_key and AppConfig.LLM_MODE == "openai":
+            try:
+                adapter = OpenAIAdapter()
+                async for token in adapter.streaming_generator(request):
+                    chunk = TokenChunk.model_construct(token=token, is_final=False)
+                    logger.debug(f"[LLM Proxy] Yielding OpenAI token SSE: {chunk.token}")
+                    yield sse("message", chunk)
+                logger.info("[LLM Proxy] OpenAI SSE stream completed")
+                final_chunk = TokenChunk.model_construct(token="", is_final=True)
+                yield sse("message", final_chunk)
+                return
+            except Exception as e:
+                logger.error(f"[LLM Proxy] OpenAI streaming fallback: {str(e)}")
+                chunk = TokenChunk.model_construct(token=f"[OpenAI error]: {e}", is_final=True)
+                yield sse("message", chunk)
+                return
+        # fallback: mock
         async for token in fake_token_generator(content):
             chunk = TokenChunk.model_construct(token=token, is_final=False)
             logger.debug(f"[LLM Proxy] Yielding token SSE: {chunk.token}")
             yield sse("message", chunk)
-
         final_chunk = TokenChunk.model_construct(token="", is_final=True)
         logger.info("[LLM Proxy] Yielding final token SSE")
         yield sse("message", final_chunk)

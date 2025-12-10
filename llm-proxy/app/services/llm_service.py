@@ -34,6 +34,26 @@ class OpenAIAdapter:
             logger.error(f"[OpenAIAdapter] OpenAI error: {e}")
             return f"[Error] OpenAI unavailable: {e}"
 
+    async def streaming_generator(self, request: ChatRequest):
+        messages = request.messages or []
+        try:
+            stream = await self.client.chat.completions.create(
+                model=request.model,
+                messages=messages,
+                stream=True,
+            )
+            async for chunk in stream:
+                token = ""
+                try:
+                    token = chunk.choices[0].delta.content or ""
+                except Exception:
+                    pass
+                if token:
+                    yield token
+        except Exception as e:
+            logger.error(f"[OpenAIAdapter][streaming] error: {e}")
+            yield f"[Error] OpenAI stream unavailable: {e}"
+
 
 async def fake_token_generator(message: str) -> AsyncGenerator[str, None]:
     """Имитация потоковой генерации токенов."""
