@@ -149,24 +149,24 @@ curl http://localhost:8001/agent/message \
 
 # Phase 3: Real LLM Integration (Day 5-6)
 
-## Iteration 3.1: LLM Proxy OpenAI Integration
+## ✅ Iteration 3.1: LLM Proxy OpenAI Integration (ЗАВЕРШЕНО)
 **Goal:** LLM Proxy работает с реальным OpenAI API
 
 **LLM Proxy Tasks:**
-- [ ] OpenAI client integration
-- [ ] Provider adapter pattern
-- [ ] Non-streaming `/llm/chat` endpoint
-- [ ] Streaming `/llm/stream` with real tokens
-- [ ] Error handling (rate limits, timeouts)
-- [ ] Fallback to mock if OpenAI unavailable
+- [x] OpenAI client integration
+- [x] Provider adapter pattern
+- [x] Non-streaming `/llm/chat` endpoint (устарело, теперь реализовано через `/v1/chat/completions`)
+- [x] Streaming `/llm/stream` with real tokens (реализовано через `/v1/chat/completions`)
+- [x] Error handling (rate limits, timeouts) (основные ошибки обрабатываются)
+- [x] Fallback to mock if OpenAI unavailable (фэйковый режим реализован)
 
 **Agent Runtime Tasks:**
-- [ ] Update to use real LLM Proxy
-- [ ] Handle real LLM response format
-- [ ] Context window management
+- [x] Update to use real LLM Proxy
+- [x] Handle real LLM response format
+- [x] Context window management (минимально, базовое хранение)
 
 **Gateway Tasks:**
-- [ ] No changes needed (protocol unchanged)
+- [x] No changes needed (protocol unchanged)
 
 **Deliverable:**
 ```bash
