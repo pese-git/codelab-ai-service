@@ -34,7 +34,7 @@ COPY --from=builder /app/.venv /app/.venv
 ENV VIRTUAL_ENV=/app/.venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-# Копируем код приложения
+# Копируем код приложения (включая все подпапки, например llm_adapters)
 COPY ./app /app/app
 
 # Настройка переменных окружения
