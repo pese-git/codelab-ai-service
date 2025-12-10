@@ -1,7 +1,7 @@
 import logging
 from typing import List
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Depends
 from sse_starlette.sse import EventSourceResponse
 
 from app.core.config import AppConfig
@@ -20,34 +20,20 @@ async def health_check():
     return HealthResponse.model_construct(status="healthy", service="llm-proxy", version="0.1.0")
 
 
+from app.core.dependencies import get_llm_adapter
+
 @router.get("/llm/models", response_model=List[LLMModel])
-async def list_models():
+async def list_models(adapter=Depends(get_llm_adapter)):
     logger.info("[LLM Proxy] List models called")
-    llm_mode = (getattr(AppConfig, "LLM_MODE", "mock") or "mock").lower()
-    if llm_mode == "openai":
-        adapter = OpenAIAdapter()
-    else:
-        adapter = FakeLLMAdapter()
     models = await adapter.get_models()
-    # Преобразовать dict -> LLMModel
     return [LLMModel.model_construct(**model) for model in models]
 
 
 @router.post("/llm/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, adapter=Depends(get_llm_adapter)):
     logger.info(
         f"[LLM Proxy] Chat request received: {request.messages[-1]['content'] if request.messages else ''}, stream={request.stream}"
     )
-
-    # централизованный выбор адаптера
-    llm_mode = (getattr(AppConfig, "LLM_MODE", "mock") or "mock").lower()
-    is_openai_model = request.model.lower().startswith("gpt-")
-    have_key = bool(getattr(AppConfig, "OPENAI_API_KEY", ""))
-    if llm_mode == "openai" and is_openai_model and have_key:
-        adapter = OpenAIAdapter()
-    else:
-        adapter = FakeLLMAdapter()
-
     try:
         content = await adapter.chat(request)
         return ChatResponse.model_construct(message=content, model=request.model)
@@ -57,20 +43,10 @@ async def chat(request: ChatRequest):
 
 
 @router.post("/llm/stream")
-async def stream_chat(request: ChatRequest, raw_request: Request):
+async def stream_chat(request: ChatRequest, raw_request: Request, adapter=Depends(get_llm_adapter)):
     logger.info(
         f"[LLM Proxy] Stream request received for content: {request.messages[-1]['content'] if request.messages else ''}"
     )
-
-    # централизованный выбор адаптера
-    llm_mode = (getattr(AppConfig, "LLM_MODE", "mock") or "mock").lower()
-    is_openai_model = request.model.lower().startswith("gpt-")
-    have_key = bool(getattr(AppConfig, "OPENAI_API_KEY", ""))
-    if llm_mode == "openai" and is_openai_model and have_key:
-        adapter = OpenAIAdapter()
-    else:
-        adapter = FakeLLMAdapter()
-
     async def event_generator():
         logger.info("[LLM Proxy] Starting SSE event generator")
         try:
@@ -85,5 +61,4 @@ async def stream_chat(request: ChatRequest, raw_request: Request):
             logger.error(f"[LLM Proxy] LLM adapter streaming error: {str(e)}")
             chunk = TokenChunk.model_construct(token=f"[LLM adapter error]: {e}", is_final=True)
             yield sse("message", chunk)
-
     return EventSourceResponse(event_generator())
