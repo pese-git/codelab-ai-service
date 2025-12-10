@@ -2,7 +2,7 @@ import abc
 import typing
 from typing import AsyncGenerator
 
-from app.models.schemas_openai import ChatCompletionRequest
+from app.models.schemas import ChatCompletionRequest
 
 
 class BaseLLMAdapter(abc.ABC):

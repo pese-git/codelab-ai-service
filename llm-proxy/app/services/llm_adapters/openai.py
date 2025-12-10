@@ -1,7 +1,7 @@
 import logging
 
 from app.core.config import AppConfig
-from app.models.schemas_openai import ChatCompletionRequest
+from app.models.schemas import ChatCompletionRequest
 
 from .base import BaseLLMAdapter
 

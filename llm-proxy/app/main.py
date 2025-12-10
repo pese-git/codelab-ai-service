@@ -1,9 +1,11 @@
 import logging
+
 from fastapi import FastAPI
 
 logger = logging.getLogger("llm-proxy")
 from fastapi.openapi.utils import get_openapi
 
+from app.api.v1.endpoints import router as router
 from app.middleware.internal_auth import InternalAuthMiddleware
 from app.models.schemas import HealthResponse
 
@@ -33,15 +35,13 @@ def custom_openapi():
     return app.openapi_schema
 
 
-app.openapi = custom_openapi  # Переопределить openapi-генератор
+app.openapi = custom_openapi  # Переопределить openapi-генератор  # ty:ignore[invalid-assignment]
 
 # Подключение middleware
 app.add_middleware(InternalAuthMiddleware)
 
-# Подключение эндпоинтов API v1
-from app.api.v1.endpoints_openai import router as openai_router
 
-app.include_router(openai_router)
+app.include_router(router)
 
 
 @app.get("/health", response_model=HealthResponse)
