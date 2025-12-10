@@ -1,6 +1,6 @@
 import asyncio
 
-from app.models.schemas import ChatRequest
+from app.models.schemas_openai import ChatCompletionRequest
 
 from .base import BaseLLMAdapter
 
@@ -18,7 +18,7 @@ class FakeLLMAdapter(BaseLLMAdapter):
             }
         ]
 
-    async def chat(self, request: ChatRequest):
+    async def chat(self, request: ChatCompletionRequest):
         last_message = request.messages[-1]["content"] if request.messages else ""
         if not getattr(request, "stream", False):
             return f"Echo from LLM: {last_message}"

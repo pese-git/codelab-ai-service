@@ -2,12 +2,14 @@ import abc
 import typing
 from typing import AsyncGenerator
 
-from app.models.schemas import ChatRequest
+from app.models.schemas_openai import ChatCompletionRequest
 
 
 class BaseLLMAdapter(abc.ABC):
     @abc.abstractmethod
-    async def chat(self, request: ChatRequest) -> typing.Union[str, AsyncGenerator[str, None]]:
+    async def chat(
+        self, request: ChatCompletionRequest
+    ) -> typing.Union[str, AsyncGenerator[str, None]]:
         """
         Если stream=False: возвращает полный текст (str)
         Если stream=True: возвращает async-генератор токенов

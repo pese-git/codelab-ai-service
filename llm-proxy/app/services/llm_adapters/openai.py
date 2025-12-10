@@ -1,7 +1,7 @@
 import logging
 
 from app.core.config import AppConfig
-from app.models.schemas import ChatRequest
+from app.models.schemas_openai import ChatCompletionRequest
 
 from .base import BaseLLMAdapter
 
@@ -62,7 +62,7 @@ class OpenAIAdapter(BaseLLMAdapter):
         self.base_url = base_url or AppConfig.OPENAI_BASE_URL
         self.client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
 
-    async def chat(self, request: ChatRequest):
+    async def chat(self, request: ChatCompletionRequest):
         messages = request.messages or []
         if not getattr(request, "stream", False):
             try:
