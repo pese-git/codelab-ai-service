@@ -313,6 +313,55 @@ pip install -e '.[dev]'
 }
 ```
 
+workspace:
+
+```json
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "llm-proxy"
+		},
+		{
+			"path": "gateway"
+		},
+		{
+			"path": "agent-runtime"
+		}
+	],
+	"settings": {
+		"python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+		"python.languageServer": "None",
+		"ty.disableLanguageServices": false,
+		"ty.diagnosticMode": "workspace",
+		"ty.inlayHints.variableTypes": true,
+		"ty.inlayHints.callArgumentNames": true,
+		"ty.experimental.rename": true,
+		"ty.importStrategy": "useBundled",
+		"[python]": {
+			"editor.defaultFormatter": "charliermarsh.ruff",
+			"editor.formatOnSave": true,
+			"editor.codeActionsOnSave": {
+				"source.fixAll": "explicit"
+			}
+		},
+		"editor.formatOnSave": true,
+		"files.exclude": {
+			"**/__pycache__": true,
+			"**/.pytest_cache": true,
+			"**/.ruff_cache": true
+		},
+		"python.testing.pytestArgs": [
+			"."
+		],
+		"python.testing.unittestEnabled": false,
+		"python.testing.pytestEnabled": true
+	}
+}
+```
+
 > 💡 Этот конфиг настраивает:
 > - Ty как основной language server для Python
 > - Ruff для форматирования и линтинга
