@@ -9,7 +9,7 @@ from app.models.schemas import (
 
 
 def test_chat_completion_request_example():
-    example = ChatCompletionRequest.model_config["json_schema_extra"]["example"]
+    example = ChatCompletionRequest.model_config["json_schema_extra"]["example"]  # ty:ignore[non-subscriptable]
     req = ChatCompletionRequest(**example)
     assert req.model == "gpt-4"
     assert req.messages[0].role == "user"
@@ -19,7 +19,7 @@ def test_chat_completion_request_example():
 
 
 def test_chat_completion_response_example():
-    example = ChatCompletionResponse.model_config["json_schema_extra"]["example"]
+    example = ChatCompletionResponse.model_config["json_schema_extra"]["example"]  # ty:ignore[non-subscriptable]
     resp = ChatCompletionResponse(**example)
     # Проверяем поля базовые
     assert resp.object == "chat.completion"
@@ -27,14 +27,14 @@ def test_chat_completion_response_example():
 
 
 def test_chat_completion_chunk_example():
-    example = ChatCompletionChunk.model_config["json_schema_extra"]["example"]
+    example = ChatCompletionChunk.model_config["json_schema_extra"]["example"]  # ty:ignore[non-subscriptable]
     chunk = ChatCompletionChunk(**example)
     assert chunk.object == "chat.completion.chunk"
     assert chunk.choices[0].delta.content == "Hello,"
 
 
 def test_openai_error_example():
-    example = OpenAIError.model_config["json_schema_extra"]["example"]
+    example = OpenAIError.model_config["json_schema_extra"]["example"]  # ty:ignore[non-subscriptable]
     err = OpenAIError(**example)
     assert "does not exist" in err.message
 

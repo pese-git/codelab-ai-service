@@ -10,7 +10,7 @@ logger = logging.getLogger("llm-proxy")
 try:
     from openai import AsyncOpenAI
 except ImportError:
-    AsyncOpenAI = None
+    AsyncOpenAI = None  # ty:ignore[invalid-assignment]
 
 
 class OpenAIAdapter(BaseLLMAdapter):

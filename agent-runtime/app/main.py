@@ -26,7 +26,8 @@ def custom_openapi():
     return app.openapi_schema
 
 
-app.openapi = custom_openapi  # Переопределить openapi-генератор
+# Переопределить openapi-генератор
+app.openapi = custom_openapi  # ty:ignore[invalid-assignment]
 
 # Подключение middleware авторизации
 app.add_middleware(InternalAuthMiddleware)
