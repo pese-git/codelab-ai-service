@@ -12,7 +12,9 @@ class AppConfig:
     VERSION: str = os.getenv("VERSION", "0.1.0")
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     OPENAI_BASE_URL: str = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
-    LLM_MODE: str = os.getenv("LLM_MODE", "mock")  # mock | openai
+    VLLM_BASE_URL: str = os.getenv("VLLM_BASE_URL", "http://localhost:8000/v1")
+    VLLM_API_KEY: str = os.getenv("VLLM_API_KEY", "")
+    LLM_MODE: str = os.getenv("LLM_MODE", "mock")  # mock | openai | vllm
 
 
 # Logging setup
