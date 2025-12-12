@@ -19,7 +19,7 @@ def get_sessions():
 
 async def llm_stream(session_id: str) -> AsyncGenerator[dict, None]:
     messages = sessions[session_id]
-    llm_request = {"model": "gpt-4", "messages": messages, "stream": True}
+    llm_request = {"model": AppConfig.LLM_MODEL, "messages": messages, "stream": True}
     logger.info(
         f"[Agent] Sending request to LLM Proxy: session_id={session_id}, messages={len(messages)}"
     )

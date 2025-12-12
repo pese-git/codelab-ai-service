@@ -1,3 +1,4 @@
+from typing import Optional
 import logging
 
 from app.core.config import AppConfig
@@ -10,7 +11,7 @@ logger = logging.getLogger("llm-proxy")
 try:
     from openai import AsyncOpenAI
 except ImportError:
-    AsyncOpenAI = None  # ty:ignore[invalid-assignment]
+    AsyncOpenAI = None  # ty:ignore[invalid-assignment, unused-ignore-comment]
 
 
 class OpenAIAdapter(BaseLLMAdapter):
@@ -55,7 +56,7 @@ class OpenAIAdapter(BaseLLMAdapter):
             },
         ]
 
-    def __init__(self, api_key: str = None, base_url: str = None):
+    def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None):
         if not AsyncOpenAI:
             raise ImportError("openai>=1.0.0 package not installed. Run 'pip install openai'.")
         self.api_key = api_key or AppConfig.OPENAI_API_KEY

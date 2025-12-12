@@ -4,6 +4,7 @@ import os
 
 class AppConfig:
     LLM_PROXY_URL: str = os.getenv("LLM_PROXY_URL", "http://localhost:8002")
+    LLM_MODEL: str = os.getenv("LLM_MODEL", "fake-llm")
     INTERNAL_API_KEY: str = os.getenv("INTERNAL_API_KEY", "change-me-internal-key")
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
     VERSION: str = os.getenv("VERSION", "0.1.0")

@@ -76,3 +76,6 @@ target/
 **/.venv
 
 *.code-workspace
+
+vllm-hf-cache
+vllm-models

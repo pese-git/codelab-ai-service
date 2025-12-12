@@ -22,6 +22,12 @@ async def message_stream(message: Message):
         f"[Agent] Incoming message stream: session_id={message.session_id}, content={message.content}"
     )
     sessions = get_sessions()
-    sessions.setdefault(message.session_id, [])
+
+    # Если сессии нет — создаём с system role
+    if message.session_id not in sessions:
+        sessions.setdefault(message.session_id, [])
+        sessions[message.session_id] = [
+            {"role": "system", "content": "You are a helpful assistant."},
+        ]
     sessions[message.session_id].append({"role": "user", "content": message.content})
     return EventSourceResponse(llm_stream(message.session_id))

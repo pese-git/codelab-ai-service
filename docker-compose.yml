@@ -41,6 +41,7 @@ services:
       - INTERNAL_API_KEY=${INTERNAL_API_KEY}
       - MAX_CONCURRENT_REQUESTS=${MAX_CONCURRENT_REQUESTS}
       - REQUEST_TIMEOUT=${REQUEST_TIMEOUT}
+      - LLM_MODEL=${LLM_MODEL}
     depends_on:
       llm-proxy:
         condition: service_healthy
@@ -70,6 +71,8 @@ services:
       - INTERNAL_API_KEY=${INTERNAL_API_KEY}
       - MAX_CONCURRENT_REQUESTS=${MAX_CONCURRENT_REQUESTS}
       - REQUEST_TIMEOUT=${REQUEST_TIMEOUT}
+      - VLLM_API_KEY=${VLLM_API_KEY}
+      - VLLM_BASE_URL=http://vllm:8003/v1
     networks:
       - codelab-network
     healthcheck:
@@ -78,6 +81,30 @@ services:
       timeout: ${HEALTHCHECK_TIMEOUT}
       retries: ${HEALTHCHECK_RETRIES}
       start_period: ${HEALTHCHECK_START_PERIOD}
+
+  vllm:
+    image: vllm-cpu:latest
+    privileged: true
+    shm_size: 4g
+    environment:
+      - LOG_LEVEL=DEBUG
+      - VLLM_CPU_KVCACHE_SPACE=4
+      - VLLM_CPU_OMP_THREADS_BIND=2
+    #- HF_TOKEN=${HF_TOKEN}  # Можно экспортировать на хосте или прописать прямо здесь свой токен
+    command:
+      [
+        "--model", "Qwen/Qwen3-0.6B",
+        "--host", "0.0.0.0",
+        "--port", "8003",
+        "--max-model-len", "32768"
+      ]
+    volumes:
+      - ./vllm-models/:/models/
+      - ./vllm-hf-cache:/root/.cache/huggingface
+    ports:
+      - "8003:8003"
+    networks:
+      - codelab-network
 
 networks:
   codelab-network:
