@@ -44,7 +44,7 @@ uv run pytest --maxfail=3 --disable-warnings -v tests
 - `POST /v1/chat/completions` — Основная точка для чат-комплишнов, поддержка SSE (stream), temperature и пр.
 
 > Все защищённые эндпоинты требуют заголовка:  
-`x-internal-auth: <INTERNAL_API_KEY>` (см. .env)
+`x-internal-auth: <LLM_PROXY__INTERNAL_API_KEY>` (см. .env)
 
 ### Пример новых запросов
 
@@ -53,7 +53,7 @@ uv run pytest --maxfail=3 --disable-warnings -v tests
 curl -X GET \
   'http://localhost:8002/v1/llm/models' \
   -H 'accept: application/json' \
-  -H 'x-internal-auth: your-internal-key'
+  -H 'x-internal-auth: ${LLM_PROXY__INTERNAL_API_KEY}'
 ```
 
 Стриминговый чат-комплишн — ответ идёт в формате Server-Sent Events (SSE):
@@ -61,7 +61,7 @@ curl -X GET \
 curl -X POST 'http://localhost:8002/v1/chat/completions' \
   -H 'accept: application/json' \
   -H 'Content-Type: application/json' \
-  -H 'x-internal-auth: your-internal-key' \
+  -H 'x-internal-auth: ${LLM_PROXY__INTERNAL_API_KEY}' \
   -d '{
     "messages": [{"content": "Say hello!", "role": "user"}],
     "model": "gpt-4",
@@ -82,17 +82,21 @@ data: [DONE]
 
 ## Конфигурация (через переменные окружения)
 
-- `LLM_MODE` — используемый провайдер: `mock`, `openai`, `vllm`
-- `INTERNAL_API_KEY` — Cекретный приватный ключ для доступа к API (по умолчанию "change-me-internal-key", переопределяется в .env/docker-compose)
-- `LOG_LEVEL` — Уровень логирования (`INFO`/`DEBUG`/...)
+Все переменные окружения имеют префикс `LLM_PROXY__` для предотвращения конфликтов в мультисервисной среде.
+
+### Основные настройки:
+- `LLM_PROXY__LLM_MODE` — используемый провайдер: `mock`, `openai`, `vllm`
+- `LLM_PROXY__INTERNAL_API_KEY` — Cекретный приватный ключ для доступа к API (по умолчанию "change-me-internal-key", переопределяется в .env/docker-compose)
+- `LLM_PROXY__LOG_LEVEL` — Уровень логирования (`INFO`/`DEBUG`/...)
+- `LLM_PROXY__VERSION` — Версия сервиса (по умолчанию "0.1.0")
 
 ### OpenAI:
-- `OPENAI_API_KEY` — API-ключ OpenAI
-- `OPENAI_BASE_URL` — URL эндпоинта OpenAI API (по умолчанию https://api.openai.com/v1)
+- `LLM_PROXY__OPENAI_API_KEY` — API-ключ OpenAI
+- `LLM_PROXY__OPENAI_BASE_URL` — URL эндпоинта OpenAI API (по умолчанию https://api.openai.com/v1)
 
 ### vLLM (локальный сервер совместимый с OpenAI):
-- `VLLM_API_KEY` — (опционально) API-ключ для локального vLLM
-- `VLLM_BASE_URL` — URL эндпоинта vLLM (по умолчанию http://localhost:8000/v1)
+- `LLM_PROXY__VLLM_API_KEY` — (опционально) API-ключ для локального vLLM
+- `LLM_PROXY__VLLM_BASE_URL` — URL эндпоинта vLLM (по умолчанию http://localhost:8000/v1)
 
 ---
 
@@ -101,9 +105,9 @@ data: [DONE]
 1. Запустите локальный vLLM сервер (инструкция — в доке vllm)
 2. Укажите в .env:
    ```
-   LLM_MODE=vllm
-   VLLM_BASE_URL=http://localhost:8000/v1
-   VLLM_API_KEY=  # если нужен
+   LLM_PROXY__LLM_MODE=vllm
+   LLM_PROXY__VLLM_BASE_URL=http://localhost:8000/v1
+   LLM_PROXY__VLLM_API_KEY=  # если нужен
    ```
 3. Запустите сервис, как обычно — прокси будет использовать локальную модель вместо OpenAI
 

@@ -87,11 +87,33 @@ uv run pytest --maxfail=3 --disable-warnings -v tests
 
 ## Конфигурация (env):
 
-- `INTERNAL_API_KEY` — секрет для защиты внутренних ручек (обязательно синхронизировать с agent-runtime!)
-- `AGENT_URL` — URL к backend сервису agent-runtime (по умолчанию: http://localhost:8001)
-- `REQUEST_TIMEOUT` — Таймаут на стрим-запросы (по умолчанию: 30.0)
-- `LOG_LEVEL` — уровень логирования (INFO/DEBUG)
-- `VERSION` — версия приложения
+Все переменные окружения имеют префикс `GATEWAY__` для избежания конфликтов с другими сервисами.
+
+- `GATEWAY__INTERNAL_API_KEY` — секрет для защиты внутренних ручек (обязательно синхронизировать с agent-runtime!)
+  - Значение по умолчанию: `change-me-internal-key`
+  - Рекомендуется: использовать сложный случайный ключ в production
+
+- `GATEWAY__AGENT_URL` — URL к backend сервису agent-runtime
+  - Значение по умолчанию: `http://localhost:8001`
+  - Пример production: `http://agent-runtime:8001`
+
+- `GATEWAY__REQUEST_TIMEOUT` — Таймаут на стрим-запросы в секундах
+  - Значение по умолчанию: `30.0`
+  - Рекомендуется: увеличить для длительных операций
+
+- `GATEWAY__LOG_LEVEL` — уровень логирования
+  - Значение по умолчанию: `DEBUG`
+  - Доступные значения: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
+  - Рекомендуется: `INFO` для production
+
+- `GATEWAY__VERSION` — версия приложения
+  - Значение по умолчанию: `0.1.0`
+  - Формат: семантическое версионирование
+
+Для локальной разработки скопируйте `.env.example` в `.env` и настройте необходимые значения:
+```bash
+cp .env.example .env
+```
 
 ---
 

@@ -48,23 +48,28 @@
 
 ## 🔑 Внутренняя авторизация между микросервисами
 
-Все внутренние REST/SSE-запросы защищены общим ключом `INTERNAL_API_KEY`:
-- Заголовок X-Internal-Auth: my-super-secret-key (либо ваш ключ из .env) прописан во всех тестах и curl
-- Тот же ключ должен быть в каждом сервисе (.env/.env.example); пробрасывается через docker-compose
+Все внутренние REST/SSE-запросы защищены ключами авторизации с префиксами для каждого сервиса:
+- Gateway: `GATEWAY__INTERNAL_API_KEY`
+- Agent Runtime: `AGENT_RUNTIME__INTERNAL_API_KEY`
+- LLM Proxy: `LLM_PROXY__INTERNAL_API_KEY`
+
+Пример использования:
+- Заголовок X-Internal-Auth должен содержать соответствующий ключ для каждого сервиса
+- Ключи пробрасываются через docker-compose из .env файла
 - Без правильного ключа все защищённые endpoint'ы вернут 401 Unauthorized
 
-Пример curl (SSE):
+Примеры запросов с авторизацией:
+
 ```bash
+# Запрос к Agent Runtime
 curl -X POST http://localhost:8001/agent/message/stream \
-    -H "X-Internal-Auth: my-super-secret-key" \
+    -H "X-Internal-Auth: ${AGENT_RUNTIME__INTERNAL_API_KEY}" \
     -H "Content-Type: application/json" \
     -d '{"session_id": "demo", "type": "user_message", "content": "Привет!"}'
-```
 
-Запрос к LLM Proxy новым API:
-```bash
+# Запрос к LLM Proxy
 curl -X POST http://localhost:8002/v1/chat/completions \
-    -H "X-Internal-Auth: my-super-secret-key" \
+    -H "X-Internal-Auth: ${LLM_PROXY__INTERNAL_API_KEY}" \
     -H "Content-Type: application/json" \
     -d '{"model": "gpt-4", "messages": [{"role": "user", "content": "Say hello!"}], "stream": true, "temperature": 1}'
 ```
@@ -98,9 +103,13 @@ cp .env.example .env
 ```
 
 4. Настройте переменные окружения в .env файле:
-- Добавьте ваш OPENAI_API_KEY
-- Добавьте ваш ANTHROPIC_API_KEY
-- При необходимости измените порты и другие параметры
+- Для каждого сервиса переменные имеют свой префикс:
+  - `GATEWAY__` для Gateway сервиса
+  - `AGENT_RUNTIME__` для Agent Runtime сервиса
+  - `LLM_PROXY__` для LLM Proxy сервиса
+- Добавьте ваш API ключ OpenAI в `LLM_PROXY__OPENAI_API_KEY`
+- Добавьте ваш API ключ Anthropic в `LLM_PROXY__ANTHROPIC_API_KEY`
+- При необходимости измените общие настройки (порты и параметры healthcheck)
 
 5. Запустите сервисы:
 ```bash
@@ -118,24 +127,22 @@ curl http://localhost:8002/health  # llm-proxy
 
 ## 🔌 Примеры работы с актуальными endpoint'ами
 
-### Получить список LLM моделей
-```bash
-curl -X GET http://localhost:8002/v1/llm/models \
-  -H "X-Internal-Auth: my-super-secret-key"
-```
+### Примеры API запросов
 
-### Потоковое общение через agent-runtime (SSE)
 ```bash
+# Получить список LLM моделей
+curl -X GET http://localhost:8002/v1/llm/models \
+  -H "X-Internal-Auth: ${LLM_PROXY__INTERNAL_API_KEY}"
+
+# Потоковое общение через agent-runtime (SSE)
 curl -X POST http://localhost:8001/agent/message/stream \
-  -H "X-Internal-Auth: my-super-secret-key" \
+  -H "X-Internal-Auth: ${AGENT_RUNTIME__INTERNAL_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"session_id": "demo", "type": "user_message", "content": "Тест!"}'
-```
 
-### Прямой запрос к LLM-proxy (SSE, token-by-token, совместимо с OpenAI)
-```bash
+# Прямой запрос к LLM-proxy (SSE, token-by-token, совместимо с OpenAI)
 curl -X POST http://localhost:8002/v1/chat/completions \
-  -H "X-Internal-Auth: my-super-secret-key" \
+  -H "X-Internal-Auth: ${LLM_PROXY__INTERNAL_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"model": "gpt-4", "messages": [{"role": "user", "content": "Say hello!"}], "stream": true, "temperature": 1}'
 ```

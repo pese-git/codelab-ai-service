@@ -71,10 +71,26 @@ uv run pytest --maxfail=3 --disable-warnings -v tests
 
 ## Конфигурирование (переменные окружения)
 
-- `LLM_PROXY_URL` — URL сервиса llm-proxy (по умолчанию: http://localhost:8002)
-- `INTERNAL_API_KEY` — секрет для авторизации запросов (по умолчанию: change-me-internal-key)
-- `LOG_LEVEL` — уровень логирования (`INFO` по умолчанию)
-- `VERSION` — версия (например, 0.1.0)
+### Основные настройки
+- `AGENT_RUNTIME__LLM_PROXY_URL` — URL сервиса llm-proxy (по умолчанию: http://localhost:8002)
+- `AGENT_RUNTIME__LLM_MODEL` — модель LLM для использования (по умолчанию: fake-llm)
+- `AGENT_RUNTIME__INTERNAL_API_KEY` — секрет для авторизации запросов (по умолчанию: change-me-internal-key)
+- `AGENT_RUNTIME__LOG_LEVEL` — уровень логирования (по умолчанию: INFO)
+- `AGENT_RUNTIME__VERSION` — версия сервиса (по умолчанию: 0.1.0)
+
+### OpenAI интеграция
+- `AGENT_RUNTIME__OPENAI_API_KEY` — API ключ для OpenAI
+- `AGENT_RUNTIME__OPENAI_BASE_URL` — базовый URL для OpenAI API (по умолчанию: https://api.openai.com/v1)
+- `AGENT_RUNTIME__LLM_MODE` — режим работы LLM: mock | openai | vllm (по умолчанию: mock)
+
+### vLLM интеграция
+- `AGENT_RUNTIME__VLLM_API_KEY` — API ключ для vLLM
+- `AGENT_RUNTIME__VLLM_BASE_URL` — базовый URL для vLLM API (по умолчанию: http://localhost:8000/v1)
+
+Для локальной разработки скопируйте `.env.example` в `.env` и настройте необходимые переменные:
+```bash
+cp .env.example .env
+```
 
 ---
 
