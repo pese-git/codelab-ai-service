@@ -1,6 +1,7 @@
-from enum import Enum
-from typing import Dict, List, Optional, Any
 from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -25,6 +26,7 @@ class SSEToken(BaseModel):
     token: str
     is_final: bool
     type: str = "assistant_message"  # "assistant_message", "tool_call", "tool_result"
+    metadata: Optional[Dict[str, Any]] = None  # Additional data for tool calls, etc.
 
 
 class ToolExecutionStatus(str, Enum):

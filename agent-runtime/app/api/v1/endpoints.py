@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from sse_starlette.sse import EventSourceResponse
 
 from app.core.config import AppConfig, logger
-from app.models.schemas import HealthResponse, Message
+from app.models.schemas import HealthResponse, Message, SessionState
 from app.services.llm_stream_service import get_sessions, llm_stream
 
 router = APIRouter()
@@ -23,11 +23,14 @@ async def message_stream(message: Message):
     )
     sessions = get_sessions()
 
-    # Если сессии нет — создаём с system role
+    # Create SessionState if not exists
     if message.session_id not in sessions:
-        sessions.setdefault(message.session_id, [])
-        sessions[message.session_id] = [
-            {"role": "system", "content": "You are a helpful assistant."},
-        ]
-    sessions[message.session_id].append({"role": "user", "content": message.content})
+        sessions[message.session_id] = SessionState(
+            session_id=message.session_id,
+            messages=[{"role": "system", "content": "You are a helpful assistant."}]
+        )
+    
+    # Append user message to session
+    sessions[message.session_id].messages.append({"role": "user", "content": message.content})
+    
     return EventSourceResponse(llm_stream(message.session_id))
