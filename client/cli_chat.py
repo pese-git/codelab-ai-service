@@ -17,7 +17,8 @@ async def ws_reader(websocket, queue):
             msg = json.loads(data)
             if msg.get("type") == "assistant_message":
                 token = msg.get("token", "")
-                print(token, end="", flush=True)
+                if token:  # Only print if token is not empty or None
+                    print(token, end="", flush=True)
                 if msg.get("is_final"):
                     print()
                     print("═════════════════════════════════════")

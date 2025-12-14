@@ -29,7 +29,7 @@ async def test_gateway_websocket_stream():
                 if msg.get("is_final"):
                     got_final = True
                     break
-    assert any(t.strip() for t in tokens)
+    assert any(t and t.strip() for t in tokens if t is not None)
     assert got_final
 
 
