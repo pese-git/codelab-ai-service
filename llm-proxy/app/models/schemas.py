@@ -95,6 +95,7 @@ class DeltaMessage(BaseModel):
     content: Optional[str] = None
     function_call: Optional[dict] = None
     tool_calls: Optional[List[ToolCall]] = None
+    metadata: Optional[Dict[str, any]] = None  # For passing raw provider data without interpretation
 
 
 class ChoiceDelta(BaseModel):
