@@ -84,6 +84,7 @@ async def chat_completions(
                             yield chunk.model_dump_json() + "\n"
                             delta_started = True
                         # Отправляем токен как delta-content
+                        # Token might contain tool calls in the content
                         delta = ChoiceDelta.model_construct(
                             index=idx,
                             delta=DeltaMessage.model_construct(content=token),

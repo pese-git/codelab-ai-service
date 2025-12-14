@@ -65,13 +65,27 @@ class OpenAIAdapter(BaseLLMAdapter):
 
     async def chat(self, request: ChatCompletionRequest):
         messages = request.messages or []
-        if not getattr(request, "stream", False):
+        
+        # Build parameters to pass to OpenAI
+        create_params = {
+            "model": request.model,
+            "messages": messages,
+            "stream": getattr(request, "stream", False)
+        }
+        
+        # Pass through optional parameters
+        if request.tools:
+            create_params["tools"] = request.tools
+        if request.tool_choice:
+            create_params["tool_choice"] = request.tool_choice
+        if request.temperature is not None:
+            create_params["temperature"] = request.temperature
+        if request.max_tokens is not None:
+            create_params["max_tokens"] = request.max_tokens
+            
+        if not create_params["stream"]:
             try:
-                response = await self.client.chat.completions.create(
-                    model=request.model,
-                    messages=messages,
-                    stream=False,
-                )
+                response = await self.client.chat.completions.create(**create_params)
                 return response.choices[0].message.content
             except Exception as e:
                 logger.error(f"[OpenAIAdapter] OpenAI error: {e}")
@@ -80,11 +94,7 @@ class OpenAIAdapter(BaseLLMAdapter):
         # stream mode
         async def token_gen():
             try:
-                stream = await self.client.chat.completions.create(
-                    model=request.model,
-                    messages=messages,
-                    stream=True,
-                )
+                stream = await self.client.chat.completions.create(**create_params)
                 async for chunk in stream:
                     token = ""
                     try:
