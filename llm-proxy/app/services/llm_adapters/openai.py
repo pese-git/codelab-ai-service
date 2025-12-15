@@ -73,16 +73,28 @@ class OpenAIAdapter(BaseLLMAdapter):
             "stream": getattr(request, "stream", False)
         }
         
-        # Pass through optional parameters
-        if request.tools:
+        # Прокидываем tools/functions при наличии
+        if getattr(request, "functions", None):
+            create_params["functions"] = request.functions
+        if getattr(request, "tools", None):
             create_params["tools"] = request.tools
-        if request.tool_choice:
+
+        # Прокидываем function_call/tool_choice при наличии
+        if getattr(request, "function_call", None) is not None:
+            create_params["function_call"] = request.function_call
+        if getattr(request, "tool_choice", None) is not None:
             create_params["tool_choice"] = request.tool_choice
+
+        # Остальные параметры — как есть
         if request.temperature is not None:
             create_params["temperature"] = request.temperature
         if request.max_tokens is not None:
             create_params["max_tokens"] = request.max_tokens
             
+        import pprint
+        logger.debug(f"[TRACE][OpenAIAdapter] Full llm_request payload:\n" + pprint.pformat(create_params, indent=2, width=120))
+
+     
         if not create_params["stream"]:
             try:
                 response = await self.client.chat.completions.create(**create_params)

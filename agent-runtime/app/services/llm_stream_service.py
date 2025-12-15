@@ -12,6 +12,65 @@ from app.services.tool_parser import parse_tool_calls
 
 logger = logging.getLogger("agent-runtime")
 
+
+#tools = [
+#    {
+#        "type": "function",
+#        "name": "read_file",
+#        "description": "Reads file contents.",
+#        "parameters": {
+#            "type": "object",
+#            "properties": {
+#                "path": {"type": "string", "description": "Path to file"}
+#            },
+#            "required": ["path"]
+#        }
+#    },
+#    {
+#        "type": "function",
+#        "name": "echo",
+#        "description": "Echo back text.",
+#        "parameters": {
+#            "type": "object",
+#            "properties": {
+#                "text": {"type": "string"}
+#            },
+#            "required": ["text"]
+#        }
+#    }
+#]
+
+
+tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "read_file",
+            "description": "Read any file from disk.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "File path"}
+                },
+                "required": ["path"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "echo",
+            "description": "Echo back any string.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string", "description": "Some string"}
+                },
+                "required": ["text"]
+            }
+        }
+    }
+]
 # In-memory session store (session_id -> SessionState)
 sessions: Dict[str, SessionState] = {}
 
@@ -75,10 +134,18 @@ async def llm_stream(session_id: str):
         return
 
     messages = session.messages
-    llm_request = {"model": AppConfig.LLM_MODEL, "messages": messages, "stream": False}
+    llm_request = {
+        "model": AppConfig.LLM_MODEL,
+        "messages": messages,
+        "stream": False,
+        "tools": tools,
+        #"function_call": "auto"
+    }
+    import pprint
     logger.info(
         f"[Agent] Sending request to LLM Proxy: session_id={session_id}, messages={len(messages)}"
     )
+    logger.debug(f"[Agent][TRACE] Full llm_request payload:\n" + pprint.pformat(llm_request, indent=2, width=120))
 
     async with httpx.AsyncClient() as client:
         response = await client.post(
@@ -114,7 +181,11 @@ async def llm_stream(session_id: str):
                 await send_tool_call_to_gateway(session_id, tool_call)
                 # TODO: добавить обработку результата и финализировать поток
 
-        # Добавляем финальный ассистентский ответ
+        # Добавляем финальный ассистентский ответ, гарантируя, что content не None
+        if clean_content is None:
+            clean_content = ""
+        elif not isinstance(clean_content, str):
+            clean_content = str(clean_content)
         messages.append({"role": "assistant", "content": clean_content})
         logger.info(f"[Agent] Appended completion to session {session_id}")
 
