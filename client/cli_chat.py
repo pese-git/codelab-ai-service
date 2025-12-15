@@ -9,7 +9,7 @@ GATEWAY_WS = "ws://localhost:8000/ws/cli-session"
 
 async def ws_reader(websocket, queue):
     """
-    Читает ответы ассистента из WebSocket и печатает результат по мере поступления токенов.
+    Читает ответы ассистента из WebSocket, обрабатывает и tool_call, и обычные сообщения.
     """
     while True:
         try:
@@ -17,12 +17,36 @@ async def ws_reader(websocket, queue):
             msg = json.loads(data)
             if msg.get("type") == "assistant_message":
                 token = msg.get("token", "")
-                if token:  # Only print if token is not empty or None
+                if token:
                     print(token, end="", flush=True)
                 if msg.get("is_final"):
                     print()
                     print("═════════════════════════════════════")
                     print("You: ", end="", flush=True)
+            elif msg.get("type") == "tool_call":
+                # Обнаружен инструмент! Спрашиваем пользователя/эмулируем результат
+                meta = msg.get("metadata", {})
+                tool = meta.get("tool_call", {})
+                call_id = tool.get("id")
+                tool_name = tool.get("tool_name")
+                arguments = tool.get("arguments", {})
+                print(f"\n[ToolCall] {tool_name} (id={call_id}) с аргументами: {arguments}")
+                # Простая эмуляция: спрашиваем у пользователя результат:
+                fake_result = None
+                try:
+                    print(f"Введите результат для инструмента '{tool_name}' (оставьте пустым для demo): ", end="", flush=True)
+                    fake_result = sys.stdin.readline().strip() or f"Executed {tool_name}"
+                except Exception:
+                    fake_result = f"Executed {tool_name}"  # fallback
+                # Собираем и отправляем tool_result обратно в Gateway через WS
+                tool_result_msg = {
+                    "type": "tool_result",
+                    "call_id": call_id,
+                    "result": {"response": fake_result},
+                }
+                await websocket.send(json.dumps(tool_result_msg))
+                print(f"[Отправлен tool_result для {tool_name} / {call_id}]")
+                print("You: ", end="", flush=True)
             elif msg.get("type") == "error":
                 print(f"\n[Error]: {msg.get('content')}")
                 print("You: ", end="", flush=True)

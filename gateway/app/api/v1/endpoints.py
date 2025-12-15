@@ -5,7 +5,7 @@ from fastapi import APIRouter, WebSocket
 from starlette.websockets import WebSocketDisconnect
 
 from app.core.config import AppConfig, logger
-from app.models.schemas import HealthResponse, WSErrorResponse, WSUserMessage
+from app.models.schemas import HealthResponse, WSErrorResponse, WSUserMessage, WSToolResult
 from app.services.stream_service import get_token_buffers, stream_agent_single
 
 router = APIRouter()
@@ -29,6 +29,27 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 raw_msg = await websocket.receive_text()
                 logger.debug(f"[{session_id}] Received WS message: {raw_msg!r}")
                 try:
+                    # Пробуем разобрать как tool_result
+                    try:
+                        tool_result = WSToolResult.model_validate(json.loads(raw_msg))
+                        logger.debug(f"[{session_id}] Parsed WSToolResult: {tool_result}")
+                        # Постим на agent-runtime
+                        resp = await client.post(
+                            f"{AppConfig.AGENT_URL}/agent/tool/result",
+                            json={
+                                "call_id": tool_result.call_id,
+                                "result": tool_result.result,
+                                "error": tool_result.error,
+                                # Дополнительные поля при необходимости
+                            },
+                            headers={"X-Internal-Auth": AppConfig.INTERNAL_API_KEY},
+                            timeout=AppConfig.REQUEST_TIMEOUT,
+                        )
+                        logger.info(f"[{session_id}] Relayed tool_result to agent-runtime (call_id={tool_result.call_id}): {resp.status_code}")
+                        await websocket.send_json({"status": "ok", "detail": f"tool_result for call_id={tool_result.call_id} relayed"})
+                        continue
+                    except Exception:
+                        pass  # не tool_result, идём обычным путём
                     msg = WSUserMessage.model_validate(json.loads(raw_msg))
                     logger.debug(f"[{session_id}] Parsed WSUserMessage: {msg}")
                 except Exception:

@@ -82,49 +82,49 @@ services:
       retries: ${HEALTHCHECK_RETRIES}
       start_period: ${HEALTHCHECK_START_PERIOD}
 
-  vllm:
-    image: vllm-cpu:latest
-    privileged: true
-    shm_size: 4g
-    # Apple Sillicon M4
-    environment:
-      - LOG_LEVEL=DEBUG
-      - VLLM_CPU_KVCACHE_SPACE=4
-      - VLLM_CPU_OMP_THREADS_BIND=2
-    #- HF_TOKEN=${HF_TOKEN}  # Можно экспортировать на хосте или прописать прямо здесь свой токен
-    command:
-      [
-        "--model", "Qwen/Qwen3-0.6B",
-        "--host", "0.0.0.0",
-        "--port", "8003",
-        "--max-model-len", "32768"
-      ]
-
-    # Apple Sillicon M1
-    #environment:
-    #  - LOG_LEVEL=DEBUG
-    #  - VLLM_CPU_KVCACHE_SPACE=10
-    #  - VLLM_CPU_OMP_THREADS_BIND=2
-    ##- HF_TOKEN=${HF_TOKEN}  # Можно экспортировать на хосте или прописать прямо здесь свой токен
-    #command:
-    #  [
-    #    "--model", "Qwen/Qwen3-0.6B",
-    #    "--dtype", "float32",
-    #    "--enforce-eager",
-    #    "--host", "0.0.0.0",
-    #    "--port", "8003",
-    #    "--max-model-len", "32768",
-    #    "--max-num-seqs", "16"
-    #  ]
-
-
-    volumes:
-      - ./vllm-models/:/models/
-      - ./vllm-hf-cache:/root/.cache/huggingface
-    ports:
-      - "8003:8003"
-    networks:
-      - codelab-network
+#  vllm:
+#    image: vllm-cpu:latest
+#    privileged: true
+#    shm_size: 4g
+#    # Apple Sillicon M4
+#    environment:
+#      - LOG_LEVEL=DEBUG
+#      - VLLM_CPU_KVCACHE_SPACE=4
+#      - VLLM_CPU_OMP_THREADS_BIND=2
+#    #- HF_TOKEN=${HF_TOKEN}  # Можно экспортировать на хосте или прописать прямо здесь свой токен
+#    command:
+#      [
+#        "--model", "Qwen/Qwen3-0.6B",
+#        "--host", "0.0.0.0",
+#        "--port", "8003",
+#        "--max-model-len", "32768"
+#      ]
+#
+#    # Apple Sillicon M1
+#    #environment:
+#    #  - LOG_LEVEL=DEBUG
+#    #  - VLLM_CPU_KVCACHE_SPACE=10
+#    #  - VLLM_CPU_OMP_THREADS_BIND=2
+#    ##- HF_TOKEN=${HF_TOKEN}  # Можно экспортировать на хосте или прописать прямо здесь свой токен
+#    #command:
+#    #  [
+#    #    "--model", "Qwen/Qwen3-0.6B",
+#    #    "--dtype", "float32",
+#    #    "--enforce-eager",
+#    #    "--host", "0.0.0.0",
+#    #    "--port", "8003",
+#    #    "--max-model-len", "32768",
+#    #    "--max-num-seqs", "16"
+#    #  ]
+#
+#
+#    volumes:
+#      - ./vllm-models/:/models/
+#      - ./vllm-hf-cache:/root/.cache/huggingface
+#    ports:
+#      - "8003:8003"
+#    networks:
+#      - codelab-network
 
 networks:
   codelab-network:
