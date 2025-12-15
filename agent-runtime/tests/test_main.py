@@ -20,23 +20,16 @@ async def test_agent_message_stream_echo():
     session_id = "pytest_stream"
     payload = {"session_id": session_id, "type": "user_message", "content": "This is stream test!"}
     async with httpx.AsyncClient(timeout=10) as client:
-        async with client.stream(
-            "POST",
+        resp = await client.post(
             "http://localhost:8001/agent/message/stream",
             json=payload,
             headers={"X-Internal-Auth": correct_key},
-        ) as resp:
-            assert resp.status_code == 200
-            tokens = []
-            async for line in resp.aiter_lines():
-                if line.startswith("data:"):
-                    data = json.loads(line[5:].strip())
-                    tokens.append(data["token"])
-                    if data.get("is_final"):
-                        break
-    assert any(t and t.strip() for t in tokens if t is not None)
-    # Check that we have tokens and last token with is_final=True
-    assert len(tokens) > 0
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+    assert "token" in data
+    assert data["token"] and data["token"].strip()
+    assert data["type"] in ("assistant_message", "tool_call")
 
 
 @pytest.mark.asyncio
