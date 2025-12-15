@@ -157,7 +157,7 @@ class UnifiedToolCallParser:
     def __init__(self):
         self.parsers = [
             OpenAIToolCallParser(),
-            XMLToolCallParser(),
+            #XMLToolCallParser(),
             CustomToolCallParser()
         ]
     

@@ -6,7 +6,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from app.core.config import AppConfig, logger
 from app.models.schemas import HealthResponse, WSErrorResponse, WSUserMessage
-from app.services.stream_service import get_token_buffers, stream_agent_sse
+from app.services.stream_service import get_token_buffers, stream_agent_single
 
 router = APIRouter()
 
@@ -39,7 +39,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                     logger.warning(f"[{session_id}] Invalid WS JSON, sent error")
                     continue
                 try:
-                    await stream_agent_sse(client, session_id, msg, websocket)
+                    await stream_agent_single(client, session_id, msg, websocket)
                 except Exception as e:
                     err = WSErrorResponse.model_construct(type="error", content=str(e))
                     await websocket.send_json(err.model_dump())

@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from sse_starlette.sse import EventSourceResponse
+from fastapi.responses import JSONResponse
 
 from app.core.config import AppConfig, logger
 from app.models.schemas import HealthResponse, Message, SessionState
@@ -33,4 +33,13 @@ async def message_stream(message: Message):
     # Append user message to session
     sessions[message.session_id].messages.append({"role": "user", "content": message.content})
     
-    return EventSourceResponse(llm_stream(message.session_id))
+    # collect first item from llm_stream and return as JSON
+    event = None
+    async for ev in llm_stream(message.session_id):
+        event = ev
+        break
+    data = event["data"]
+    if isinstance(data, str):
+        import json as _json
+        data = _json.loads(data)
+    return JSONResponse(content=data)
