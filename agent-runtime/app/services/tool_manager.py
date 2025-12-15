@@ -118,7 +118,10 @@ class ToolCallTracker:
             # Create error result
             result = ToolResult(
                 call_id=call_id,
-                error=error
+                result=None,
+                error=error,
+                executed_at=datetime.now(),
+                execution_time_ms=0
             )
             self._results[call_id] = result
             
