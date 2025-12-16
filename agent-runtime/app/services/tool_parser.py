@@ -34,37 +34,50 @@ class ToolCallParser(ABC):
 
 
 class OpenAIToolCallParser(ToolCallParser):
-    """Parser for OpenAI native tool call format"""
-    
+    """Parser for OpenAI native tool call format (legacy and modern tools)"""
     def parse(self, content: str, metadata: Optional[Dict[str, Any]] = None) -> Tuple[List[ToolCall], str]:
         tool_calls = []
-        
-        if metadata and "tool_calls" in metadata:
-            # Native OpenAI tool calls in metadata
+        # Новый OpenAI tools API — tool_calls массив
+        if metadata and "tool_calls" in metadata and metadata["tool_calls"]:
             for tc in metadata["tool_calls"]:
-                try:
-                    tool_call = ToolCall(
-                        id=tc.get("id", f"call_{len(tool_calls)}"),
-                        tool_name=tc.get("function", {}).get("name", ""),
-                        arguments=json.loads(tc.get("function", {}).get("arguments", "{}"))
+                func = tc.get("function") if isinstance(tc, dict) else getattr(tc, "function", None)
+                tc_id = tc.get("id") if isinstance(tc, dict) else getattr(tc, "id", None)
+                tool_name = None
+                arguments = {}
+                if func:
+                    tool_name = func.get("name") if isinstance(func, dict) else getattr(func, "name", None)
+                    args_str = func.get("arguments") if isinstance(func, dict) else getattr(func, "arguments", "")
+                    try:
+                        arguments = json.loads(args_str) if args_str else {}
+                    except Exception:
+                        arguments = {}
+                if not tool_name:
+                    tool_name = tc.get("name") if isinstance(tc, dict) else getattr(tc, "name", None)
+                logger.debug(f"Parsing tool_call: tc={tc}, func={func}, tool_name={tool_name}, args={arguments}")
+                tool_calls.append(
+                    ToolCall(
+                        id=tc_id or f"tc_{len(tool_calls)}",
+                        tool_name=tool_name or "unknown",
+                        arguments=arguments or {},
                     )
-                    tool_calls.append(tool_call)
-                except Exception as e:
-                    logger.warning(f"Failed to parse OpenAI tool call: {e}")
-        
-        # Also check for function_call (legacy format)
+                )
+        # Старый OpenAI function_call (legacy)
         if metadata and "function_call" in metadata:
             try:
                 fc = metadata["function_call"]
+                id = f"call_func_{len(tool_calls)}"
+                tool_name=fc.get("name", "") if isinstance(fc, dict) else getattr(fc, "name", "")
+                arguments=json.loads(fc.get("arguments", "{}")) if isinstance(fc, dict) else json.loads(getattr(fc, "arguments", "{}"))
                 tool_call = ToolCall(
-                    id=f"call_func_{len(tool_calls)}",
-                    tool_name=fc.get("name", ""),
-                    arguments=json.loads(fc.get("arguments", "{}"))
+                    id=id,
+                    tool_name=tool_name,
+                    arguments=arguments
                 )
+                logger.debug(f"Parsing tool_call: tc={id}, func={fc}, tool_name={tool_name}, args={arguments}")
                 tool_calls.append(tool_call)
             except Exception as e:
                 logger.warning(f"Failed to parse OpenAI function call: {e}")
-                
+        # Прежний fallback (контентный парсинг) можно оставить только для совместимости
         return tool_calls, content
 
 
