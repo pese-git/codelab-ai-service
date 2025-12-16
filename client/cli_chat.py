@@ -31,21 +31,15 @@ async def ws_reader(websocket, queue):
                 tool_name = tool.get("tool_name")
                 arguments = tool.get("arguments", {})
                 print(f"\n[ToolCall] {tool_name} (id={call_id}) с аргументами: {arguments}")
-                # Простая эмуляция: спрашиваем у пользователя результат:
-                fake_result = None
-                try:
-                    print(f"Введите результат для инструмента '{tool_name}' (оставьте пустым для demo): ", end="", flush=True)
-                    fake_result = sys.stdin.readline().strip() or f"Executed {tool_name}"
-                except Exception:
-                    fake_result = f"Executed {tool_name}"  # fallback
-                # Собираем и отправляем tool_result обратно в Gateway через WS
+                # Автоматическая эмуляция результата tool_call без участия пользователя:
+                fake_result = f"Auto-executed {tool_name} with args: {arguments}"
                 tool_result_msg = {
                     "type": "tool_result",
                     "call_id": call_id,
                     "result": {"response": fake_result},
                 }
                 await websocket.send(json.dumps(tool_result_msg))
-                print(f"[Отправлен tool_result для {tool_name} / {call_id}]")
+                print(f"[Отправлен tool_result {tool_result_msg} для {tool_name} / {call_id}]")
                 print("You: ", end="", flush=True)
             elif msg.get("type") == "error":
                 print(f"\n[Error]: {msg.get('content')}")
