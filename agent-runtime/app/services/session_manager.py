@@ -1,13 +1,16 @@
-from typing import Dict, Optional, Any, List
-from threading import RLock
-from app.models.schemas import SessionState
 from datetime import datetime
+from threading import RLock
+from typing import Dict, List, Optional
+
+from app.models.schemas import SessionState
+
 
 class SessionManager:
     """
     Управляет всеми сессиями: создание, доступ, изменение сообщений.
     В будущем можно заменить in-memory storage на persistent storage (например, Redis/BoltDB).
     """
+
     def __init__(self):
         self._sessions: Dict[str, SessionState] = {}
         self._lock = RLock()
@@ -20,7 +23,7 @@ class SessionManager:
         with self._lock:
             if session_id in self._sessions:
                 raise ValueError(f"Session {session_id} already exists")
-            state = SessionState(session_id=session_id)
+            state = SessionState.model_construct(session_id=session_id)
             if system_prompt:
                 state.messages.append({"role": "system", "content": system_prompt})
             self._sessions[session_id] = state
@@ -52,6 +55,7 @@ class SessionManager:
         with self._lock:
             if session_id in self._sessions:
                 del self._sessions[session_id]
+
 
 # Singleton instance for global use
 session_manager = SessionManager()

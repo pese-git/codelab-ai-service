@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Literal
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -29,21 +29,21 @@ class SSEToken(BaseModel):
     metadata: Optional[Dict[str, Any]] = None  # Additional data for tool calls, etc.
 
 
-
 class WSToolCall(BaseModel):
     """WebSocket message for tool call from Agent to IDE"""
+
     type: Literal["tool_call"]
     call_id: str = Field(description="Unique identifier for this tool call")
     tool_name: str = Field(description="Name of the tool to execute")
     arguments: Dict[str, Any] = Field(description="Arguments for the tool")
-    
+
     class Config:
         json_schema_extra = {
             "example": {
                 "type": "tool_call",
                 "call_id": "call_abc123",
                 "tool_name": "read_file",
-                "arguments": {"path": "/src/main.py"}
+                "arguments": {"path": "/src/main.py"},
             }
         }
 
@@ -63,14 +63,14 @@ class ToolCall(BaseModel):
     arguments: Dict[str, Any] = Field(description="Arguments for the tool")
     created_at: datetime = Field(default_factory=datetime.now)
     status: ToolExecutionStatus = Field(default=ToolExecutionStatus.PENDING)
-    
+
     class Config:
         json_schema_extra = {
             "example": {
                 "id": "call_abc123",
                 "tool_name": "read_file",
                 "arguments": {"path": "/src/main.py"},
-                "status": "pending"
+                "status": "pending",
             }
         }
 
@@ -81,13 +81,13 @@ class ToolResult(BaseModel):
     error: Optional[str] = Field(description="Error message if execution failed")
     executed_at: datetime = Field(default_factory=datetime.now)
     execution_time_ms: Optional[int] = Field(description="Execution time in milliseconds")
-    
+
     class Config:
         json_schema_extra = {
             "example": {
                 "call_id": "call_abc123",
                 "result": {"content": "file content here"},
-                "execution_time_ms": 150
+                "execution_time_ms": 150,
             }
         }
 
@@ -100,6 +100,7 @@ class ToolCallRequest(BaseModel):
 
 class PendingToolCall(BaseModel):
     """Tracks a tool call waiting for execution result"""
+
     tool_call: ToolCall
     session_id: str
     request_time: datetime = Field(default_factory=datetime.now)
@@ -110,6 +111,7 @@ class PendingToolCall(BaseModel):
 
 class SessionState(BaseModel):
     """Maintains state for an active session"""
+
     session_id: str
     messages: List[Dict[str, Any]] = Field(default_factory=list)
     pending_tool_calls: Dict[str, PendingToolCall] = Field(default_factory=dict)

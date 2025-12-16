@@ -2,11 +2,9 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from app.core.config import AppConfig, logger
-from app.models.schemas import HealthResponse, Message, SessionState, ToolResult, MessageResponse
+from app.models.schemas import HealthResponse, Message
 from app.services.llm_stream_service import llm_stream
 from app.services.session_manager import session_manager
-import asyncio
-
 
 SYSTEM_PROMPT = """
 You are an expert AI programming assistant working together with a developer and their code editor (IDE).
@@ -63,14 +61,15 @@ async def message_stream(message: Message):
     session_manager.get_or_create(message.session_id, system_prompt=SYSTEM_PROMPT)
     # Добавить user message
     session_manager.append_message(message.session_id, "user", message.content)
-    
+
     # collect first item from llm_stream and return as JSON
     event = None
     async for ev in llm_stream(message.session_id):
         event = ev
         break
-    data = event["data"]
+    data = event["data"]  # ty:ignore[non-subscriptable]
     if isinstance(data, str):
         import json as _json
+
         data = _json.loads(data)
     return JSONResponse(content=data)
