@@ -78,16 +78,3 @@ async def message_stream(message: Message):
         import json as _json
         data = _json.loads(data)
     return JSONResponse(content=data)
-
-
-@router.post("/agent/tool/result", response_model=MessageResponse)
-async def receive_tool_result(result: ToolResult):
-    logger.info(f"[Agent] Received tool_result: call_id={result.call_id}")
-    tracker = get_tool_tracker()
-    pending = await tracker.complete_tool_call(result.call_id, result)
-    if not pending:
-        logger.warning(f"[Agent] tool_result: call_id={result.call_id} not found or already completed")
-        return MessageResponse(status="error", message=f"Tool call {result.call_id} not found or already completed.")
-    # (опционально) инициировать продолжение диалога, разблокировать поток, др.
-    # Пока просто подтверждаем успех
-    return MessageResponse(status="ok", message=f"Result accepted for tool call {result.call_id}")
