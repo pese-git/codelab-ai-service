@@ -1,6 +1,6 @@
 from typing import Optional
 import logging
-
+import pprint
 from app.core.config import AppConfig
 from app.models.schemas import ChatCompletionRequest
 
@@ -91,14 +91,15 @@ class OpenAIAdapter(BaseLLMAdapter):
         if request.max_tokens is not None:
             create_params["max_tokens"] = request.max_tokens
             
-        import pprint
         logger.debug(f"[TRACE][OpenAIAdapter] Full llm_request payload:\n" + pprint.pformat(create_params, indent=2, width=120))
 
      
         if not create_params["stream"]:
             try:
                 response = await self.client.chat.completions.create(**create_params)
-                return response.choices[0].message.content
+
+                logger.debug(f"[TRACE][OpenAIAdapter] Full llm_response:\n" + pprint.pformat(response, indent=2, width=120))
+                return [choice.message.model_dump() for choice in response.choices]
             except Exception as e:
                 logger.error(f"[OpenAIAdapter] OpenAI error: {e}")
                 return f"[Error] OpenAI unavailable: {e}"

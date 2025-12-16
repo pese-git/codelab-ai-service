@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 from typing import AsyncGenerator, Dict, Optional
-
+import pprint
 import httpx
 
 from app.core.config import AppConfig
@@ -141,7 +141,7 @@ async def llm_stream(session_id: str):
         "tools": tools,
         #"function_call": "auto"
     }
-    import pprint
+
     logger.info(
         f"[Agent] Sending request to LLM Proxy: session_id={session_id}, messages={len(messages)}"
     )
@@ -154,19 +154,29 @@ async def llm_stream(session_id: str):
             headers={"X-Internal-Auth": AppConfig.INTERNAL_API_KEY},
             timeout=360.0,  # увеличили таймаут для долгих генераций
         )
-        logger.info(f"[Agent] LLM proxy responded: {response.status_code}, body startswith: {response.text[:500]}")
+        logger.info(f"[Agent] LLM proxy responded: {response.status_code}, body startswith: " + pprint.pformat(response.text, indent=2, width=120))
         response.raise_for_status()
         data = response.json()
         result_message = data["choices"][0]["message"]
         content = result_message.get("content", "")
         metadata = {}
-        if "tool_calls" in result_message:
-            metadata["tool_calls"] = result_message["tool_calls"]
+        
+        # Новый блок: если content — список, искать tool_calls в каждом из dict
+        if isinstance(content, list):
+            for obj in content:
+                if isinstance(obj, dict) and "tool_calls" in obj and obj["tool_calls"]:
+                    metadata["tool_calls"] = obj["tool_calls"]
+                    break
+        else:
+            if "tool_calls" in result_message:
+                metadata["tool_calls"] = result_message["tool_calls"]
+        
         if "function_call" in result_message:
             metadata["function_call"] = result_message["function_call"]
 
         # Парсим tool_calls если есть
         tool_calls, clean_content = parse_tool_calls(content, metadata)
+        logger.debug(f"[Agent][TRACE] ToolCll:\n" + pprint.pformat(tool_calls, indent=2, width=120))
         if tool_calls:
             for tool_call in tool_calls:
                 yield {
