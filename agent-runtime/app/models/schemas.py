@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Literal
 
 from pydantic import BaseModel, Field
 
@@ -27,6 +27,25 @@ class SSEToken(BaseModel):
     is_final: bool
     type: str = "assistant_message"  # "assistant_message", "tool_call", "tool_result"
     metadata: Optional[Dict[str, Any]] = None  # Additional data for tool calls, etc.
+
+
+
+class WSToolCall(BaseModel):
+    """WebSocket message for tool call from Agent to IDE"""
+    type: Literal["tool_call"]
+    call_id: str = Field(description="Unique identifier for this tool call")
+    tool_name: str = Field(description="Name of the tool to execute")
+    arguments: Dict[str, Any] = Field(description="Arguments for the tool")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "type": "tool_call",
+                "call_id": "call_abc123",
+                "tool_name": "read_file",
+                "arguments": {"path": "/src/main.py"}
+            }
+        }
 
 
 class ToolExecutionStatus(str, Enum):

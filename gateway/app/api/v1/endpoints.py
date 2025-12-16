@@ -20,6 +20,7 @@ pending_tool_results = {}  # call_id: Future
 
 @router.post("/tool/execute/{session_id}", status_code=status.HTTP_202_ACCEPTED)
 async def tool_execute(session_id: str, tool_call: WSToolCall):
+    logger.debug(f"ToolCall request payload: {tool_call.model_dump()}")
     ws = active_websockets.get(session_id)
     if ws is None:
         return {"status": "error", "detail": f"Session {session_id} not found"}

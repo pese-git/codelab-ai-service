@@ -6,8 +6,7 @@ import pprint
 import httpx
 
 from app.core.config import AppConfig
-from app.models.schemas import SSEToken, SessionState, ToolCall, ToolResult
-from app.services.tool_manager import get_tool_tracker
+from app.models.schemas import SSEToken, SessionState, ToolCall, WSToolCall
 from app.services.tool_parser import parse_tool_calls
 
 logger = logging.getLogger("agent-runtime")
@@ -79,44 +78,40 @@ def get_sessions():
     return sessions
 
 
-async def send_tool_call_to_gateway(session_id: str, tool_call: ToolCall) -> Optional[ToolResult]:
-    """Send tool call to Gateway and wait for result"""
-    tracker = get_tool_tracker()
-    
-    # Register the tool call
-    await tracker.register_tool_call(tool_call, session_id)
-    
-    # Send to Gateway
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.post(
-                f"{AppConfig.GATEWAY_URL}/tool/execute",
-                json={
-                    "session_id": session_id,
-                    "tool_call": json.loads(tool_call.model_dump_json())
-                },
-                headers={"X-Internal-Auth": AppConfig.INTERNAL_API_KEY},
-                timeout=30.0
+async def send_tool_call_to_gateway(session_id: str, tool_call: ToolCall) -> Optional[dict]:
+    """Send tool call to Gateway and wait REST-synchronously for tool result"""
+    try:
+        path  =f"{AppConfig.GATEWAY_URL}/tool/execute/{session_id}"
+        logger.debug(f"ToolExecute path: {path}")
+        async with httpx.AsyncClient() as client:
+            #tool_call_dict = {
+            #    "type": "tool_call",
+            #    "call_id": tool_call.id,
+            #    "tool_name": tool_call.tool_name,
+            #    "arguments": tool_call.arguments,
+            # }
+            tool_call_dict = WSToolCall(
+                type="tool_call",
+                call_id=tool_call.id,
+                tool_name=tool_call.tool_name,
+                arguments=tool_call.arguments,
             )
-            
-            if response.status_code == 200:
-                await tracker.mark_executing(tool_call.id)
-                
-                # Wait for result (this would be improved with websocket or polling)
-                # For now, we'll simulate waiting
-                await asyncio.sleep(0.5)
-                
-                # In real implementation, Gateway would call back with result
-                # For now, return None to continue flow
-                return None
+            logger.debug(f"ToolCall payload: {tool_call_dict.model_dump()}")
+            response = await client.post(
+                path,
+                json=tool_call_dict.model_dump(),
+                headers={"X-Internal-Auth": AppConfig.INTERNAL_API_KEY},
+                timeout=35.0
+            )
+            response.raise_for_status()
+            data = response.json()
+            if data.get("status") == "ok" and "result" in data:
+                return data["result"]
             else:
-                logger.error(f"Failed to send tool call to Gateway: {response.status_code}")
-                await tracker.fail_tool_call(tool_call.id, f"Gateway error: {response.status_code}")
-                
-        except Exception as e:
-            logger.error(f"Error sending tool call to Gateway: {e}")
-            await tracker.fail_tool_call(tool_call.id, str(e))
-    
+                err_msg = data.get("detail", "Unknown Gateway error")
+                logger.error(f"Gateway returned error: {err_msg}")
+    except Exception as e:
+        logger.error(f"Error communicating with Gateway for tool_call: {e}")
     return None
 
 
@@ -174,21 +169,23 @@ async def llm_stream(session_id: str):
         if "function_call" in result_message:
             metadata["function_call"] = result_message["function_call"]
 
+        tool_result = None
         # Парсим tool_calls если есть
         tool_calls, clean_content = parse_tool_calls(content, metadata)
-        logger.debug(f"[Agent][TRACE] ToolCll:\n" + pprint.pformat(tool_calls, indent=2, width=120))
+        logger.debug(f"[Agent][TRACE] ToolCalls:\n" + pprint.pformat(tool_calls, indent=2, width=120))
         if tool_calls:
             for tool_call in tool_calls:
-                yield {
-                    "event": "tool_call",
-                    "data": SSEToken.model_construct(
-                        token="",
-                        is_final=False,
-                        type="tool_call",
-                        metadata={"tool_call": tool_call.model_dump()}
-                    ).model_dump_json()
-                }
-                await send_tool_call_to_gateway(session_id, tool_call)
+                #yield {
+                #    "event": "tool_call",
+                #    "data": SSEToken.model_construct(
+                #        token="",
+                #        is_final=False,
+                #        type="tool_call",
+                #        metadata={"tool_call": tool_call.model_dump()}
+                #    ).model_dump_json()
+                #}
+                logger.debug(f"[Agent][TRACE] TOOL CALL:\n" + pprint.pformat(tool_call, indent=2, width=120))
+                tool_result = await send_tool_call_to_gateway(session_id, tool_call)
                 # TODO: добавить обработку результата и финализировать поток
 
         # Добавляем финальный ассистентский ответ, гарантируя, что content не None
@@ -196,6 +193,9 @@ async def llm_stream(session_id: str):
             clean_content = ""
         elif not isinstance(clean_content, str):
             clean_content = str(clean_content)
+            
+        #if tool_result != None:
+        #    clean_content = clean_content + pprint.pformat(tool_result, indent=2, width=120)
         messages.append({"role": "assistant", "content": clean_content})
         logger.info(f"[Agent] Appended completion to session {session_id}")
 

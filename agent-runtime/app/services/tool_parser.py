@@ -54,13 +54,15 @@ class OpenAIToolCallParser(ToolCallParser):
                 if not tool_name:
                     tool_name = tc.get("name") if isinstance(tc, dict) else getattr(tc, "name", None)
                 logger.debug(f"Parsing tool_call: tc={tc}, func={func}, tool_name={tool_name}, args={arguments}")
-                tool_calls.append(
-                    ToolCall(
-                        id=tc_id or f"tc_{len(tool_calls)}",
-                        tool_name=tool_name or "unknown",
-                        arguments=arguments or {},
+                # НЕ добавлять ToolCall если tool_name пустой!
+                if tool_name:
+                    tool_calls.append(
+                        ToolCall(
+                            id=tc_id or f"tc_{len(tool_calls)}",
+                            tool_name=tool_name,
+                            arguments=arguments or {},
+                        )
                     )
-                )
         # Старый OpenAI function_call (legacy)
         if metadata and "function_call" in metadata:
             try:
@@ -68,16 +70,31 @@ class OpenAIToolCallParser(ToolCallParser):
                 id = f"call_func_{len(tool_calls)}"
                 tool_name=fc.get("name", "") if isinstance(fc, dict) else getattr(fc, "name", "")
                 arguments=json.loads(fc.get("arguments", "{}")) if isinstance(fc, dict) else json.loads(getattr(fc, "arguments", "{}"))
-                tool_call = ToolCall(
-                    id=id,
-                    tool_name=tool_name,
-                    arguments=arguments
-                )
-                logger.debug(f"Parsing tool_call: tc={id}, func={fc}, tool_name={tool_name}, args={arguments}")
-                tool_calls.append(tool_call)
+                # НЕ добавлять ToolCall если tool_name пустой
+                if tool_name:
+                    tool_call = ToolCall(
+                        id=id,
+                        tool_name=tool_name,
+                        arguments=arguments
+                    )
+                    logger.debug(f"Parsing tool_call: tc={id}, func={fc}, tool_name={tool_name}, args={arguments}")
+                    tool_calls.append(tool_call)
             except Exception as e:
                 logger.warning(f"Failed to parse OpenAI function call: {e}")
-        # Прежний fallback (контентный парсинг) можно оставить только для совместимости
+        # Исправление: если content это список, но в нем нет tool_call — вернуть текст без ToolCall!
+        if isinstance(content, list):
+            for item in content:
+                if (
+                    isinstance(item, dict) and
+                    (
+                        ("tool_calls" in item and item["tool_calls"]) or
+                        ("function_call" in item and item["function_call"])
+                    )
+                ):
+                    pass # будем парсить как обычно
+            if not tool_calls:
+                first_content = content[0].get("content", "") if content and isinstance(content[0], dict) else ""
+                return [], first_content
         return tool_calls, content
 
 
