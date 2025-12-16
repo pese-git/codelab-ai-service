@@ -3,7 +3,8 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import AppConfig, logger
 from app.models.schemas import HealthResponse, Message, SessionState, ToolResult, MessageResponse
-from app.services.llm_stream_service import get_sessions, llm_stream
+from app.services.llm_stream_service import llm_stream
+from app.services.session_manager import session_manager
 import asyncio
 
 
@@ -58,17 +59,10 @@ async def message_stream(message: Message):
     logger.info(
         f"[Agent] Incoming message stream: session_id={message.session_id}, content={message.content}"
     )
-    sessions = get_sessions()
-
-    # Create SessionState if not exists
-    if message.session_id not in sessions:
-        sessions[message.session_id] = SessionState(
-            session_id=message.session_id,
-            messages=[{"role": "system", "content": SYSTEM_PROMPT}]
-        )
-    
-    # Append user message to session
-    sessions[message.session_id].messages.append({"role": "user", "content": message.content})
+    # Получить или создать сессию с system prompt
+    session_manager.get_or_create(message.session_id, system_prompt=SYSTEM_PROMPT)
+    # Добавить user message
+    session_manager.append_message(message.session_id, "user", message.content)
     
     # collect first item from llm_stream and return as JSON
     event = None
