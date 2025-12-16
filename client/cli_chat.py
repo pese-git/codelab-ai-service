@@ -15,6 +15,7 @@ async def ws_reader(websocket, queue):
         try:
             data = await websocket.recv()
             msg = json.loads(data)
+            print(f"DEBUG: data: {data}")
             if msg.get("type") == "assistant_message":
                 token = msg.get("token", "")
                 if token:
@@ -24,14 +25,11 @@ async def ws_reader(websocket, queue):
                     print("═════════════════════════════════════")
                     print("You: ", end="", flush=True)
             elif msg.get("type") == "tool_call":
-                # Обнаружен инструмент! Спрашиваем пользователя/эмулируем результат
-                meta = msg.get("metadata", {})
-                tool = meta.get("tool_call", {})
-                call_id = tool.get("id")
-                tool_name = tool.get("tool_name")
-                arguments = tool.get("arguments", {})
+                # Простая обработка: поля сразу в основном сообщении
+                call_id = msg.get("call_id")
+                tool_name = msg.get("tool_name")
+                arguments = msg.get("arguments", {})
                 print(f"\n[ToolCall] {tool_name} (id={call_id}) с аргументами: {arguments}")
-                # Автоматическая эмуляция результата tool_call без участия пользователя:
                 fake_result = f"Auto-executed {tool_name} with args: {arguments}"
                 tool_result_msg = {
                     "type": "tool_result",
