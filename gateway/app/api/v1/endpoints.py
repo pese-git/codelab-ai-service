@@ -1,14 +1,42 @@
 import json
 
 import httpx
-from fastapi import APIRouter, WebSocket
+from fastapi import APIRouter, WebSocket, Request, status
 from starlette.websockets import WebSocketDisconnect
 
 from app.core.config import AppConfig, logger
-from app.models.schemas import HealthResponse, WSErrorResponse, WSUserMessage, WSToolResult
+from app.models.schemas import HealthResponse, WSErrorResponse, WSUserMessage, WSToolResult, WSToolCall
 from app.services.stream_service import get_token_buffers, stream_agent_single
 
 router = APIRouter()
+
+# Simple in-memory mapping: session_id -> websocket
+active_websockets = {}
+
+# In-memory storage for waiting tool results
+timeout_seconds = 30  # how long to wait for tool_result
+pending_tool_results = {}  # call_id: Future
+
+
+@router.post("/tool/execute/{session_id}", status_code=status.HTTP_202_ACCEPTED)
+async def tool_execute(session_id: str, tool_call: WSToolCall):
+    ws = active_websockets.get(session_id)
+    if ws is None:
+        return {"status": "error", "detail": f"Session {session_id} not found"}
+    import asyncio
+    call_id = tool_call.call_id
+    fut = asyncio.get_event_loop().create_future()
+    pending_tool_results[call_id] = fut
+    await ws.send_json(tool_call.model_dump())
+    try:
+        result = await asyncio.wait_for(fut, timeout=timeout_seconds)
+        return {"status": "ok", "result": result}
+    except asyncio.TimeoutError:
+        pending_tool_results.pop(call_id, None)
+        return {"status": "error", "detail": f"Timeout waiting for tool_result (call_id={call_id})"}
+    finally:
+        # После завершения очищаем future
+        pending_tool_results.pop(call_id, None)
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -22,6 +50,7 @@ async def health_check():
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
     await websocket.accept()
     logger.info(f"[{session_id}] WebSocket connected")
+    active_websockets[session_id] = websocket
     token_buffers = get_token_buffers()
     try:
         async with httpx.AsyncClient() as client:
@@ -33,20 +62,11 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                     try:
                         tool_result = WSToolResult.model_validate(json.loads(raw_msg))
                         logger.debug(f"[{session_id}] Parsed WSToolResult: {tool_result}")
-                        # Постим на agent-runtime
-                        resp = await client.post(
-                            f"{AppConfig.AGENT_URL}/agent/tool/result",
-                            json={
-                                "call_id": tool_result.call_id,
-                                "result": tool_result.result,
-                                "error": tool_result.error,
-                                # Дополнительные поля при необходимости
-                            },
-                            headers={"X-Internal-Auth": AppConfig.INTERNAL_API_KEY},
-                            timeout=AppConfig.REQUEST_TIMEOUT,
-                        )
-                        logger.info(f"[{session_id}] Relayed tool_result to agent-runtime (call_id={tool_result.call_id}): {resp.status_code}")
-                        await websocket.send_json({"status": "ok", "detail": f"tool_result for call_id={tool_result.call_id} relayed"})
+                        # Если есть ожидающий Future — выполнить его
+                        fut = pending_tool_results.pop(tool_result.call_id, None)
+                        if fut and not fut.done():
+                            fut.set_result(tool_result.result)
+                        await websocket.send_json({"status": "ok", "detail": f"tool_result for call_id={tool_result.call_id} received"})
                         continue
                     except Exception:
                         pass  # не tool_result, идём обычным путём
@@ -68,5 +88,6 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
     except WebSocketDisconnect:
         logger.info(f"[{session_id}] WebSocket disconnected")
         token_buffers.pop(session_id, None)
+        active_websockets.pop(session_id, None)
     except Exception as e:
         logger.error(f"[{session_id}] WS fatal error: {e}")
