@@ -102,7 +102,7 @@ async def llm_stream(session_id: str):
     data = await llm_proxy_client.chat_completion(
         model=AppConfig.LLM_MODEL, messages=messages, tools=tools, stream=False
     )
-    logger.info(f"[Agent] LLM proxy responded: {str(data)[:256]}")
+    logger.info("[Agent][TRACE] LLM proxy responded:\n" + pprint.pformat(data, indent=2, width=120))
     result_message = data["choices"][0]["message"]
     content = result_message.get("content", "")
     metadata = {}
@@ -141,9 +141,14 @@ async def llm_stream(session_id: str):
         data2 = await llm_proxy_client.chat_completion(
             model=AppConfig.LLM_MODEL, messages=new_messages, tools=tools, stream=False
         )
-        logger.info(f"[Agent] Second LLM proxy call for final assistant reply: {str(data2)[:256]}")
+
+        logger.info(
+            "[Agent] Second LLM proxy call for final assistant reply::\n"
+            + pprint.pformat(data2, indent=2, width=120)
+        )
+
         result_message2 = data2["choices"][0]["message"]
-        final_content = result_message2.get("content", "")
+        final_content = result_message2["content"][0]["content"]
         # Добавляем ассистентский финальный ответ в историю
         session_manager.append_message(session_id, "assistant", final_content)
         yield {
@@ -155,13 +160,18 @@ async def llm_stream(session_id: str):
         return
 
     # Если tool_calls нет -- обычный ассистентский ответ
-    if clean_content is None:
-        clean_content = ""
-    elif not isinstance(clean_content, str):
-        clean_content = str(clean_content)
-    session_manager.append_message(session_id, "assistant", clean_content)
-    logger.info(f"[Agent] Appended completion to session {session_id}")
+    # if clean_content is None:
+    #    clean_content = ""
+    # elif not isinstance(clean_content, str):
+    #    clean_content = str(clean_content)
 
+    clean_content = result_message["content"][0]["content"]
+    session_manager.append_message(session_id, "assistant", clean_content)
+
+    logger.info(
+        "[Agent] Appended completion to session {session_id}::\n"
+        + pprint.pformat(clean_content, indent=2, width=120)
+    )
     yield {
         "event": "message",
         "data": SSEToken.model_construct(
