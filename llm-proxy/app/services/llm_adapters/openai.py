@@ -32,12 +32,14 @@ class OpenAIAdapter(BaseLLMAdapter):
                             "is_available": True,
                         }
                     )
+            logger.debug(f"[OpenAIAdapter] OpenAI fetched models: {pprint.pformat(models_list, indent=2, width=120)}")
             if models_list:
                 return models_list
         except Exception as e:
             logger.warning(
                 f"[OpenAIAdapter] Cannot fetch list of models, fallback to defaults: {e}"
             )
+            logger.debug(f"[OpenAIAdapter][EXCEPTION get_models] Locals: {pprint.pformat(locals(), indent=2, width=120)}")
         # fallback (ручной список)
         return [
             {
@@ -101,7 +103,8 @@ class OpenAIAdapter(BaseLLMAdapter):
                 logger.debug(f"[TRACE][OpenAIAdapter] Full llm_response:\n" + pprint.pformat(response, indent=2, width=120))
                 return [choice.message.model_dump() for choice in response.choices]
             except Exception as e:
-                logger.error(f"[OpenAIAdapter] OpenAI error: {e}")
+                logger.error(f"[OpenAIAdapter] OpenAI error: {e}", exc_info=True)
+                logger.error(f"[OpenAIAdapter][EXCEPTION chat.non-stream] Locals: {pprint.pformat(locals(), indent=2, width=120)}")
                 return f"[Error] OpenAI unavailable: {e}"
 
         # stream mode
@@ -113,11 +116,14 @@ class OpenAIAdapter(BaseLLMAdapter):
                     try:
                         token = chunk.choices[0].delta.content or ""
                     except Exception:
-                        pass
+                        logger.error(f"[OpenAIAdapter][stream] chunk parse error", exc_info=True)
+                        logger.error(f"[OpenAIAdapter][stream] chunk: {pprint.pformat(chunk, indent=2, width=120)}")
                     if token:
+                        logger.debug(f"[OpenAIAdapter][stream] yield token: {token}")
                         yield token
             except Exception as e:
-                logger.error(f"[OpenAIAdapter][streaming] error: {e}")
+                logger.error(f"[OpenAIAdapter][streaming] error: {e}", exc_info=True)
+                logger.error(f"[OpenAIAdapter][EXCEPTION stream] Locals: {pprint.pformat(locals(), indent=2, width=120)}")
                 yield f"[Error] OpenAI stream unavailable: {e}"
 
         return token_gen()

@@ -1,5 +1,6 @@
 import logging
 import os
+import pprint
 from typing import AsyncGenerator, Optional
 
 import openai
@@ -9,7 +10,7 @@ from app.models.schemas import ChatCompletionRequest
 
 from .base import BaseLLMAdapter
 
-logger = logging.getLogger("llm-proxy")
+logger = logging.getLogger("llm-proxy.vllm_adapter")
 
 
 class VLLMAdapter(BaseLLMAdapter):
@@ -40,9 +41,11 @@ class VLLMAdapter(BaseLLMAdapter):
                         "is_available": True,
                     }
                 )
+            logger.debug(f"[VLLMAdapter] Models fetched: {pprint.pformat(models, indent=2, width=120)}")
             return models or []
         except Exception as e:
-            logger.warning(f"[VLLMAdapter] Cannot fetch models: {e}")
+            logger.warning(f"[VLLMAdapter] Cannot fetch models: {e}", exc_info=True)
+            logger.debug(f"[VLLMAdapter][EXCEPTION get_models] Locals: {pprint.pformat(locals(), indent=2, width=120)}")
             return []
 
     async def chat(self, request: ChatCompletionRequest) -> str | AsyncGenerator[str, None]:
@@ -57,25 +60,31 @@ class VLLMAdapter(BaseLLMAdapter):
             "messages": messages,
             "stream": getattr(request, "stream", False),
         }
-        logger.debug(f"[DEBUG VLLM PAYLOAD] {payload}")
+        logger.debug(f"[TRACE][VLLMAdapter] Full llm_request payload:\n" + pprint.pformat(payload, indent=2, width=120))
         if not payload["stream"]:
             try:
                 response = await oa_client.chat.completions.create(**payload, timeout=600)
-                logger.debug(f"[DEBUG VLLM RESPONSE] {response}")
+                logger.debug(f"[TRACE][VLLMAdapter] Full llm_response:\n" + pprint.pformat(response, indent=2, width=120))
                 return response.choices[0].message.content
             except Exception as e:
-                logger.error(f"[VLLMAdapter] error: {e}")
+                logger.error(f"[VLLMAdapter] error: {e}", exc_info=True)
+                logger.error(f"[VLLMAdapter][EXCEPTION chat.non-stream] Locals: {pprint.pformat(locals(), indent=2, width=120)}")
                 return f"[Error] vLLM unavailable: {e}"
 
         # stream mode
         async def token_gen():
             try:
-                async for chunk in await oa_client.chat.completions.create(**payload, timeout=600):
+                stream = await oa_client.chat.completions.create(**payload, timeout=600)
+                async for chunk in stream:
+                    logger.debug(f"[VLLMAdapter][stream] chunk: {pprint.pformat(chunk, indent=2, width=120)}")
+                    token = None
                     if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
                         token = chunk.choices[0].delta.content
+                        logger.debug(f"[VLLMAdapter][stream] yield token: {token}")
                         yield token
             except Exception as e:
-                logger.error(f"[VLLMAdapter][stream] error: {e}")
+                logger.error(f"[VLLMAdapter][stream] error: {e}", exc_info=True)
+                logger.error(f"[VLLMAdapter][EXCEPTION stream] Locals: {pprint.pformat(locals(), indent=2, width=120)}")
                 yield f"[Error] vLLM stream unavailable: {e}"
 
         return token_gen()

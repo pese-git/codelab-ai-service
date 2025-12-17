@@ -76,105 +76,121 @@ async def llm_stream(session_id: str):
     """
     Send a non-streaming (stream=False) request to LLM Proxy and process tool calls/result.
     """
-    session = session_manager.get(session_id)
-    if not session:
-        logger.error(f"Session {session_id} not found")
-        yield {"event": "error", "data": json.dumps({"error": "Session not found"})}
-        return
+    try:
+        session = session_manager.get(session_id)
+        if not session:
+            logger.error(f"Session {session_id} not found")
+            yield {"event": "error", "data": json.dumps({"error": "Session not found"})}
+            return
 
-    messages = session.messages
-    llm_request = {
-        "model": AppConfig.LLM_MODEL,
-        "messages": messages,
-        "stream": False,
-        "tools": tools,
-        # "function_call": "auto"
-    }
-
-    logger.info(
-        f"[Agent] Sending request to LLM Proxy: session_id={session_id}, messages={len(messages)}"
-    )
-    logger.debug(
-        "[Agent][TRACE] Full llm_request payload:\n"
-        + pprint.pformat(llm_request, indent=2, width=120)
-    )
-
-    data = await llm_proxy_client.chat_completion(
-        model=AppConfig.LLM_MODEL, messages=messages, tools=tools, stream=False
-    )
-    logger.info("[Agent][TRACE] LLM proxy responded:\n" + pprint.pformat(data, indent=2, width=120))
-    result_message = data["choices"][0]["message"]
-    content = result_message.get("content", "")
-    metadata = {}
-
-    # Новый блок: если content — список, искать tool_calls в каждом из dict
-    if isinstance(content, list):
-        for obj in content:
-            if isinstance(obj, dict) and "tool_calls" in obj and obj["tool_calls"]:
-                metadata["tool_calls"] = obj["tool_calls"]
-                break
-    else:
-        if "tool_calls" in result_message:
-            metadata["tool_calls"] = result_message["tool_calls"]
-
-    if "function_call" in result_message:
-        metadata["function_call"] = result_message["function_call"]
-
-    # Парсим tool_calls если есть
-    tool_calls, clean_content = parse_tool_calls(content, metadata)
-    logger.debug("[Agent][TRACE] ToolCalls:\n" + pprint.pformat(tool_calls, indent=2, width=120))
-    if tool_calls:
-        # Поддерживаем только первый tool_call (как в OpenAI)
-        tool_call = tool_calls[0]
-        logger.debug("[Agent][TRACE] TOOL CALL:\n" + pprint.pformat(tool_call, indent=2, width=120))
-        # 1. Выполняем tool через Gateway
-        tool_result = await tool_call_handler.execute(session_id, tool_call)
-        # 2. Добавляем result как function message в историю диалога (OpenAI pattern)
-        function_message = {
-            "role": "function",
-            "name": tool_call.tool_name,
-            "content": tool_result if isinstance(tool_result, str) else str(tool_result),
+        messages = session.messages
+        llm_request = {
+            "model": AppConfig.LLM_MODEL,
+            "messages": messages,
+            "stream": False,
+            "tools": tools,
+            # "function_call": "auto"
         }
-        session_manager.get(session_id).messages.append(function_message)  # ty:ignore[possibly-missing-attribute]
-        # 3. Делаем повторный запрос в LLM (уже с user + assistant(function_call)+ function result)
-        new_messages = session_manager.get(session_id).messages  # ty:ignore[possibly-missing-attribute]
-        data2 = await llm_proxy_client.chat_completion(
-            model=AppConfig.LLM_MODEL, messages=new_messages, tools=tools, stream=False
-        )
 
         logger.info(
-            "[Agent] Second LLM proxy call for final assistant reply::\n"
-            + pprint.pformat(data2, indent=2, width=120)
+            f"[Agent] Sending request to LLM Proxy: session_id={session_id}, messages={len(messages)}"
+        )
+        logger.debug(
+            "[Agent][TRACE] Full llm_request payload:\n"
+            + pprint.pformat(llm_request, indent=2, width=120)
         )
 
-        result_message2 = data2["choices"][0]["message"]
-        final_content = result_message2["content"][0]["content"]
-        # Добавляем ассистентский финальный ответ в историю
-        session_manager.append_message(session_id, "assistant", final_content)
+        data = await llm_proxy_client.chat_completion(
+            model=AppConfig.LLM_MODEL, messages=messages, tools=tools, stream=False
+        )
+        logger.info(
+            "[Agent][TRACE] LLM proxy responded:\n" + pprint.pformat(data, indent=2, width=120)
+        )
+        result_message = data["choices"][0]["message"]
+        content = result_message.get("content", "")
+        metadata = {}
+
+        # Новый блок: если content — список, искать tool_calls в каждом из dict
+        if isinstance(content, list):
+            for obj in content:
+                if isinstance(obj, dict) and "tool_calls" in obj and obj["tool_calls"]:
+                    metadata["tool_calls"] = obj["tool_calls"]
+                    break
+        else:
+            if "tool_calls" in result_message:
+                metadata["tool_calls"] = result_message["tool_calls"]
+
+        if "function_call" in result_message:
+            metadata["function_call"] = result_message["function_call"]
+
+        # Парсим tool_calls если есть
+        tool_calls, clean_content = parse_tool_calls(content, metadata)
+        logger.debug(
+            "[Agent][TRACE] ToolCalls:\n" + pprint.pformat(tool_calls, indent=2, width=120)
+        )
+        if tool_calls:
+            # Поддерживаем только первый tool_call (как в OpenAI)
+            tool_call = tool_calls[0]
+            logger.debug(
+                "[Agent][TRACE] TOOL CALL:\n" + pprint.pformat(tool_call, indent=2, width=120)
+            )
+            # 1. Выполняем tool через Gateway
+            tool_result = await tool_call_handler.execute(session_id, tool_call)
+            # 2. Добавляем result как function message в историю диалога (OpenAI pattern)
+            function_message = {
+                "role": "function",
+                "name": tool_call.tool_name,
+                "content": tool_result if isinstance(tool_result, str) else str(tool_result),
+            }
+            session_manager.get(session_id).messages.append(function_message)  # ty:ignore[possibly-missing-attribute]
+            # 3. Делаем повторный запрос в LLM (уже с user + assistant(function_call)+ function result)
+            new_messages = session_manager.get(session_id).messages  # ty:ignore[possibly-missing-attribute]
+            data2 = await llm_proxy_client.chat_completion(
+                model=AppConfig.LLM_MODEL, messages=new_messages, tools=tools, stream=False
+            )
+
+            logger.info(
+                "[Agent] Second LLM proxy call for final assistant reply::\n"
+                + pprint.pformat(data2, indent=2, width=120)
+            )
+
+            result_message2 = data2["choices"][0]["message"]
+            final_content = result_message2["content"][0]["content"]
+            # Добавляем ассистентский финальный ответ в историю
+            session_manager.append_message(session_id, "assistant", final_content)
+            yield {
+                "event": "message",
+                "data": SSEToken.model_construct(
+                    token=final_content, is_final=True, type="assistant_message"
+                ).model_dump_json(),
+            }
+            return
+
+        # Если tool_calls нет -- обычный ассистентский ответ
+        # if clean_content is None:
+        #    clean_content = ""
+        # elif not isinstance(clean_content, str):
+        #    clean_content = str(clean_content)
+
+        clean_content = result_message["content"][0]["content"]
+        session_manager.append_message(session_id, "assistant", clean_content)
+
+        logger.info(
+            "[Agent] Appended completion to session {session_id}::\n"
+            + pprint.pformat(clean_content, indent=2, width=120)
+        )
         yield {
             "event": "message",
             "data": SSEToken.model_construct(
-                token=final_content, is_final=True, type="assistant_message"
+                token=clean_content, is_final=True, type="assistant_message"
             ).model_dump_json(),
         }
+    except Exception as e:
+        logger.error(
+            f"[Agent][ERROR] Exception in llm_stream for session {session_id}: {e}", exc_info=True
+        )
+        logger.error(
+            "[Agent][ERROR] Locals at exception:\n" + pprint.pformat(locals(), indent=2, width=120)
+        )
+        yield {"event": "error", "data": json.dumps({"error": str(e)})}
         return
-
-    # Если tool_calls нет -- обычный ассистентский ответ
-    # if clean_content is None:
-    #    clean_content = ""
-    # elif not isinstance(clean_content, str):
-    #    clean_content = str(clean_content)
-
-    clean_content = result_message["content"][0]["content"]
-    session_manager.append_message(session_id, "assistant", clean_content)
-
-    logger.info(
-        "[Agent] Appended completion to session {session_id}::\n"
-        + pprint.pformat(clean_content, indent=2, width=120)
-    )
-    yield {
-        "event": "message",
-        "data": SSEToken.model_construct(
-            token=clean_content, is_final=True, type="assistant_message"
-        ).model_dump_json(),
-    }

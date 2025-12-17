@@ -1,4 +1,5 @@
 import logging
+import pprint
 from typing import Optional
 
 import httpx
@@ -6,7 +7,7 @@ import httpx
 from app.core.config import AppConfig
 from app.models.schemas import ToolCall, WSToolCall
 
-logger = logging.getLogger("agent-runtime")
+logger = logging.getLogger("agent-runtime.tool_call_handler")
 
 
 class ToolCallHandler:
@@ -24,15 +25,17 @@ class ToolCallHandler:
         Возвращает dict - результат выполнения инструмента.
         """
         try:
+            logger.info(f"[ToolCallHandler] Executing tool_call for session={session_id}, tool={tool_call.tool_name}")
+            logger.debug(f"[ToolCallHandler] tool_call object:\n" + pprint.pformat(tool_call.model_dump(), indent=2, width=120))
             path = f"{self.gateway_url}/tool/execute/{session_id}"
-            logger.debug(f"ToolExecute path: {path}")
+            logger.debug(f"[ToolCallHandler] ToolExecute path: {path}")
             ws_tool_call = WSToolCall.model_construct(
                 type="tool_call",
                 call_id=tool_call.id,
                 tool_name=tool_call.tool_name,
                 arguments=tool_call.arguments,
             )
-            logger.debug(f"ToolCall payload: {ws_tool_call.model_dump()}")
+            logger.debug(f"[ToolCallHandler] ToolCall payload:\n" + pprint.pformat(ws_tool_call.model_dump(), indent=2, width=120))
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     path,
@@ -40,15 +43,19 @@ class ToolCallHandler:
                     headers={"X-Internal-Auth": self.api_key},
                     timeout=35.0,
                 )
+                logger.debug(f"[ToolCallHandler] Raw Gateway response [{response.status_code}]: {response.text[:300]}")
                 response.raise_for_status()
                 data = response.json()
+                logger.debug(f"[ToolCallHandler] Gateway parsed response:\n" + pprint.pformat(data, indent=2, width=120))
                 if data.get("status") == "ok" and "result" in data:
+                    logger.info(f"[ToolCallHandler] Gateway tool execution ok. Result keys: {list(data['result'].keys()) if isinstance(data['result'], dict) else type(data['result'])}")
                     return data["result"]
                 else:
                     err_msg = data.get("detail", "Unknown Gateway error")
-                    logger.error(f"Gateway returned error: {err_msg}")
+                    logger.error(f"[ToolCallHandler] Gateway returned error: {err_msg}\nFull data: {pprint.pformat(data, indent=2, width=120)}")
         except Exception as e:
-            logger.error(f"Error communicating with Gateway for tool_call: {e}")
+            logger.error(f"[ToolCallHandler] Error communicating with Gateway for tool_call: {e}", exc_info=True)
+            logger.error(f"[ToolCallHandler] tool_call params/locals:\n" + pprint.pformat(locals(), indent=2, width=120))
         return None
 
 

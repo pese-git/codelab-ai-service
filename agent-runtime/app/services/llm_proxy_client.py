@@ -1,11 +1,12 @@
 import logging
+import pprint
 from typing import List, Optional
 
 import httpx
 
 from app.core.config import AppConfig
 
-logger = logging.getLogger("agent-runtime")
+logger = logging.getLogger("agent-runtime.llm_proxy_client")
 
 
 class LLMProxyClient:
@@ -36,20 +37,28 @@ class LLMProxyClient:
             payload.update(extra_payload)
 
         logger.info(f"[LLMProxyClient] POST {self.api_url}/v1/chat/completions stream={stream}")
-        logger.debug(f"[LLMProxyClient] Payload: {payload}")
+        logger.debug("[LLMProxyClient] Payload:\n" + pprint.pformat(payload, indent=2, width=120))
 
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{self.api_url}/v1/chat/completions",
-                json=payload,
-                headers={"X-Internal-Auth": self.api_key},
-                timeout=360.0,
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.api_url}/v1/chat/completions",
+                    json=payload,
+                    headers={"X-Internal-Auth": self.api_key},
+                    timeout=360.0,
+                )
+            response.raise_for_status()
+            logger.debug(
+                f"[LLMProxyClient] Response {response.status_code}, head: {str(response.text)[:256]}"
             )
-        response.raise_for_status()
-        logger.debug(
-            f"[LLMProxyClient] Response {response.status_code}, body startswith: {str(response.text)[:128]}"
-        )
-        return response.json()
+            logger.debug(
+                "[LLMProxyClient] Response JSON:\n" + pprint.pformat(response.json(), indent=2, width=120)
+            )
+            return response.json()
+        except Exception as e:
+            logger.error(f"[LLMProxyClient] Exception in chat_completion: {e}", exc_info=True)
+            logger.error("[LLMProxyClient] Locals at exception:\n" + pprint.pformat(locals(), indent=2, width=120))
+            raise
 
 
 # Singleton для всего проекта (можно замокать при необходимости)
