@@ -1,9 +1,12 @@
+import traceback
+
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
+from app.core.agent.llm_proxy_agent import LLMProxyAgent
 from app.core.config import AppConfig, logger
 from app.models.schemas import HealthResponse, Message
-from app.services.llm_stream_service import llm_stream
+from app.services.llm_proxy_client import llm_proxy_client
 from app.services.session_manager import session_manager
 
 SYSTEM_PROMPT = """
@@ -52,24 +55,37 @@ async def health_check() -> HealthResponse:
     )
 
 
+# agent = SimpleLLMAgent(system_prompt=SYSTEM_PROMPT)
+
+
 @router.post("/agent/message/stream")
 async def message_stream(message: Message):
     logger.info(
-        f"[Agent] Incoming message stream: session_id={message.session_id}, content={message.content}"
+        f"[TRACE] Incoming message stream: session_id={message.session_id}, content={message.content}"
     )
-    # Получить или создать сессию с system prompt
-    session_manager.get_or_create(message.session_id, system_prompt=SYSTEM_PROMPT)
-    # Добавить user message
-    session_manager.append_message(message.session_id, "user", message.content)
+    try:
+        # Получить или создать сессию с system prompt
+        session_manager.get_or_create(message.session_id, system_prompt=SYSTEM_PROMPT)
+        # Добавить user message
+        session_manager.append_message(message.session_id, "user", message.content)
 
-    # collect first item from llm_stream and return as JSON
-    event = None
-    async for ev in llm_stream(message.session_id):
-        event = ev
-        break
-    data = event["data"]  # ty:ignore[non-subscriptable]
-    if isinstance(data, str):
-        import json as _json
+        # Используем LLMProxyAgent для получения ответа по всей истории чата
+        history = session_manager.get(message.session_id).messages  # ty:ignore[possibly-missing-attribute]
+        logger.debug(f"[TRACE] Chat history for {message.session_id}: {history}")
+        agent = LLMProxyAgent(llm=llm_proxy_client, model="gpt-4.1")
+        logger.info(f"[TRACE] Calling agent {agent.name} ...")
+        step = await agent.decide({"history": history})
+        logger.info(f"[TRACE] AgentStep: {step}")
+        assistant_reply = getattr(step.step, "content", "")  # без content будет пусто
 
-        data = _json.loads(data)
-    return JSONResponse(content=data)
+        # Добавить ответ агента в историю
+        session_manager.append_message(message.session_id, "assistant", assistant_reply)
+        logger.info(f"[TRACE] Assistant reply: {assistant_reply}")
+
+        # Вернуть стандартный ответ SSE совместимый формат
+        return JSONResponse(
+            content={"token": assistant_reply, "is_final": True, "type": "assistant_message"}
+        )
+    except Exception:
+        logger.error(f"[TRACE][ERROR] Exception in /agent/message/stream\n{traceback.format_exc()}")
+        return JSONResponse(content={"error": "Internal server error"}, status_code=500)

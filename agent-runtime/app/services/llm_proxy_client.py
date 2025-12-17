@@ -19,7 +19,6 @@ class LLMProxyClient:
 
     async def chat_completion(
         self,
-        *,
         model: str,
         messages: List[dict],
         tools: Optional[list] = None,
