@@ -30,9 +30,7 @@ def tool_spec(fn, name: str, description: str, parameters: dict):
 
 
 TOOLS: Dict[str, Callable] = {"echo": echo_tool, "calculator": math_tool}
-
-def get_tool_registry():
-    return TOOLS
+# get_tool_registry теперь в app/core/dependencies.py
 
 TOOLS_SPEC = [
     tool_spec(

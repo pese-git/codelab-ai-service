@@ -6,7 +6,8 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import AppConfig, logger
 from app.models.schemas import HealthResponse, Message
-from app.services.chat_service import get_chat_service, ChatService
+from app.core.dependencies import get_chat_service
+from app.services.chat_service import ChatService
 
 router = APIRouter()
 

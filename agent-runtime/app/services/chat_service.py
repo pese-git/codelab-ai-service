@@ -1,14 +1,14 @@
 from typing import List
-from fastapi import Depends
+# from fastapi import Depends
 
 from app.models.schemas import Message
 from app.core.config import logger
 from app.services.session_manager import session_manager
 from app.core.agent.prompts import SYSTEM_PROMPT
 from app.core.agent.llm_proxy_agent import LLMProxyAgent
-from app.services.llm_proxy_client import get_llm_proxy_client, LLMProxyClient
+from app.services.llm_proxy_client import LLMProxyClient
 from app.services.orchestrator import AgentOrchestrator
-from app.services.tool_registry import get_tool_registry
+# get_llm_proxy_client и get_tool_registry теперь только в app/core/dependencies.py
 
 class ChatService:
     def __init__(self, llm_proxy_client: LLMProxyClient, tools):
@@ -52,8 +52,4 @@ class ChatService:
             "trace": trace,
         }
 
-def get_chat_service(
-    llm_proxy_client: LLMProxyClient = Depends(get_llm_proxy_client),
-    tools = Depends(get_tool_registry),
-) -> ChatService:
-    return ChatService(llm_proxy_client=llm_proxy_client, tools=tools)
+# get_chat_service теперь в app/core/dependencies.py
