@@ -1,6 +1,6 @@
 from typing import List
 
-from app.core.agent.sgr import AgentStep
+from app.models.agents import AgentStep
 
 
 class BaseAgent:

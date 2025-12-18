@@ -1,14 +1,13 @@
+import logging
+import pprint
 from datetime import datetime
 from threading import RLock
 from typing import Dict, List, Optional
-import logging
-import pprint
 
 from app.models.schemas import SessionState
 
-
-
 logger = logging.getLogger("agent-runtime.session_manager")
+
 
 class SessionManager:
     """
@@ -19,6 +18,7 @@ class SessionManager:
     def __init__(self):
         self._sessions: Dict[str, SessionState] = {}
         self._lock = RLock()
+
     def exists(self, session_id: str) -> bool:
         with self._lock:
             exists = session_id in self._sessions
@@ -26,21 +26,28 @@ class SessionManager:
             return exists
 
     def create(self, session_id: str, system_prompt: Optional[str] = None) -> SessionState:
+        from app.models.schemas import Message
+
         with self._lock:
             if session_id in self._sessions:
                 logger.error(f"[SessionManager] Attempt to create duplicate session: {session_id}")
                 raise ValueError(f"Session {session_id} already exists")
             state = SessionState.model_construct(session_id=session_id)
             if system_prompt:
-                state.messages.append({"role": "system", "content": system_prompt})
+                state.messages.append(Message.model_construct(role="system", content=system_prompt))
             self._sessions[session_id] = state
-            logger.info(f"[SessionManager] Created session: {session_id}. State:\n" + pprint.pformat(state.model_dump(), indent=2, width=120))
+            logger.info(
+                f"[SessionManager] Created session: {session_id}. State:\n"
+                + pprint.pformat(state.model_dump(), indent=2, width=120)
+            )
             return state
 
     def get(self, session_id: str) -> Optional[SessionState]:
         with self._lock:
             session = self._sessions.get(session_id)
-            logger.debug(f"[SessionManager] Get session: {session_id} -> {'found' if session else 'not found'}")
+            logger.debug(
+                f"[SessionManager] Get session: {session_id} -> {'found' if session else 'not found'}"
+            )
             return session
 
     def get_or_create(self, session_id: str, system_prompt: Optional[str] = None) -> SessionState:
@@ -51,21 +58,31 @@ class SessionManager:
             logger.debug(f"[SessionManager] Found existing session in get_or_create: {session_id}")
             return self._sessions[session_id]
 
-    def append_message(self, session_id: str, role: str, content: str):
+    def append_message(self, session_id: str, role: str, content: str, name: Optional[str] = None):
+        from app.models.schemas import Message
+
         with self._lock:
             state = self.get(session_id)
             if not state:
                 logger.error(f"[SessionManager] append_message: Session {session_id} not found")
                 raise ValueError(f"Session {session_id} not found")
-            msg = {"role": role, "content": content}
+            msg = Message.model_construct(role=role, content=content, name=name)
             state.messages.append(msg)
             state.last_activity = datetime.now()
-            logger.debug(f"[SessionManager] Appended message to {session_id}:\n" + pprint.pformat(msg, indent=2, width=120))
-            logger.debug(f"[SessionManager] New session messages for {session_id}:\n" + pprint.pformat(state.messages, indent=2, width=120))
+            logger.debug(
+                f"[SessionManager] Appended message to {session_id}:\n"
+                + pprint.pformat(msg.model_dump(), indent=2, width=120)
+            )
+            logger.debug(
+                f"[SessionManager] New session messages for {session_id}:\n"
+                + pprint.pformat([m.model_dump() for m in state.messages], indent=2, width=120)
+            )
 
     def all_sessions(self) -> List[SessionState]:
         with self._lock:
-            logger.debug(f"[SessionManager] all_sessions called, found {len(self._sessions)} sessions")
+            logger.debug(
+                f"[SessionManager] all_sessions called, found {len(self._sessions)} sessions"
+            )
             return list(self._sessions.values())
 
     def delete(self, session_id: str):
@@ -74,7 +91,9 @@ class SessionManager:
                 logger.info(f"[SessionManager] Deleting session: {session_id}")
                 del self._sessions[session_id]
             else:
-                logger.warning(f"[SessionManager] Tried to delete non-existent session: {session_id}")
+                logger.warning(
+                    f"[SessionManager] Tried to delete non-existent session: {session_id}"
+                )
 
 
 # Singleton instance for global use

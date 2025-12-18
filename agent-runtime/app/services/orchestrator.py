@@ -3,7 +3,7 @@ import pprint
 from typing import Any, Dict, List, Optional
 
 from app.core.agent.base_agent import BaseAgent
-from app.core.agent.sgr import AgentStep, UseTool
+from app.models.agents import AgentStep, UseTool
 from app.models.schemas import ToolCall
 from app.services.tool_registry import execute_tool
 

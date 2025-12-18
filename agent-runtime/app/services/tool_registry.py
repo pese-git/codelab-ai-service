@@ -31,6 +31,9 @@ def tool_spec(fn, name: str, description: str, parameters: dict):
 
 TOOLS: Dict[str, Callable] = {"echo": echo_tool, "calculator": math_tool}
 
+def get_tool_registry():
+    return TOOLS
+
 TOOLS_SPEC = [
     tool_spec(
         echo_tool,
@@ -107,7 +110,7 @@ async def execute_tool(
     if tool_fn:
         try:
             logger.info(f"[TOOL_REGISTRY] Calling local tool function: {tool_fn.__name__}")  # ty:ignore[unresolved-attribute]
-            args = tool_call.arguments
+            args = tool_call.arguments.model_dump() if hasattr(tool_call.arguments, "model_dump") else dict(tool_call.arguments)
             result = tool_fn(**args)
             logger.info(
                 f"[TOOL_REGISTRY] Local result: {pprint.pformat(result, indent=2, width=120)}"

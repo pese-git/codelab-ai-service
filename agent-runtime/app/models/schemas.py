@@ -12,9 +12,10 @@ class HealthResponse(BaseModel):
 
 
 class Message(BaseModel):
-    session_id: str
-    type: str
+    role: Literal["user", "assistant", "system", "tool"]
     content: str
+    name: Optional[str] = None # если требуется (например, имя инструмента)
+    # session_id намеренно убирается из единичного сообщения: оно есть в SessionState
 
 
 class MessageResponse(BaseModel):
@@ -57,10 +58,18 @@ class ToolExecutionStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
+class ReadFileArgs(BaseModel):
+    path: str
+
+from typing import Optional
+class ToolArguments(BaseModel):
+    read_file: Optional[ReadFileArgs] = None
+    # Можно добавить другие инструменты: write_file: Optional[WriteFileArgs] = None
+
 class ToolCall(BaseModel):
     id: str = Field(description="Unique identifier for this tool call")
     tool_name: str = Field(description="Name of the tool to execute")
-    arguments: Dict[str, Any] = Field(description="Arguments for the tool")
+    arguments: ToolArguments = Field(description="Arguments for the tool")
     created_at: datetime = Field(default_factory=datetime.now)
     status: ToolExecutionStatus = Field(default=ToolExecutionStatus.PENDING)
 
@@ -113,7 +122,7 @@ class SessionState(BaseModel):
     """Maintains state for an active session"""
 
     session_id: str
-    messages: List[Dict[str, Any]] = Field(default_factory=list)
+    messages: List[Message] = Field(default_factory=list)
     pending_tool_calls: Dict[str, PendingToolCall] = Field(default_factory=dict)
     active_tool_calls: List[str] = Field(default_factory=list)
     last_activity: datetime = Field(default_factory=datetime.now)

@@ -63,3 +63,6 @@ class LLMProxyClient:
 
 # Singleton для всего проекта (можно замокать при необходимости)
 llm_proxy_client = LLMProxyClient()
+
+def get_llm_proxy_client():
+    return llm_proxy_client

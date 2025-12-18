@@ -29,7 +29,9 @@ async def ws_reader(websocket, queue):
                 call_id = msg.get("call_id")
                 tool_name = msg.get("tool_name")
                 arguments = msg.get("arguments", {})
-                print(f"\n[ToolCall] {tool_name} (id={call_id}) с аргументами: {arguments}")
+                print(
+                    f"\n[ToolCall] {tool_name} (id={call_id}) с аргументами: {arguments}"
+                )
                 fake_result = f"Auto-executed {tool_name} with args: {arguments}"
                 tool_result_msg = {
                     "type": "tool_result",
@@ -37,7 +39,9 @@ async def ws_reader(websocket, queue):
                     "result": {"response": fake_result},
                 }
                 await websocket.send(json.dumps(tool_result_msg))
-                print(f"[Отправлен tool_result {tool_result_msg} для {tool_name} / {call_id}]")
+                print(
+                    f"[Отправлен tool_result {tool_result_msg} для {tool_name} / {call_id}]"
+                )
                 print("You: ", end="", flush=True)
             elif msg.get("type") == "error":
                 print(f"\n[Error]: {msg.get('content')}")
@@ -79,7 +83,7 @@ async def main():
                     break
                 if not user_input:
                     continue
-                msg = {"type": "user_message", "content": user_input}
+                msg = {"type": "user_message", "content": user_input, "role": "user"}
                 await ws.send(json.dumps(msg))
         except KeyboardInterrupt:
             print("\n👋 Bye!")

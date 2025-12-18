@@ -3,7 +3,7 @@ import pprint
 from typing import Optional, override
 
 from app.core.agent.base_agent import BaseAgent
-from app.core.agent.sgr import AgentStep, Finish, UseTool
+from app.models.agents import AgentStep, Finish, UseTool
 from app.core.config import AppConfig, logger
 from app.services.llm_proxy_client import LLMProxyClient
 from app.services.tool_registry import TOOLS_SPEC
