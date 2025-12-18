@@ -1,20 +1,14 @@
-from typing import Dict, List
-
 import httpx
 from fastapi import WebSocket
 import pprint
 
 from app.core.config import AppConfig, logger
-from app.models.schemas import AgentRequest, AgentResponse, WSUserMessage
+from app.models.rest import AgentRequest, AgentResponse
+from app.models.websocket import WSUserMessage
 
 BUFFER_SIZE = 100
 
-token_buffers: Dict[str, List[str]] = {}
-
-
-def get_token_buffers():
-    return token_buffers
-
+# TokenBufferManager теперь внедряется через Depends там, где это реально требуется
 
 async def stream_agent_single(
     client: httpx.AsyncClient,
