@@ -9,6 +9,7 @@ from app.core.agent.prompts import SYSTEM_PROMPT
 from app.core.config import AppConfig, logger
 from app.models.schemas import HealthResponse, Message
 from app.services.llm_proxy_client import llm_proxy_client
+from app.services.orchestrator import AgentOrchestrator
 from app.services.session_manager import session_manager
 from app.services.tool_registry import TOOLS
 
@@ -31,48 +32,24 @@ async def message_stream(message: Message):
     try:
         session_manager.get_or_create(message.session_id, system_prompt=SYSTEM_PROMPT)
         session_manager.append_message(message.session_id, "user", message.content)
-        history = session_manager.get(message.session_id).messages  # ty:ignore[possibly-missing-attribute]
+        history = session_manager.get(message.session_id).messages
         logger.debug(
             f"[TRACE] Chat history for {message.session_id}: {pprint.pformat(history, indent=2, width=120)}"
         )
-        agent = LLMProxyAgent(llm=llm_proxy_client, model=None)
-        logger.info(f"[TRACE] Starting reasoning loop for agent: {agent.name}")
-        max_steps = 8
-        answer = None
-        for _ in range(max_steps):
-            step = await agent.decide({"history": history})
-            logger.info(f"[TRACE] AgentStep: {step}")
-            step_type = type(step.step).__name__
-            if step_type == "Reply":
-                reply = getattr(step.step, "content", "")
-                history.append({"role": "assistant", "content": reply})
-            elif step_type == "UseTool":
-                tool_name = getattr(step.step, "tool_name", "")
-                args = getattr(step.step, "args", {})
-                tool_fn = TOOLS.get(tool_name)
-                if tool_fn:
-                    tool_result = tool_fn(**args)
-                else:
-                    tool_result = f"No such tool: {tool_name}"
-                history.append({"role": "tool", "name": tool_name, "content": tool_result})
-                logger.info(f"[TRACE] Tool '{tool_name}' result: {tool_result}")
-            elif step_type == "AskAgent":
-                history.append(
-                    {"role": "assistant", "content": "AskAgent not supported in this endpoint."}
-                )
-            elif step_type == "Finish":
-                answer = getattr(step.step, "summary", "")
-                session_manager.append_message(message.session_id, "assistant", answer)
-                logger.info(f"[TRACE] Reasoning finished with summary: {answer}")
-                return JSONResponse(
-                    content={"token": answer, "is_final": True, "type": "assistant_message"}
-                )
-        logger.warning("[TRACE] Max reasoning steps exceeded; stopping loop.")
+        agent = LLMProxyAgent(llm=llm_proxy_client)
+        orchestrator = AgentOrchestrator(agent=agent, tools=TOOLS)
+        result = await orchestrator.run(history)
+        final_answer = result.get("result", "No response from agent.")
+        trace = result.get("trace", [])
+        # Сохраняем ответ в историю
+        session_manager.append_message(message.session_id, "assistant", final_answer)
+        logger.info(f"[TRACE] Orchestrator finished. Final answer: {final_answer}")
         return JSONResponse(
             content={
-                "token": "Max reasoning steps exceeded",
+                "token": final_answer,
                 "is_final": True,
                 "type": "assistant_message",
+                "trace": trace,
             }
         )
     except Exception:
