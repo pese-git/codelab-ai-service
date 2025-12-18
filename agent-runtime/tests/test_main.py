@@ -1,5 +1,3 @@
-import json
-
 import httpx
 import pytest
 
@@ -18,7 +16,12 @@ async def test_health():
 async def test_agent_message_stream_echo():
     correct_key = "my-super-secret-key"
     session_id = "pytest_stream"
-    payload = {"session_id": session_id, "type": "user_message", "content": "This is stream test!"}
+    payload = {
+        "session_id": session_id,
+        "type": "user_message",
+        "content": "This is stream test!",
+        "role": "user",
+    }
     async with httpx.AsyncClient(timeout=10) as client:
         resp = await client.post(
             "http://localhost:8001/agent/message/stream",

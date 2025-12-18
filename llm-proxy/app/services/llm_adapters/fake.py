@@ -21,14 +21,39 @@ class FakeLLMAdapter(BaseLLMAdapter):
                 "is_available": True,
             }
         ]
-        logger.debug(f"[FakeLLMAdapter] get_models returns: {pprint.pformat(models, indent=2, width=120)}")
+        logger.debug(
+            f"[FakeLLMAdapter] get_models returns: {pprint.pformat(models, indent=2, width=120)}"
+        )
         return models
 
     async def chat(self, request: ChatCompletionRequest):
-        logger.debug(f"[FakeLLMAdapter] chat called with: {pprint.pformat(request.model_dump(), indent=2, width=120)}")
-        last_message = request.messages[-1].content if request.messages else ""
+        logger.debug(
+            f"[FakeLLMAdapter] chat called with: {pprint.pformat(request.model_dump(), indent=2, width=120)}"
+        )
+        # Для теста: всегда возвращаем детерминированный mock-ответ, не зависящий от ввода
         if not getattr(request, "stream", False):
-            result = f"Echo from LLM: {last_message}"
+            result = {
+                "id": "chatcmpl-fake-echo-1",
+                "object": "chat.completion",
+                "created": 1234567890,
+                "model": getattr(request, "model", "mock-llm"),
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": [
+                                {
+                                    "role": "assistant",
+                                    "content": "Mock LLM response (static)",
+                                }
+                            ],
+                        },
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": None,
+            }
             logger.debug(f"[FakeLLMAdapter] chat result (not streamed): {result}")
             return result
 
