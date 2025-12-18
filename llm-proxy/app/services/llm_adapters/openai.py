@@ -1,6 +1,7 @@
-from typing import Optional
 import logging
 import pprint
+from typing import Optional
+
 from app.core.config import AppConfig
 from app.models.schemas import ChatCompletionRequest
 
@@ -32,14 +33,18 @@ class OpenAIAdapter(BaseLLMAdapter):
                             "is_available": True,
                         }
                     )
-            logger.debug(f"[OpenAIAdapter] OpenAI fetched models: {pprint.pformat(models_list, indent=2, width=120)}")
+            logger.debug(
+                f"[OpenAIAdapter] OpenAI fetched models: {pprint.pformat(models_list, indent=2, width=120)}"
+            )
             if models_list:
                 return models_list
         except Exception as e:
             logger.warning(
                 f"[OpenAIAdapter] Cannot fetch list of models, fallback to defaults: {e}"
             )
-            logger.debug(f"[OpenAIAdapter][EXCEPTION get_models] Locals: {pprint.pformat(locals(), indent=2, width=120)}")
+            logger.debug(
+                f"[OpenAIAdapter][EXCEPTION get_models] Locals: {pprint.pformat(locals(), indent=2, width=120)}"
+            )
         # fallback (ручной список)
         return [
             {
@@ -67,14 +72,14 @@ class OpenAIAdapter(BaseLLMAdapter):
 
     async def chat(self, request: ChatCompletionRequest):
         messages = request.messages or []
-        
+
         # Build parameters to pass to OpenAI
         create_params = {
             "model": request.model,
             "messages": messages,
-            "stream": getattr(request, "stream", False)
+            "stream": getattr(request, "stream", False),
         }
-        
+
         # Прокидываем tools/functions при наличии
         if getattr(request, "functions", None):
             create_params["functions"] = request.functions
@@ -92,19 +97,26 @@ class OpenAIAdapter(BaseLLMAdapter):
             create_params["temperature"] = request.temperature
         if request.max_tokens is not None:
             create_params["max_tokens"] = request.max_tokens
-            
-        logger.debug(f"[TRACE][OpenAIAdapter] Full llm_request payload:\n" + pprint.pformat(create_params, indent=2, width=120))
 
-     
+        logger.debug(
+            "[TRACE][OpenAIAdapter] Full llm_request payload:\n"
+            + pprint.pformat(create_params, indent=2, width=120)
+        )
+
         if not create_params["stream"]:
             try:
                 response = await self.client.chat.completions.create(**create_params)
 
-                logger.debug(f"[TRACE][OpenAIAdapter] Full llm_response:\n" + pprint.pformat(response, indent=2, width=120))
+                logger.debug(
+                    "[TRACE][OpenAIAdapter] Full llm_response:\n"
+                    + pprint.pformat(response, indent=2, width=120)
+                )
                 return [choice.message.model_dump() for choice in response.choices]
             except Exception as e:
                 logger.error(f"[OpenAIAdapter] OpenAI error: {e}", exc_info=True)
-                logger.error(f"[OpenAIAdapter][EXCEPTION chat.non-stream] Locals: {pprint.pformat(locals(), indent=2, width=120)}")
+                logger.error(
+                    f"[OpenAIAdapter][EXCEPTION chat.non-stream] Locals: {pprint.pformat(locals(), indent=2, width=120)}"
+                )
                 return f"[Error] OpenAI unavailable: {e}"
 
         # stream mode
@@ -116,14 +128,18 @@ class OpenAIAdapter(BaseLLMAdapter):
                     try:
                         token = chunk.choices[0].delta.content or ""
                     except Exception:
-                        logger.error(f"[OpenAIAdapter][stream] chunk parse error", exc_info=True)
-                        logger.error(f"[OpenAIAdapter][stream] chunk: {pprint.pformat(chunk, indent=2, width=120)}")
+                        logger.error("[OpenAIAdapter][stream] chunk parse error", exc_info=True)
+                        logger.error(
+                            f"[OpenAIAdapter][stream] chunk: {pprint.pformat(chunk, indent=2, width=120)}"
+                        )
                     if token:
                         logger.debug(f"[OpenAIAdapter][stream] yield token: {token}")
                         yield token
             except Exception as e:
                 logger.error(f"[OpenAIAdapter][streaming] error: {e}", exc_info=True)
-                logger.error(f"[OpenAIAdapter][EXCEPTION stream] Locals: {pprint.pformat(locals(), indent=2, width=120)}")
+                logger.error(
+                    f"[OpenAIAdapter][EXCEPTION stream] Locals: {pprint.pformat(locals(), indent=2, width=120)}"
+                )
                 yield f"[Error] OpenAI stream unavailable: {e}"
 
         return token_gen()

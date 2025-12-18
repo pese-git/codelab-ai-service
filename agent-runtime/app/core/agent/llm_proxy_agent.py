@@ -2,7 +2,7 @@ import pprint
 from typing import Optional, override
 
 from app.core.agent.base_agent import BaseAgent
-from app.core.agent.sgr import AgentStep, Reply
+from app.core.agent.sgr import AgentStep, Finish, Reply
 from app.core.config import AppConfig, logger
 from app.services.llm_proxy_client import LLMProxyClient
 from app.services.tool_registry import TOOLS
@@ -111,11 +111,9 @@ class LLMProxyAgent(BaseAgent):
                     step=Reply.model_construct(action="reply", content=result)
                 )
             else:
-                reply_text = response["choices"][0]["message"]["content"]
+                reply_text = response["choices"][0]["message"]["content"][0]["content"]
                 logger.info(f"[TRACE][LLMProxyAgent] reply_text: {reply_text}")
-                return AgentStep.model_construct(
-                    step=Reply.model_construct(action="reply", content=reply_text)
-                )
+                return AgentStep.model_construct(step=Finish.model_construct(summary=reply_text))
         except Exception as e:
             logger.error(f"[TRACE][LLMProxyAgent][ERROR] {e}", exc_info=True)
             raise
