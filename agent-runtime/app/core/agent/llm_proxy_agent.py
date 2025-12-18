@@ -1,3 +1,4 @@
+import json
 import pprint
 from typing import Optional, override
 
@@ -14,7 +15,7 @@ class LLMProxyAgent(BaseAgent):
 
     def __init__(self, llm: LLMProxyClient, model: Optional[str] = None, tools_spec=None):
         super().__init__(llm=llm)
-        self.model = model or getattr(AppConfig, "LLM_PROXY_MODEL", "gpt-3.5-turbo")
+        self.model = model or getattr(AppConfig, "LLM_PROXY_MODEL", "gpt-4.1")
         self.tools_spec = tools_spec or TOOLS_SPEC
 
     @override
@@ -35,26 +36,61 @@ class LLMProxyAgent(BaseAgent):
                 f"[TRACE][LLMProxyAgent] LLM output: {pprint.pformat(response, indent=2, width=120)}"
             )
             message = response["choices"][0]["message"]
-            if "tool_calls" in message and message["tool_calls"]:
+            # --- Improved logic for tool handling ---
+            content_items = message.get("content")
+            if content_items:
+                # Defensive: OpenAI/LLM content typically as a list of dict(s)
+                item = content_items[0]
+                if item.get("tool_calls"):
+                    tc = item["tool_calls"][0]
+                    return AgentStep.model_construct(
+                        step=UseTool.model_construct(
+                            action="use_tool",
+                            tool_id=tc["id"],
+                            tool_name=tc["function"]["name"],
+                            args=json.loads(tc["function"].get("arguments", "{}")),
+                        )
+                    )
+                elif item.get("function_call"):
+                    tc = item["function_call"]
+                    return AgentStep.model_construct(
+                        step=UseTool.model_construct(
+                            action="use_tool",
+                            tool_id=tc["id"],
+                            tool_name=tc["name"],
+                            args=json.loads(tc.get("arguments", "{}")),
+                        )
+                    )
+                elif item.get("content"):
+                    logger.info(
+                        f"[TRACE][LLMProxyAgent] LLM content: {pprint.pformat(item['content'], indent=2, width=120)}"
+                    )
+                    return AgentStep.model_construct(
+                        step=Finish.model_construct(action="finish", summary=item["content"])
+                    )
+                else:
+                    return AgentStep.model_construct(
+                        step=Finish.model_construct(
+                            action="finish", summary="No answer (empty content item)"
+                        )
+                    )
+            elif "tool_calls" in message and message["tool_calls"]:
                 tc = message["tool_calls"][0]
                 return AgentStep.model_construct(
                     step=UseTool.model_construct(
                         action="use_tool",
+                        tool_id=tc["id"],
                         tool_name=tc["function"]["name"],
-                        args=tc["function"].get("arguments", {}),
+                        args=json.loads(tc["function"].get("arguments", "{}")),
                     )
                 )
             elif message.get("content"):
                 logger.info(
-                    f"[TRACE][LLMProxyAgent] LLM content: {pprint.pformat(message['content'], indent=2, width=120)}"
+                    f"[TRACE][LLMProxyAgent] LLM content (plain): {pprint.pformat(message['content'], indent=2, width=120)}"
                 )
-                content = message["content"][0]["content"]
                 return AgentStep.model_construct(
-                    step=Finish.model_construct(action="finish", summary=content)
+                    step=Finish.model_construct(action="finish", summary=message["content"])
                 )
-                # return AgentStep.model_construct(
-                #    step=Reply.model_construct(action="reply", content=content)
-                # )
             else:
                 return AgentStep.model_construct(
                     step=Finish.model_construct(action="finish", summary="No answer")

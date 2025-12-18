@@ -37,7 +37,7 @@ async def message_stream(message: Message):
             f"[TRACE] Chat history for {message.session_id}: {pprint.pformat(history, indent=2, width=120)}"
         )
         agent = LLMProxyAgent(llm=llm_proxy_client)
-        orchestrator = AgentOrchestrator(agent=agent, tools=TOOLS)
+        orchestrator = AgentOrchestrator(agent=agent, tools=TOOLS, session_id=message.session_id)
         result = await orchestrator.run(history)
         final_answer = result.get("result", "No response from agent.")
         trace = result.get("trace", [])

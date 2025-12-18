@@ -11,6 +11,7 @@ class AskAgent(BaseModel):
 
 class UseTool(BaseModel):
     action: Literal["use_tool"] = "use_tool"
+    tool_id: str
     tool_name: str
     args: Dict[str, Any] = Field(default_factory=dict)
 
