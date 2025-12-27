@@ -59,11 +59,67 @@ TOOLS_SPEC = [
         "type": "function",
         "function": {
             "name": "read_file",
-            "description": "Read any file from disk.",
+            "description": "Read content from a file on disk. Supports partial reading by line numbers.",
             "parameters": {
                 "type": "object",
-                "properties": {"path": {"type": "string", "description": "File path"}},
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Path to the file relative to project workspace"
+                    },
+                    "encoding": {
+                        "type": "string",
+                        "description": "File encoding (default: utf-8)",
+                        "default": "utf-8"
+                    },
+                    "start_line": {
+                        "type": "integer",
+                        "description": "Starting line number (1-based, inclusive)",
+                        "minimum": 1
+                    },
+                    "end_line": {
+                        "type": "integer",
+                        "description": "Ending line number (1-based, inclusive)",
+                        "minimum": 1
+                    }
+                },
                 "required": ["path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "write_file",
+            "description": "Write content to a file. Requires user confirmation before execution.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Path to the file relative to project workspace"
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "Content to write to the file"
+                    },
+                    "encoding": {
+                        "type": "string",
+                        "description": "File encoding (default: utf-8)",
+                        "default": "utf-8"
+                    },
+                    "create_dirs": {
+                        "type": "boolean",
+                        "description": "Create parent directories if they don't exist",
+                        "default": False
+                    },
+                    "backup": {
+                        "type": "boolean",
+                        "description": "Create backup before overwriting existing file",
+                        "default": True
+                    }
+                },
+                "required": ["path", "content"],
             },
         },
     },

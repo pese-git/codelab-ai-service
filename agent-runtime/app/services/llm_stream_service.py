@@ -3,41 +3,12 @@ import logging
 import pprint
 
 from app.core.config import AppConfig
-from app.models.schemas import SSEToken
+from app.models.schemas import StreamChunk
 from app.services.llm_proxy_client import llm_proxy_client
 from app.services.session_manager import session_manager
-from app.services.tool_call_handler import tool_call_handler
 from app.services.tool_parser import parse_tool_calls
 
 logger = logging.getLogger("agent-runtime")
-
-
-# tools = [
-#    {
-#        "type": "function",
-#        "name": "read_file",
-#        "description": "Reads file contents.",
-#        "parameters": {
-#            "type": "object",
-#            "properties": {
-#                "path": {"type": "string", "description": "Path to file"}
-#            },
-#            "required": ["path"]
-#        }
-#    },
-#    {
-#        "type": "function",
-#        "name": "echo",
-#        "description": "Echo back text.",
-#        "parameters": {
-#            "type": "object",
-#            "properties": {
-#                "text": {"type": "string"}
-#            },
-#            "required": ["text"]
-#        }
-#    }
-# ]
 
 
 tools = [
@@ -66,51 +37,56 @@ tools = [
         },
     },
 ]
-# SessionManager теперь управляет всеми сессиями
 
 
-# ToolCallHandler теперь инкапсулирует работу с инструментами
-
-
-async def llm_stream(session_id: str):
+async def stream_response(session_id: str, history: list):
     """
-    Send a non-streaming (stream=False) request to LLM Proxy and process tool calls/result.
+    Генерирует streaming ответ от LLM.
+    При получении tool_call - отправляет его в stream и ЗАВЕРШАЕТ генерацию.
+    Не пытается выполнять tool локально.
+    
+    Args:
+        session_id: ID сессии
+        history: История сообщений для LLM
+        
+    Yields:
+        StreamChunk: Чанки для SSE streaming
     """
     try:
-        session = session_manager.get(session_id)
-        if not session:
-            logger.error(f"Session {session_id} not found")
-            yield {"event": "error", "data": json.dumps({"error": "Session not found"})}
-            return
+        logger.info(
+            f"[Agent] Starting stream_response: session_id={session_id}, messages={len(history)}"
+        )
+        logger.debug(
+            "[Agent][TRACE] Full history:\n"
+            + pprint.pformat(history, indent=2, width=120)
+        )
 
-        messages = session.messages
         llm_request = {
             "model": AppConfig.LLM_MODEL,
-            "messages": messages,
+            "messages": history,
             "stream": False,
             "tools": tools,
-            # "function_call": "auto"
         }
 
-        logger.info(
-            f"[Agent] Sending request to LLM Proxy: session_id={session_id}, messages={len(messages)}"
-        )
         logger.debug(
             "[Agent][TRACE] Full llm_request payload:\n"
             + pprint.pformat(llm_request, indent=2, width=120)
         )
 
+        # Запрос к LLM
         data = await llm_proxy_client.chat_completion(
-            model=AppConfig.LLM_MODEL, messages=messages, tools=tools, stream=False
+            model=AppConfig.LLM_MODEL, messages=history, tools=tools, stream=False
         )
+        
         logger.info(
             "[Agent][TRACE] LLM proxy responded:\n" + pprint.pformat(data, indent=2, width=120)
         )
+        
         result_message = data["choices"][0]["message"]
         content = result_message.get("content", "")
         metadata = {}
 
-        # Новый блок: если content — список, искать tool_calls в каждом из dict
+        # Проверяем наличие tool_calls
         if isinstance(content, list):
             for obj in content:
                 if isinstance(obj, dict) and "tool_calls" in obj and obj["tool_calls"]:
@@ -125,72 +101,125 @@ async def llm_stream(session_id: str):
 
         # Парсим tool_calls если есть
         tool_calls, clean_content = parse_tool_calls(content, metadata)
+        
         logger.debug(
-            "[Agent][TRACE] ToolCalls:\n" + pprint.pformat(tool_calls, indent=2, width=120)
+            "[Agent][TRACE] Parsed tool_calls:\n" + pprint.pformat(tool_calls, indent=2, width=120)
         )
+
         if tool_calls:
-            # Поддерживаем только первый tool_call (как в OpenAI)
-            tool_call = tool_calls[0]
-            logger.debug(
-                "[Agent][TRACE] TOOL CALL:\n" + pprint.pformat(tool_call, indent=2, width=120)
-            )
-            # 1. Выполняем tool через Gateway
-            tool_result = await tool_call_handler.execute(session_id, tool_call)
-            # 2. Добавляем result как function message в историю диалога (OpenAI pattern)
-            function_message = {
-                "role": "function",
-                "name": tool_call.tool_name,
-                "content": tool_result if isinstance(tool_result, str) else str(tool_result),
-            }
-            session_manager.get(session_id).messages.append(function_message)  # ty:ignore[possibly-missing-attribute]
-            # 3. Делаем повторный запрос в LLM (уже с user + assistant(function_call)+ function result)
-            new_messages = session_manager.get(session_id).messages  # ty:ignore[possibly-missing-attribute]
-            data2 = await llm_proxy_client.chat_completion(
-                model=AppConfig.LLM_MODEL, messages=new_messages, tools=tools, stream=False
-            )
-
+            # ВАЖНО: При tool_call отправляем его в stream и ЗАВЕРШАЕМ генерацию
+            # Не пытаемся выполнять tool локально
+            tool_call = tool_calls[0]  # Берем первый tool_call
+            
             logger.info(
-                "[Agent] Second LLM proxy call for final assistant reply::\n"
-                + pprint.pformat(data2, indent=2, width=120)
+                f"[Agent] Tool call detected: {tool_call.tool_name}, завершаем stream"
             )
-
-            result_message2 = data2["choices"][0]["message"]
-            final_content = result_message2["content"][0]["content"]
-            # Добавляем ассистентский финальный ответ в историю
-            session_manager.append_message(session_id, "assistant", final_content)
-            yield {
-                "event": "message",
-                "data": SSEToken.model_construct(
-                    token=final_content, is_final=True, type="assistant_message"
-                ).model_dump_json(),
+            
+            # Добавляем assistant message с tool_call в историю
+            # tool_call.arguments уже dict, не нужно вызывать model_dump()
+            arguments_dict = tool_call.arguments if isinstance(tool_call.arguments, dict) else tool_call.arguments.model_dump()
+            
+            assistant_msg = {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [{
+                    "id": tool_call.id,
+                    "type": "function",
+                    "function": {
+                        "name": tool_call.tool_name,
+                        "arguments": json.dumps(arguments_dict)
+                    }
+                }]
             }
+            session_manager.get(session_id).messages.append(assistant_msg)
+            
+            # Отправляем tool_call в stream
+            chunk = StreamChunk(
+                type="tool_call",
+                call_id=tool_call.id,
+                tool_name=tool_call.tool_name,
+                arguments=arguments_dict,
+                is_final=True
+            )
+            
+            logger.debug(
+                "[Agent][TRACE] Yielding tool_call chunk:\n"
+                + pprint.pformat(chunk.model_dump(), indent=2, width=120)
+            )
+            
+            yield chunk
+            
+            # Завершаем генерацию - ждем tool_result от Gateway
             return
 
-        # Если tool_calls нет -- обычный ассистентский ответ
-        # if clean_content is None:
-        #    clean_content = ""
-        # elif not isinstance(clean_content, str):
-        #    clean_content = str(clean_content)
+        # Если tool_calls нет - обычный ассистентский ответ
+        if isinstance(content, list) and len(content) > 0:
+            if isinstance(content[0], dict) and "content" in content[0]:
+                clean_content = content[0]["content"]
+            else:
+                clean_content = str(content)
+        elif not isinstance(clean_content, str):
+            clean_content = str(clean_content) if clean_content else ""
 
-        clean_content = result_message["content"][0]["content"]
+        # Добавляем ответ в историю
         session_manager.append_message(session_id, "assistant", clean_content)
 
         logger.info(
-            "[Agent] Appended completion to session {session_id}::\n"
-            + pprint.pformat(clean_content, indent=2, width=120)
+            f"[Agent] Sending assistant message: {len(clean_content)} chars"
         )
-        yield {
-            "event": "message",
-            "data": SSEToken.model_construct(
-                token=clean_content, is_final=True, type="assistant_message"
-            ).model_dump_json(),
-        }
+
+        # Отправляем assistant message
+        chunk = StreamChunk(
+            type="assistant_message",
+            content=clean_content,
+            token=clean_content,
+            is_final=True
+        )
+        
+        logger.debug(
+            "[Agent][TRACE] Yielding assistant_message chunk:\n"
+            + pprint.pformat(chunk.model_dump(), indent=2, width=120)
+        )
+        
+        yield chunk
+
     except Exception as e:
         logger.error(
-            f"[Agent][ERROR] Exception in llm_stream for session {session_id}: {e}", exc_info=True
+            f"[Agent][ERROR] Exception in stream_response for session {session_id}: {e}",
+            exc_info=True
         )
         logger.error(
-            "[Agent][ERROR] Locals at exception:\n" + pprint.pformat(locals(), indent=2, width=120)
+            "[Agent][ERROR] Locals at exception:\n"
+            + pprint.pformat(locals(), indent=2, width=120)
         )
-        yield {"event": "error", "data": json.dumps({"error": str(e)})}
+        
+        # Отправляем ошибку в stream
+        error_chunk = StreamChunk(
+            type="error",
+            error=str(e),
+            is_final=True
+        )
+        yield error_chunk
+
+
+# Оставляем старую функцию для обратной совместимости, но помечаем как deprecated
+async def llm_stream(session_id: str):
+    """
+    DEPRECATED: Используйте stream_response вместо этой функции.
+    Оставлено для обратной совместимости.
+    """
+    logger.warning("[Agent] llm_stream is deprecated, use stream_response instead")
+    
+    session = session_manager.get(session_id)
+    if not session:
+        logger.error(f"Session {session_id} not found")
+        yield {"event": "error", "data": json.dumps({"error": "Session not found"})}
         return
+
+    history = session_manager.get_history(session_id)
+    
+    async for chunk in stream_response(session_id, history):
+        yield {
+            "event": "message",
+            "data": chunk.model_dump_json()
+        }

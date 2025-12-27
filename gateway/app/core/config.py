@@ -11,6 +11,7 @@ class AppConfig:
     INTERNAL_API_KEY: str = os.getenv("GATEWAY__INTERNAL_API_KEY", "change-me-internal-key")
     LOG_LEVEL: str = os.getenv("GATEWAY__LOG_LEVEL", "DEBUG")
     REQUEST_TIMEOUT: float = float(os.getenv("GATEWAY__REQUEST_TIMEOUT", "30.0"))
+    AGENT_STREAM_TIMEOUT: float = float(os.getenv("GATEWAY__AGENT_STREAM_TIMEOUT", "60.0"))
     VERSION: str = os.getenv("GATEWAY__VERSION", "0.1.0")
 
 

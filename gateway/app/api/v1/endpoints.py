@@ -4,45 +4,16 @@ from fastapi import APIRouter, WebSocket, status, Depends
 from starlette.websockets import WebSocketDisconnect
 
 from app.core.config import AppConfig, logger
-from app.models.websocket import WSErrorResponse, WSUserMessage, WSToolResult, WSToolCall
+from app.models.websocket import WSErrorResponse, WSUserMessage, WSToolResult
 from app.models.rest import HealthResponse
-from app.services.stream_service import stream_agent_single
 from app.core.dependencies import (
     get_session_manager,
-    get_tool_result_manager,
     get_token_buffer_manager,
 )
 from app.services.session_manager import SessionManager
-from app.services.tool_result_manager import ToolResultManager
 from app.services.token_buffer_manager import TokenBufferManager
 
 router = APIRouter()
-
-timeout_seconds = 30  # how long to wait for tool_result
-
-@router.post("/tool/execute/{session_id}", status_code=status.HTTP_202_ACCEPTED)
-async def tool_execute(
-    session_id: str,
-    tool_call: WSToolCall,
-    session_manager: SessionManager = Depends(get_session_manager),
-    tool_result_manager: ToolResultManager = Depends(get_tool_result_manager)
-):
-    logger.debug(f"ToolCall request payload: {tool_call.model_dump()}")
-    ws = await session_manager.get(session_id)
-    if ws is None:
-        return {"status": "error", "detail": f"Session {session_id} not found"}
-    call_id = tool_call.call_id
-    fut = await tool_result_manager.register(call_id)
-    await ws.send_json(tool_call.model_dump())
-    import asyncio
-    try:
-        result = await asyncio.wait_for(fut, timeout=timeout_seconds)
-        return {"status": "ok", "result": result}
-    except asyncio.TimeoutError:
-        await tool_result_manager.pop(call_id)
-        return {"status": "error", "detail": f"Timeout waiting for tool_result (call_id={call_id})"}
-    finally:
-        await tool_result_manager.pop(call_id)
 
 @router.get("/health", response_model=HealthResponse)
 async def health_check():
@@ -55,47 +26,163 @@ async def websocket_endpoint(
     websocket: WebSocket,
     session_id: str,
     session_manager: SessionManager = Depends(get_session_manager),
-    tool_result_manager: ToolResultManager = Depends(get_tool_result_manager),
     token_buffer_manager: "TokenBufferManager" = Depends(get_token_buffer_manager),
 ):
+    """
+    WebSocket endpoint для двунаправленной связи между IDE и Agent через HTTP streaming.
+    
+    Flow:
+    1. IDE отправляет user_message или tool_result через WebSocket
+    2. Gateway пересылает в Agent через HTTP streaming (SSE)
+    3. Agent отправляет SSE события (assistant_message, tool_call)
+    4. Gateway пересылает SSE события в IDE через WebSocket
+    """
     await websocket.accept()
     logger.info(f"[{session_id}] WebSocket connected")
     await session_manager.add(session_id, websocket)
+    
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=AppConfig.AGENT_STREAM_TIMEOUT) as client:
             while True:
+                # Получаем сообщение от IDE
                 raw_msg = await websocket.receive_text()
                 logger.debug(f"[{session_id}] Received WS message: {raw_msg!r}")
+                
                 try:
-                    # Пробуем разобрать как tool_result
-                    try:
-                        tool_result = WSToolResult.model_validate(json.loads(raw_msg))
-                        logger.debug(f"[{session_id}] Parsed WSToolResult: {tool_result}")
-                        await tool_result_manager.resolve(tool_result.call_id, tool_result.result)
-                        await websocket.send_json(
-                            {"status": "ok", "detail": f"tool_result for call_id={tool_result.call_id} received"}
+                    ide_msg = json.loads(raw_msg)
+                    msg_type = ide_msg.get("type")
+                    
+                    # Валидация сообщения
+                    if msg_type == "user_message":
+                        msg = WSUserMessage.model_validate(ide_msg)
+                        logger.info(f"[{session_id}] Received user_message: role={msg.role}")
+                    elif msg_type == "tool_result":
+                        msg = WSToolResult.model_validate(ide_msg)
+                        logger.info(f"[{session_id}] Received tool_result: call_id={msg.call_id}, has_error={msg.error is not None}")
+                    else:
+                        logger.warning(f"[{session_id}] Unknown message type: {msg_type}")
+                        err = WSErrorResponse.model_construct(
+                            type="error", content=f"Unknown message type: {msg_type}"
                         )
+                        await websocket.send_json(err.model_dump())
                         continue
-                    except Exception:
-                        pass  # не tool_result, идём обычным путём
-                    msg = WSUserMessage.model_validate(json.loads(raw_msg))
-                    logger.debug(f"[{session_id}] Parsed WSUserMessage: {msg}")
-                except Exception:
+                        
+                except Exception as e:
+                    logger.error(f"[{session_id}] Failed to parse message: {e}")
                     err = WSErrorResponse.model_construct(
-                        type="error", content="Invalid JSON message"
+                        type="error", content=f"Invalid JSON message: {str(e)}"
                     )
                     await websocket.send_json(err.model_dump())
-                    logger.warning(f"[{session_id}] Invalid WS JSON, sent error")
                     continue
+                
+                # Отправляем в Agent через HTTP streaming
                 try:
-                    await stream_agent_single(client, session_id, msg, websocket)
-                except Exception as e:
-                    err = WSErrorResponse.model_construct(type="error", content=str(e))
+                    logger.debug(f"[{session_id}] Forwarding to Agent via HTTP streaming")
+                    async with client.stream(
+                        "POST",
+                        f"{AppConfig.AGENT_URL}/agent/message/stream",
+                        json={"session_id": session_id, "message": ide_msg},
+                        headers={"X-Internal-Auth": AppConfig.INTERNAL_API_KEY},
+                    ) as response:
+                        response.raise_for_status()
+                        logger.debug(f"[{session_id}] Agent streaming started, status={response.status_code}")
+                        
+                        # Читаем SSE stream от Agent и пересылаем в IDE
+                        # SSE формат:
+                        # event: message
+                        # data: {"type": "assistant_message", ...}
+                        #
+                        # event: done
+                        # data: {"status": "completed"}
+                        
+                        current_event_type = None
+                        
+                        async for line in response.aiter_lines():
+                            # Пустая строка - разделитель SSE событий
+                            if not line:
+                                current_event_type = None
+                                continue
+                            
+                            # Обрабатываем строку с типом события
+                            if line.startswith("event: "):
+                                current_event_type = line[7:].strip()
+                                logger.debug(f"[{session_id}] SSE event type: {current_event_type}")
+                                
+                                # Если получили event: done - завершаем обработку stream
+                                if current_event_type == "done":
+                                    logger.info(f"[{session_id}] Received 'done' event, completing stream")
+                                    break
+                                
+                                continue
+                            
+                            # Обрабатываем строку с данными
+                            if line.startswith("data: "):
+                                data_str = line[6:]
+                                
+                                # Проверяем на специальный маркер [DONE]
+                                if data_str == "[DONE]":
+                                    logger.info(f"[{session_id}] Received [DONE] marker, completing stream")
+                                    break
+                                
+                                # Парсим JSON данные только для event: message
+                                if current_event_type == "message":
+                                    try:
+                                        data = json.loads(data_str)
+                                        msg_type = data.get('type')
+                                        logger.debug(f"[{session_id}] Received SSE data: type={msg_type}")
+                                        
+                                        # Фильтруем null значения, чтобы не отправлять лишние поля
+                                        filtered_data = {k: v for k, v in data.items() if v is not None}
+                                        
+                                        logger.debug(f"[{session_id}] Sending to IDE: {json.dumps(filtered_data, indent=2)}")
+                                        
+                                        # Пересылаем событие в IDE через WebSocket
+                                        await websocket.send_json(filtered_data)
+                                        
+                                    except json.JSONDecodeError as e:
+                                        logger.warning(f"[{session_id}] Failed to parse SSE data: {e}, line={line}")
+                                else:
+                                    # Для других типов событий (например error) тоже пытаемся парсить
+                                    try:
+                                        data = json.loads(data_str)
+                                        logger.debug(f"[{session_id}] Received SSE data for event '{current_event_type}': {data}")
+                                        
+                                        # Пересылаем событие в IDE
+                                        await websocket.send_json(data)
+                                        
+                                    except json.JSONDecodeError as e:
+                                        logger.warning(f"[{session_id}] Failed to parse SSE data for event '{current_event_type}': {e}")
+                                
+                                continue
+                            
+                            # SSE комментарий (heartbeat), игнорируем
+                            if line.startswith(":"):
+                                logger.debug(f"[{session_id}] SSE heartbeat received")
+                                continue
+                            
+                            # Неизвестный формат строки
+                            logger.debug(f"[{session_id}] Ignoring unknown SSE line: {line}")
+                        
+                        logger.info(f"[{session_id}] Agent streaming completed successfully")
+                        
+                except httpx.HTTPStatusError as e:
+                    logger.error(f"[{session_id}] Agent HTTP error: {e.response.status_code}, {e.response.text}")
+                    err = WSErrorResponse.model_construct(
+                        type="error", content=f"Agent error: {e.response.status_code}"
+                    )
                     await websocket.send_json(err.model_dump())
-                    logger.error(f"[{session_id}] Error streaming: {e}")
+                except Exception as e:
+                    logger.error(f"[{session_id}] Error streaming from Agent: {e}", exc_info=True)
+                    err = WSErrorResponse.model_construct(
+                        type="error", content=f"Streaming error: {str(e)}"
+                    )
+                    await websocket.send_json(err.model_dump())
+                    
     except WebSocketDisconnect:
         logger.info(f"[{session_id}] WebSocket disconnected")
         await token_buffer_manager.remove(session_id)
         await session_manager.remove(session_id)
     except Exception as e:
-        logger.error(f"[{session_id}] WS fatal error: {e}")
+        logger.error(f"[{session_id}] WS fatal error: {e}", exc_info=True)
+        await token_buffer_manager.remove(session_id)
+        await session_manager.remove(session_id)

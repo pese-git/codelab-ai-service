@@ -15,6 +15,7 @@ class WSToolCall(BaseModel):
     call_id: str
     tool_name: str
     arguments: Dict[str, Any]
+    requires_approval: Optional[bool] = False
 
     class Config:
         json_schema_extra = {
@@ -23,6 +24,7 @@ class WSToolCall(BaseModel):
                 "call_id": "call_abc123",
                 "tool_name": "read_file",
                 "arguments": {"path": "/src/main.py"},
+                "requires_approval": False,
             }
         }
 

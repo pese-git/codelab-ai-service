@@ -23,17 +23,27 @@ class ToolCallHandler:
         """
         Отправляет tool_call на Gateway, ожидает ответ (REST-sync).
         Возвращает dict - результат выполнения инструмента.
+        
+        Поддерживает все инструменты, включая read_file и write_file.
+        Для write_file автоматически устанавливается requires_approval=True.
         """
         try:
             logger.info(f"[ToolCallHandler] Executing tool_call for session={session_id}, tool={tool_call.tool_name}")
             logger.debug(f"[ToolCallHandler] tool_call object:\n" + pprint.pformat(tool_call.model_dump(), indent=2, width=120))
             path = f"{self.gateway_url}/tool/execute/{session_id}"
             logger.debug(f"[ToolCallHandler] ToolExecute path: {path}")
+            
+            # Определяем, требуется ли подтверждение пользователя (HITL)
+            requires_approval = tool_call.tool_name == "write_file"
+            if requires_approval:
+                logger.info(f"[ToolCallHandler] Tool '{tool_call.tool_name}' requires user approval (HITL)")
+            
             ws_tool_call = WSToolCall.model_construct(
                 type="tool_call",
                 call_id=tool_call.id,
                 tool_name=tool_call.tool_name,
                 arguments=tool_call.arguments,
+                requires_approval=requires_approval,
             )
             logger.debug(f"[ToolCallHandler] ToolCall payload:\n" + pprint.pformat(ws_tool_call.model_dump(), indent=2, width=120))
             async with httpx.AsyncClient() as client:
