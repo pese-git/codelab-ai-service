@@ -78,24 +78,32 @@ class SessionManager:
                 + pprint.pformat([m.model_dump() for m in state.messages], indent=2, width=120)
             )
 
-    def append_tool_result(self, session_id: str, tool_name: str, result: str):
+    def append_tool_result(self, session_id: str, call_id: str, tool_name: str, result: str):
         """
-        Добавляет tool_result в историю сессии как function message.
+        Добавляет tool_result в историю сессии как tool message.
         Используется для добавления результатов выполнения инструментов.
+        
+        Note: Используем роль 'tool' вместо 'function' для совместимости с Azure OpenAI.
+        Tool messages требуют поле 'tool_call_id' согласно OpenAI API spec.
         """
-        from app.models.schemas import Message
-
         with self._lock:
             state = self.get(session_id)
             if not state:
                 logger.error(f"[SessionManager] append_tool_result: Session {session_id} not found")
                 raise ValueError(f"Session {session_id} not found")
-            msg = Message.model_construct(role="function", content=result, name=tool_name)
+            
+            # Создаем tool message с tool_call_id
+            msg = {
+                "role": "tool",
+                "content": result,
+                "tool_call_id": call_id,
+                "name": tool_name
+            }
             state.messages.append(msg)
             state.last_activity = datetime.now()
             logger.debug(
                 f"[SessionManager] Appended tool_result to {session_id}:\n"
-                + pprint.pformat(msg.model_dump(), indent=2, width=120)
+                + pprint.pformat(msg, indent=2, width=120)
             )
 
     def get_history(self, session_id: str) -> List[dict]:
@@ -108,7 +116,13 @@ class SessionManager:
             if not state:
                 logger.warning(f"[SessionManager] get_history: Session {session_id} not found")
                 return []
-            history = [m.model_dump() for m in state.messages]
+            # Обрабатываем как Pydantic модели, так и dict объекты
+            history = []
+            for m in state.messages:
+                if isinstance(m, dict):
+                    history.append(m)
+                else:
+                    history.append(m.model_dump())
             logger.debug(
                 f"[SessionManager] Retrieved history for {session_id}: {len(history)} messages"
             )

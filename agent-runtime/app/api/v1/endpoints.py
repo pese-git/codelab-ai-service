@@ -61,17 +61,19 @@ async def message_stream_sse(request: AgentStreamRequest):
             
             if message_type == "tool_result":
                 # Это результат выполнения инструмента
+                call_id = request.message.get("call_id")
                 tool_name = request.message.get("tool_name")
                 result = request.message.get("result")
                 
                 logger.info(
-                    f"[Agent] Received tool_result: tool={tool_name}, session={request.session_id}"
+                    f"[Agent] Received tool_result: call_id={call_id}, tool={tool_name}, session={request.session_id}"
                 )
                 
-                # Добавляем tool_result в историю как function message
+                # Добавляем tool_result в историю как tool message
                 result_str = json.dumps(result) if not isinstance(result, str) else result
                 session_manager.append_tool_result(
                     request.session_id,
+                    call_id=call_id,
                     tool_name=tool_name,
                     result=result_str
                 )
