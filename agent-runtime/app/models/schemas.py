@@ -191,6 +191,7 @@ class StreamChunk(BaseModel):
     call_id: Optional[str] = Field(default=None, description="Tool call identifier")
     tool_name: Optional[str] = Field(default=None, description="Name of the tool to call")
     arguments: Optional[Dict[str, Any]] = Field(default=None, description="Tool arguments")
+    requires_approval: Optional[bool] = Field(default=False, description="Whether this tool requires user approval (HITL)")
     
     # For error type
     error: Optional[str] = Field(default=None, description="Error message if any")

@@ -7,36 +7,9 @@ from app.models.schemas import StreamChunk
 from app.services.llm_proxy_client import llm_proxy_client
 from app.services.session_manager import session_manager
 from app.services.tool_parser import parse_tool_calls
+from app.services.tool_registry import TOOLS_SPEC
 
 logger = logging.getLogger("agent-runtime")
-
-
-tools = [
-    {
-        "type": "function",
-        "function": {
-            "name": "read_file",
-            "description": "Read any file from disk.",
-            "parameters": {
-                "type": "object",
-                "properties": {"path": {"type": "string", "description": "File path"}},
-                "required": ["path"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "echo",
-            "description": "Echo back any string.",
-            "parameters": {
-                "type": "object",
-                "properties": {"text": {"type": "string", "description": "Some string"}},
-                "required": ["text"],
-            },
-        },
-    },
-]
 
 
 async def stream_response(session_id: str, history: list):
@@ -65,7 +38,7 @@ async def stream_response(session_id: str, history: list):
             "model": AppConfig.LLM_MODEL,
             "messages": history,
             "stream": False,
-            "tools": tools,
+            "tools": TOOLS_SPEC,
         }
 
         logger.debug(
@@ -75,7 +48,7 @@ async def stream_response(session_id: str, history: list):
 
         # Запрос к LLM
         data = await llm_proxy_client.chat_completion(
-            model=AppConfig.LLM_MODEL, messages=history, tools=tools, stream=False
+            model=AppConfig.LLM_MODEL, messages=history, tools=TOOLS_SPEC, stream=False
         )
         
         logger.info(
@@ -109,10 +82,38 @@ async def stream_response(session_id: str, history: list):
         if tool_calls:
             # ВАЖНО: При tool_call отправляем его в stream и ЗАВЕРШАЕМ генерацию
             # Не пытаемся выполнять tool локально
-            tool_call = tool_calls[0]  # Берем первый tool_call
             
+            # КРИТИЧЕСКАЯ ВАЛИДАЦИЯ: Агент должен вызывать только ОДИН инструмент за раз
+            if len(tool_calls) > 1:
+                logger.warning(
+                    f"[Agent][VALIDATION] LLM attempted to call {len(tool_calls)} tools simultaneously! "
+                    f"This violates the one-tool-at-a-time rule. Tools: {[tc.tool_name for tc in tool_calls]}"
+                )
+                logger.warning(
+                    "[Agent][VALIDATION] Only the first tool call will be executed. "
+                    "The agent should wait for tool result before calling next tool."
+                )
+            
+            tool_call = tool_calls[0]  # Берем первый tool_call
+
             logger.info(
                 f"[Agent] Tool call detected: tool_name={tool_call.tool_name}, call_id={tool_call.id}"
+            )
+            
+            # Определяем, требуется ли подтверждение пользователя (HITL)
+            requires_approval = tool_call.tool_name in ["write_file", "delete_file", "move_file"]
+            
+            # Для execute_command проверяем на опасные команды
+            if tool_call.tool_name == "execute_command":
+                command = tool_call.arguments.get("command", "").lower()
+                dangerous_patterns = [
+                    "rm -rf", "sudo", "chmod", "chown", "mkfs",
+                    "dd if=", "> /dev/", ":(){ :|:& };:", "curl", "wget"
+                ]
+                requires_approval = any(pattern in command for pattern in dangerous_patterns)
+            
+            logger.info(
+                f"[Agent] Tool '{tool_call.tool_name}' requires_approval={requires_approval}"
             )
             
             # Добавляем assistant message с tool_call в историю
@@ -146,6 +147,7 @@ async def stream_response(session_id: str, history: list):
                 call_id=tool_call.id,
                 tool_name=tool_call.tool_name,
                 arguments=arguments_dict,
+                requires_approval=requires_approval,
                 is_final=True
             )
             
