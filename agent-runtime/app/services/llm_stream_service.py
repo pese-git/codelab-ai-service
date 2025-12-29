@@ -112,18 +112,19 @@ async def stream_response(session_id: str, history: list):
             tool_call = tool_calls[0]  # Берем первый tool_call
             
             logger.info(
-                f"[Agent] Tool call detected: {tool_call.tool_name}, завершаем stream"
+                f"[Agent] Tool call detected: tool_name={tool_call.tool_name}, call_id={tool_call.id}"
             )
             
             # Добавляем assistant message с tool_call в историю
-            # tool_call.arguments уже dict, не нужно вызывать model_dump()
-            arguments_dict = tool_call.arguments if isinstance(tool_call.arguments, dict) else tool_call.arguments.model_dump()
+            # tool_call.arguments всегда dict (см. tool_parser.py:78)
+            arguments_dict = tool_call.arguments
             
+            # КРИТИЧНО: Используем оригинальный call_id из tool_call
             assistant_msg = {
                 "role": "assistant",
-                "content": "",
+                "content": None,
                 "tool_calls": [{
-                    "id": tool_call.id,
+                    "id": tool_call.id,  # ВАЖНО: Этот ID должен совпадать с tool_call_id в tool message
                     "type": "function",
                     "function": {
                         "name": tool_call.tool_name,
@@ -131,6 +132,12 @@ async def stream_response(session_id: str, history: list):
                     }
                 }]
             }
+            
+            logger.info(
+                f"[Agent] Saving assistant message with tool_call: call_id={tool_call.id}, "
+                f"tool_name={tool_call.tool_name}"
+            )
+            
             session_manager.get(session_id).messages.append(assistant_msg)
             
             # Отправляем tool_call в stream

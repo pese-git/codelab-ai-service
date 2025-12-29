@@ -47,6 +47,13 @@ class OpenAIToolCallParser(ToolCallParser):
             for tc in metadata["tool_calls"]:
                 func = tc.get("function") if isinstance(tc, dict) else getattr(tc, "function", None)
                 tc_id = tc.get("id") if isinstance(tc, dict) else getattr(tc, "id", None)
+                
+                # КРИТИЧНО: Логируем извлечение call_id для отладки
+                logger.info(
+                    f"[ToolParser] Extracting call_id from tool_call: "
+                    f"tc_id={tc_id}, tc_type={type(tc)}, tc_keys={tc.keys() if isinstance(tc, dict) else 'N/A'}"
+                )
+                
                 tool_name = None
                 arguments = {}
                 if func:
@@ -66,17 +73,32 @@ class OpenAIToolCallParser(ToolCallParser):
                     tool_name = (
                         tc.get("name") if isinstance(tc, dict) else getattr(tc, "name", None)
                     )
+                
                 logger.debug(
-                    f"Parsing tool_call: tc={tc}, func={func}, tool_name={tool_name}, args={arguments}"
+                    f"[ToolParser] Parsed tool_call: tc_id={tc_id}, tool_name={tool_name}, args={arguments}"
                 )
+                
+                # КРИТИЧНО: Если tc_id отсутствует, это ошибка!
+                if not tc_id:
+                    logger.error(
+                        f"[ToolParser] CRITICAL: tool_call missing 'id' field! "
+                        f"This will cause call_id mismatch. tc={tc}"
+                    )
+                    # Генерируем fallback ID, но это может вызвать проблемы
+                    tc_id = f"tc_fallback_{len(tool_calls)}"
+                    logger.warning(f"[ToolParser] Using fallback call_id: {tc_id}")
+                
                 # НЕ добавлять ToolCall если tool_name пустой!
                 if tool_name:
                     tool_calls.append(
                         ToolCall.model_construct(
-                            id=tc_id or f"tc_{len(tool_calls)}",
+                            id=tc_id,
                             tool_name=tool_name,
                             arguments=arguments or {},
                         )
+                    )
+                    logger.info(
+                        f"[ToolParser] Created ToolCall: id={tc_id}, tool_name={tool_name}"
                     )
         # Старый OpenAI function_call (legacy)
         if metadata and "function_call" in metadata:

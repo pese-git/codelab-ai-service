@@ -72,11 +72,14 @@ class OpenAIAdapter(BaseLLMAdapter):
 
     async def chat(self, request: ChatCompletionRequest):
         messages = request.messages or []
+        
+        # Convert Pydantic models to dicts to preserve all fields (including call_id)
+        messages_dicts = [msg.model_dump(exclude_none=True) if hasattr(msg, 'model_dump') else msg for msg in messages]
 
         # Build parameters to pass to OpenAI
         create_params = {
             "model": request.model,
-            "messages": messages,
+            "messages": messages_dicts,
             "stream": getattr(request, "stream", False),
         }
 

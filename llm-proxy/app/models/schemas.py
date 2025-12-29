@@ -5,10 +5,15 @@ from pydantic import BaseModel, Field
 
 
 class ChatMessage(BaseModel):
+    model_config = {"extra": "allow"}  # Allow extra fields to pass through
+    
     role: str  # 'system', 'user', 'assistant', 'function', 'tool'
     content: Optional[str]
     name: Optional[str] = None
     function_call: Optional[dict] = None  # For function/tool replies
+    tool_calls: Optional[List[dict]] = None  # For assistant messages with tool calls
+    call_id: Optional[str] = None  # For tool messages (Azure OpenAI format)
+    tool_call_id: Optional[str] = None  # For tool messages (standard OpenAI format)
 
 
 class FunctionCall(BaseModel):

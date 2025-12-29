@@ -66,8 +66,21 @@ async def message_stream_sse(request: AgentStreamRequest):
                 result = request.message.get("result")
                 
                 logger.info(
-                    f"[Agent] Received tool_result: call_id={call_id}, tool={tool_name}, session={request.session_id}"
+                    f"[Agent] Received tool_result from Gateway: "
+                    f"call_id={call_id}, tool_name={tool_name}, session={request.session_id}"
                 )
+                logger.debug(
+                    f"[Agent][TRACE] Tool result message:\n"
+                    + pprint.pformat(request.message, indent=2, width=120)
+                )
+                
+                # КРИТИЧНО: Проверяем наличие call_id
+                if not call_id:
+                    logger.error(
+                        f"[Agent][ERROR] tool_result missing call_id! This will cause Azure OpenAI error. "
+                        f"message={request.message}"
+                    )
+                    raise ValueError("tool_result must contain call_id")
                 
                 # Добавляем tool_result в историю как tool message
                 result_str = json.dumps(result) if not isinstance(result, str) else result

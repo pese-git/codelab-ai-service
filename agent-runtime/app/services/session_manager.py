@@ -75,7 +75,7 @@ class SessionManager:
             )
             logger.debug(
                 f"[SessionManager] New session messages for {session_id}:\n"
-                + pprint.pformat([m.model_dump() for m in state.messages], indent=2, width=120)
+                + pprint.pformat([m.model_dump() if hasattr(m, 'model_dump') else m for m in state.messages], indent=2, width=120)
             )
 
     def append_tool_result(self, session_id: str, call_id: str, tool_name: str, result: str):
@@ -92,17 +92,28 @@ class SessionManager:
                 logger.error(f"[SessionManager] append_tool_result: Session {session_id} not found")
                 raise ValueError(f"Session {session_id} not found")
             
-            # Создаем tool message с tool_call_id
+            logger.info(
+                f"[SessionManager] Creating tool message: call_id={call_id}, tool_name={tool_name}, "
+                f"result_len={len(result)}"
+            )
+            
+            # Создаем tool message с tool_call_id (стандарт OpenAI API)
+            # КРИТИЧНО: tool_call_id должен совпадать с id из assistant message tool_calls
             msg = {
                 "role": "tool",
                 "content": result,
-                "tool_call_id": call_id,
+                "tool_call_id": call_id,  # ВАЖНО: Должен совпадать с id из tool_call
                 "name": tool_name
             }
             state.messages.append(msg)
             state.last_activity = datetime.now()
+            
+            logger.info(
+                f"[SessionManager] Appended tool_result to {session_id}: "
+                f"tool_call_id={call_id}, tool_name={tool_name}"
+            )
             logger.debug(
-                f"[SessionManager] Appended tool_result to {session_id}:\n"
+                f"[SessionManager] Tool message details:\n"
                 + pprint.pformat(msg, indent=2, width=120)
             )
 
