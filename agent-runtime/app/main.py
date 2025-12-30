@@ -2,6 +2,7 @@
 Agent Runtime Service - Main application entry point.
 
 FastAPI application for AI agent runtime with LLM integration and tool execution.
+Multi-agent system with specialized agents for different tasks.
 """
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
@@ -9,6 +10,9 @@ from fastapi.openapi.utils import get_openapi
 from app.api.v1.endpoints import router as v1_router
 from app.middleware.internal_auth import InternalAuthMiddleware
 from app.core.config import AppConfig
+
+# Initialize multi-agent system
+import app.agents  # This will register all agents
 
 # Create FastAPI application
 app = FastAPI(
