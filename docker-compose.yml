@@ -8,13 +8,13 @@ services:
     environment:
       - ENVIRONMENT=${ENVIRONMENT}
       - PORT=${GATEWAY_PORT}
-      - AGENT_URL=http://agent-runtime:${AGENT_RUNTIME_PORT}
-      - LOG_LEVEL=${LOG_LEVEL}
-      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
-      - WS_HEARTBEAT_INTERVAL=${WS_HEARTBEAT_INTERVAL}
-      - WS_CLOSE_TIMEOUT=${WS_CLOSE_TIMEOUT}
-      - MAX_CONCURRENT_REQUESTS=${MAX_CONCURRENT_REQUESTS}
-      - REQUEST_TIMEOUT=${REQUEST_TIMEOUT}
+      - GATEWAY__AGENT_URL=http://agent-runtime:${AGENT_RUNTIME_PORT}
+      - GATEWAY__LOG_LEVEL=${GATEWAY__LOG_LEVEL}
+      - GATEWAY__INTERNAL_API_KEY=${GATEWAY__INTERNAL_API_KEY}
+      - GATEWAY__WS_HEARTBEAT_INTERVAL=${GATEWAY__WS_HEARTBEAT_INTERVAL}
+      - GATEWAY__WS_CLOSE_TIMEOUT=${GATEWAY__WS_CLOSE_TIMEOUT}
+      - GATEWAY__MAX_CONCURRENT_REQUESTS=${GATEWAY__MAX_CONCURRENT_REQUESTS}
+      - GATEWAY__REQUEST_TIMEOUT=${GATEWAY__REQUEST_TIMEOUT}
     depends_on:
       agent-runtime:
         condition: service_healthy
@@ -36,11 +36,13 @@ services:
     environment:
       - ENVIRONMENT=${ENVIRONMENT}
       - PORT=${AGENT_RUNTIME_PORT}
-      - LLM_PROXY_URL=http://llm-proxy:${LLM_PROXY_PORT}
-      - LOG_LEVEL=${LOG_LEVEL}
-      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
-      - MAX_CONCURRENT_REQUESTS=${MAX_CONCURRENT_REQUESTS}
-      - REQUEST_TIMEOUT=${REQUEST_TIMEOUT}
+      - AGENT_RUNTIME__GATEWAY_URL=${AGENT_RUNTIME__GATEWAY_URL}
+      - AGENT_RUNTIME__LLM_PROXY_URL=http://llm-proxy:${LLM_PROXY_PORT}
+      - AGENT_RUNTIME__LOG_LEVEL=${AGENT_RUNTIME__LOG_LEVEL}
+      - AGENT_RUNTIME__INTERNAL_API_KEY=${AGENT_RUNTIME__INTERNAL_API_KEY}
+      - AGENT_RUNTIME__MAX_CONCURRENT_REQUESTS=${AGENT_RUNTIME__MAX_CONCURRENT_REQUESTS}
+      - AGENT_RUNTIME__REQUEST_TIMEOUT=${AGENT_RUNTIME__REQUEST_TIMEOUT}
+      - AGENT_RUNTIME__LLM_MODEL=${AGENT_RUNTIME__LLM_MODEL}
     depends_on:
       llm-proxy:
         condition: service_healthy
@@ -62,12 +64,16 @@ services:
     environment:
       - ENVIRONMENT=${ENVIRONMENT}
       - PORT=${LLM_PROXY_PORT}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - LOG_LEVEL=${LOG_LEVEL}
-      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
-      - MAX_CONCURRENT_REQUESTS=${MAX_CONCURRENT_REQUESTS}
-      - REQUEST_TIMEOUT=${REQUEST_TIMEOUT}
+      - LLM_PROXY__OPENAI_API_KEY=${LLM_PROXY__OPENAI_API_KEY}
+      - LLM_PROXY__ANTHROPIC_API_KEY=${LLM_PROXY__ANTHROPIC_API_KEY}
+      - LLM_PROXY__LLM_MODE=${LLM_PROXY__LLM_MODE}
+      - LLM_PROXY__OPENAI_BASE_URL=${LLM_PROXY__OPENAI_BASE_URL}
+      - LLM_PROXY__LOG_LEVEL=${LLM_PROXY__LOG_LEVEL}
+      - LLM_PROXY__INTERNAL_API_KEY=${LLM_PROXY__INTERNAL_API_KEY}
+      - LLM_PROXY__MAX_CONCURRENT_REQUESTS=${LLM_PROXY__MAX_CONCURRENT_REQUESTS}
+      - LLM_PROXY__REQUEST_TIMEOUT=${LLM_PROXY__REQUEST_TIMEOUT}
+      - LLM_PROXY__VLLM_API_KEY=${LLM_PROXY__VLLM_API_KEY}
+      - LLM_PROXY__VLLM_BASE_URL=http://vllm:8003/v1
     networks:
       - codelab-network
     healthcheck:
@@ -76,6 +82,50 @@ services:
       timeout: ${HEALTHCHECK_TIMEOUT}
       retries: ${HEALTHCHECK_RETRIES}
       start_period: ${HEALTHCHECK_START_PERIOD}
+
+#  vllm:
+#    image: vllm-cpu:latest
+#    privileged: true
+#    shm_size: 4g
+#    # Apple Sillicon M4
+#    environment:
+#      - LOG_LEVEL=DEBUG
+#      - VLLM_CPU_KVCACHE_SPACE=4
+#      - VLLM_CPU_OMP_THREADS_BIND=2
+#    #- HF_TOKEN=${HF_TOKEN}  # Можно экспортировать на хосте или прописать прямо здесь свой токен
+#    command:
+#      [
+#        "--model", "Qwen/Qwen3-0.6B",
+#        "--host", "0.0.0.0",
+#        "--port", "8003",
+#        "--max-model-len", "32768"
+#      ]
+#
+#    # Apple Sillicon M1
+#    #environment:
+#    #  - LOG_LEVEL=DEBUG
+#    #  - VLLM_CPU_KVCACHE_SPACE=10
+#    #  - VLLM_CPU_OMP_THREADS_BIND=2
+#    ##- HF_TOKEN=${HF_TOKEN}  # Можно экспортировать на хосте или прописать прямо здесь свой токен
+#    #command:
+#    #  [
+#    #    "--model", "Qwen/Qwen3-0.6B",
+#    #    "--dtype", "float32",
+#    #    "--enforce-eager",
+#    #    "--host", "0.0.0.0",
+#    #    "--port", "8003",
+#    #    "--max-model-len", "32768",
+#    #    "--max-num-seqs", "16"
+#    #  ]
+#
+#
+#    volumes:
+#      - ./vllm-models/:/models/
+#      - ./vllm-hf-cache:/root/.cache/huggingface
+#    ports:
+#      - "8003:8003"
+#    networks:
+#      - codelab-network
 
 networks:
   codelab-network:

@@ -98,21 +98,21 @@ ws.send(JSON.stringify({type: "user_message", content: "Привет"}))
 **Цель:** Потоковая передача через все сервисы (имитация токенов)
 
 **Задачи LLM Proxy:**
-- [ ] SSE endpoint `/llm/stream`
-- [ ] Генератор имитации токенов (слово за словом)
-- [ ] Формат потокового ответа
+- [x] SSE endpoint `/llm/stream`
+- [x] Генератор имитации токенов (слово за словом)
+- [x] Формат потокового ответа
 
 **Задачи Agent Runtime:**
-- [ ] Получение SSE от LLM Proxy
-- [ ] Преобразование в формат Gateway
-- [ ] POST `/agent/message/stream` с SSE ответом
-- [ ] Хранение контекста сессии (в памяти)
+- [x] Получение SSE от LLM Proxy
+- [x] Преобразование в формат Gateway
+- [x] POST `/agent/message/stream` с SSE ответом
+- [x] Хранение контекста сессии (в памяти)
 
 **Задачи Gateway:**
-- [ ] Получение SSE от Agent Runtime
-- [ ] Преобразование SSE в WebSocket сообщения
-- [ ] Обработка разрывов WebSocket соединения
-- [ ] Буферизация последних N токенов
+- [x] Получение SSE от Agent Runtime
+- [x] Преобразование SSE в WebSocket сообщения
+- [x] Обработка разрывов WebSocket соединения
+- [x] Буферизация последних N токенов
 
 **Результат:**
 ```javascript
@@ -124,14 +124,14 @@ ws.onmessage = (event) => {
 }
 ```
 
-## Iteration 2.2: Inter-Service Authentication
+## ✅ Iteration 2.2: Inter-Service Authentication (РЕАЛИЗОВАНО)
 **Goal:** Базовая безопасность между сервисами
 
 **All Services Tasks:**
-- [ ] API key validation middleware
-- [ ] Internal service keys (X-Internal-Auth)
-- [ ] Request context propagation
-- [ ] Unauthorized error handling
+- [x] API key validation middleware
+- [x] Internal service keys (X-Internal-Auth)
+- [x] Request context propagation
+- [x] Unauthorized error handling
 
 **Deliverable:**
 ```bash
@@ -149,24 +149,24 @@ curl http://localhost:8001/agent/message \
 
 # Phase 3: Real LLM Integration (Day 5-6)
 
-## Iteration 3.1: LLM Proxy OpenAI Integration
+## ✅ Iteration 3.1: LLM Proxy OpenAI Integration (ЗАВЕРШЕНО)
 **Goal:** LLM Proxy работает с реальным OpenAI API
 
 **LLM Proxy Tasks:**
-- [ ] OpenAI client integration
-- [ ] Provider adapter pattern
-- [ ] Non-streaming `/llm/chat` endpoint
-- [ ] Streaming `/llm/stream` with real tokens
-- [ ] Error handling (rate limits, timeouts)
-- [ ] Fallback to mock if OpenAI unavailable
+- [x] OpenAI client integration
+- [x] Provider adapter pattern
+- [x] Non-streaming `/llm/chat` endpoint (устарело, теперь реализовано через `/v1/chat/completions`)
+- [x] Streaming `/llm/stream` with real tokens (реализовано через `/v1/chat/completions`)
+- [x] Error handling (rate limits, timeouts) (основные ошибки обрабатываются)
+- [x] Fallback to mock if OpenAI unavailable (фэйковый режим реализован)
 
 **Agent Runtime Tasks:**
-- [ ] Update to use real LLM Proxy
-- [ ] Handle real LLM response format
-- [ ] Context window management
+- [x] Update to use real LLM Proxy
+- [x] Handle real LLM response format
+- [x] Context window management (минимально, базовое хранение)
 
 **Gateway Tasks:**
-- [ ] No changes needed (protocol unchanged)
+- [x] No changes needed (protocol unchanged)
 
 **Deliverable:**
 ```bash
@@ -180,13 +180,13 @@ ws.send('{"type": "user_message", "content": "What is 2+2?"}')
 
 **Задачи LLM Proxy:**
 - [ ] Адаптер для Anthropic
-- [ ] Адаптер для локальных моделей (Ollama)
-- [ ] Логика маршрутизации моделей
-- [ ] Специфичная обработка ошибок для каждого провайдера
-- [ ] Унифицированный формат ответов
+- [x] Адаптер для локальных моделей (vLLM)
+- [x] Логика маршрутизации моделей
+- [x] Специфичная обработка ошибок для каждого провайдера
+- [x] Унифицированный формат ответов
 
 **Задачи Agent Runtime:**
-- [ ] Выбор модели в запросах
+- [x] Выбор модели в запросах
 - [ ] Специфичные промпты для каждого провайдера
 
 **Результат:**

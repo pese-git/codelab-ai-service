@@ -71,3 +71,13 @@ wheels/
 
 # PyBuilder
 target/
+
+
+**/.venv
+
+*.code-workspace
+
+vllm-hf-cache
+vllm-models
+
+cherry-pick-script.sh

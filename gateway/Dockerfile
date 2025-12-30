@@ -40,6 +40,7 @@ COPY ./app /app/app
 # Настройка переменных окружения
 ENV PYTHONPATH=/app
 ENV PORT=8000
+ENV INTERNAL_API_KEY="None"
 
 # Запуск приложения
 CMD ["python", "app/main.py"]

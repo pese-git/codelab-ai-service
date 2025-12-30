@@ -1,67 +1,56 @@
-from typing import List
+import logging
 
-import uvicorn
 from fastapi import FastAPI
-from pydantic import BaseModel
+from fastapi.openapi.utils import get_openapi
 
-app = FastAPI(title="LLM Proxy Service")
+from app.api.v1.endpoints import router as router
+from app.middleware.internal_auth import InternalAuthMiddleware
+from app.models.schemas import HealthResponse
 
-class ChatRequest(BaseModel):
-    model: str = "gpt-4"  # default model
-    messages: List[dict]
-    stream: bool = False
+logger = logging.getLogger("llm-proxy")
 
-
-class ChatResponse(BaseModel):
-    message: str
-    model: str
-
-
-class HealthResponse(BaseModel):
-    status: str
-    service: str
-    version: str
+app = FastAPI(
+    title="LLM Proxy Service",
+    swagger_ui_init_oauth={},
+    openapi_tags=[],  # если есть
+)
 
 
-class LLMModel(BaseModel):
-    id: str
-    name: str
-    provider: str
-    context_length: int
-    is_available: bool
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+    # Добавляем схему X-Internal-Auth
+    openapi_schema["components"]["securitySchemes"] = {
+        "XInternalAuth": {"type": "apiKey", "in": "header", "name": "x-internal-auth"}
+    }
+    # Настроить всю security глобально для эндпоинтов по желанию:
+    openapi_schema["security"] = [{"XInternalAuth": []}]
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi  # Переопределить openapi-генератор  # ty:ignore[invalid-assignment]
+
+# Подключение middleware
+app.add_middleware(InternalAuthMiddleware)  # ty:ignore[invalid-argument-type]
+
+
+app.include_router(router)
 
 
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
+    logger.info("[LLM Proxy] Health check called")
     return HealthResponse.model_construct(status="healthy", service="llm-proxy", version="0.1.0")
 
 
-@app.get("/llm/models", response_model=List[LLMModel])
-async def list_models():
-    # Mock data for now
-    return [
-        LLMModel.model_construct(
-            id="gpt-4", name="GPT-4", provider="OpenAI", context_length=8192, is_available=True
-        ),
-        LLMModel.model_construct(
-            id="claude-2",
-            name="Claude 2",
-            provider="Anthropic",
-            context_length=100000,
-            is_available=True,
-        ),
-    ]
-
-
-@app.post("/llm/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
-    # Echo mode - just return the last message content
-    last_message = request.messages[-1] if request.messages else {"content": ""}
-    return ChatResponse.model_construct(
-        message=f"Echo from LLM: {last_message.get('content', '')}",
-        model=request.model
-    )
-
-
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8002)
+    import uvicorn
+
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8002, log_level="info", reload=True)

@@ -1,71 +1,41 @@
-import logging
-import os
-from typing import List
-
-import httpx
-import uvicorn
 from fastapi import FastAPI
-from pydantic import BaseModel
+from fastapi.openapi.utils import get_openapi
 
-# Настройка логирования
-logging.basicConfig(level=os.getenv('LOG_LEVEL', 'INFO'))
-logger = logging.getLogger(__name__)
+from app.api.v1.endpoints import router as v1_router
+from app.middleware.internal_auth import InternalAuthMiddleware
 
 app = FastAPI(title="Agent Runtime Service")
 
-# Configuration
-LLM_PROXY_URL = os.getenv('LLM_PROXY_URL', 'http://localhost:8002')
 
-
-class HealthResponse(BaseModel):
-    status: str
-    service: str
-    version: str
-
-
-class Message(BaseModel):
-    session_id: str
-    type: str
-    content: str
-
-
-class MessageResponse(BaseModel):
-    status: str
-    message: str
-
-
-@app.get("/health", response_model=HealthResponse)
-async def health_check() -> HealthResponse:
-    return HealthResponse.model_construct(
-        status="healthy", service="agent-runtime", version="0.1.0"
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
     )
-
-
-@app.post("/agent/message", response_model=MessageResponse)
-async def process_message(message: Message) -> MessageResponse:
-    # Prepare message for LLM
-    llm_request = {
-        "model": "gpt-4",
-        "messages": [
-            {"role": "user", "content": message.content}
-        ],
-        "stream": False
+    # Добавляем схему X-Internal-Auth
+    openapi_schema["components"]["securitySchemes"] = {
+        "XInternalAuth": {"type": "apiKey", "in": "header", "name": "x-internal-auth"}
     }
-    
-    # Send request to LLM Proxy
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            f"{LLM_PROXY_URL}/llm/chat",
-            json=llm_request
-        )
-        response.raise_for_status()
-        llm_response = response.json()
-        
-        return MessageResponse.model_construct(
-            status="success",
-            message=llm_response["message"]
-        )
+    # Настроить всю security глобально для эндпоинтов по желанию:
+    openapi_schema["security"] = [{"XInternalAuth": []}]
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
 
+
+# Переопределить openapi-генератор
+app.openapi = custom_openapi  # ty:ignore[invalid-assignment]
+
+# Подключение middleware авторизации
+app.add_middleware(InternalAuthMiddleware)
+
+# Подключение роутов API v1
+app.include_router(v1_router)
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    import uvicorn
+
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8001, log_level="info", reload=True)

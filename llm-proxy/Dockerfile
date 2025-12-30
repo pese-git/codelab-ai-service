@@ -34,12 +34,13 @@ COPY --from=builder /app/.venv /app/.venv
 ENV VIRTUAL_ENV=/app/.venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-# Копируем код приложения
+# Копируем код приложения (включая все подпапки, например llm_adapters)
 COPY ./app /app/app
 
 # Настройка переменных окружения
 ENV PYTHONPATH=/app
 ENV PORT=8002
+ENV INTERNAL_API_KEY="None"
 
 # Запуск приложения
 CMD ["python", "app/main.py"]
