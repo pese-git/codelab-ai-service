@@ -43,14 +43,32 @@ async def chat_completions(
         result = await adapter.chat(request)
         if not request.stream:
             # НЕ-СТРИМОВЫЙ РЕЖИМ
-            # Формируем openai-совместимый ответ
-            choices = [
-                ChoiceMsg.model_construct(
-                    index=0,
-                    message=ChatMessage.model_construct(role="assistant", content=result),
-                    finish_reason="stop",
-                )
-            ]
+            # result - это список словарей с сообщениями от адаптера
+            # Каждый словарь содержит role, content и возможно tool_calls
+            
+            if isinstance(result, str):
+                # Обработка ошибки (строка)
+                choices = [
+                    ChoiceMsg.model_construct(
+                        index=0,
+                        message=ChatMessage.model_construct(role="assistant", content=result),
+                        finish_reason="stop",
+                    )
+                ]
+            else:
+                # Обработка списка сообщений от адаптера
+                choices = []
+                for idx, msg_dict in enumerate(result):
+                    # msg_dict уже содержит role, content и возможно tool_calls
+                    message = ChatMessage.model_construct(**msg_dict)
+                    choices.append(
+                        ChoiceMsg.model_construct(
+                            index=idx,
+                            message=message,
+                            finish_reason="stop",
+                        )
+                    )
+            
             resp = ChatCompletionResponse.model_construct(
                 id=req_id,
                 object="chat.completion",

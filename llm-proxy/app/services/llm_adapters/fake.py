@@ -32,34 +32,19 @@ class FakeLLMAdapter(BaseLLMAdapter):
         )
         # Для теста: всегда возвращаем детерминированный mock-ответ, не зависящий от ввода
         if not getattr(request, "stream", False):
-            result = {
-                "id": "chatcmpl-fake-echo-1",
-                "object": "chat.completion",
-                "created": 1234567890,
-                "model": getattr(request, "model", "mock-llm"),
-                "choices": [
-                    {
-                        "index": 0,
-                        "message": {
-                            "role": "assistant",
-                            "content": [
-                                {
-                                    "role": "assistant",
-                                    "content": "Mock LLM response (static)",
-                                }
-                            ],
-                        },
-                        "finish_reason": "stop",
-                    }
-                ],
-                "usage": None,
-            }
+            # Возвращаем список сообщений (как LiteLLMAdapter)
+            result = [
+                {
+                    "role": "assistant",
+                    "content": "Mock LLM response (static)",
+                }
+            ]
             logger.debug(f"[FakeLLMAdapter] chat result (not streamed): {result}")
             return result
 
         # stream mode
         async def token_gen():
-            words = last_message.split()
+            words = "Mock LLM streaming response".split()
             for word in words:
                 logger.debug(f"[FakeLLMAdapter][stream] yield token: {word}")
                 yield word + " "

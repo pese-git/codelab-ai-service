@@ -1,0 +1,47 @@
+model_list:
+  # Локальные модели Ollama
+  - model_name: qwen3
+    litellm_params:
+      model: ollama/qwen3:0.6b
+      api_base: http://ollama:11434
+
+  # OpenRouter модели
+  - model_name: gpt-3.5-turbo
+    litellm_params:
+      model: openrouter/openai/gpt-3.5-turbo
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: gpt-4
+    litellm_params:
+      model: openrouter/openai/gpt-4
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: gpt-4.1
+    litellm_params:
+      model: openrouter/openai/gpt-4-turbo
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: claude-3-5-sonnet
+    litellm_params:
+      model: openrouter/anthropic/claude-3.5-sonnet
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: claude-3-opus
+    litellm_params:
+      model: openrouter/anthropic/claude-3-opus
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  # Дополнительные популярные модели через OpenRouter
+  - model_name: deepseek-chat
+    litellm_params:
+      model: openrouter/deepseek/deepseek-chat
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: qwen-2.5-72b
+    litellm_params:
+      model: openrouter/qwen/qwen-2.5-72b-instruct
+      api_key: os.environ/OPENROUTER_API_KEY
+
+litellm_settings:
+  drop_params: true
+  set_verbose: false

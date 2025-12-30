@@ -64,16 +64,17 @@ services:
     environment:
       - ENVIRONMENT=${ENVIRONMENT}
       - PORT=${LLM_PROXY_PORT}
-      - LLM_PROXY__OPENAI_API_KEY=${LLM_PROXY__OPENAI_API_KEY}
-      - LLM_PROXY__ANTHROPIC_API_KEY=${LLM_PROXY__ANTHROPIC_API_KEY}
+      - LLM_PROXY__LITELLM_PROXY_URL=http://litellm-proxy:4000
+      - LLM_PROXY__LITELLM_API_KEY=${LITELLM_MASTER_KEY}
+      - LLM_PROXY__DEFAULT_MODEL=${LLM_PROXY__DEFAULT_MODEL}
       - LLM_PROXY__LLM_MODE=${LLM_PROXY__LLM_MODE}
-      - LLM_PROXY__OPENAI_BASE_URL=${LLM_PROXY__OPENAI_BASE_URL}
       - LLM_PROXY__LOG_LEVEL=${LLM_PROXY__LOG_LEVEL}
       - LLM_PROXY__INTERNAL_API_KEY=${LLM_PROXY__INTERNAL_API_KEY}
       - LLM_PROXY__MAX_CONCURRENT_REQUESTS=${LLM_PROXY__MAX_CONCURRENT_REQUESTS}
       - LLM_PROXY__REQUEST_TIMEOUT=${LLM_PROXY__REQUEST_TIMEOUT}
-      - LLM_PROXY__VLLM_API_KEY=${LLM_PROXY__VLLM_API_KEY}
-      - LLM_PROXY__VLLM_BASE_URL=http://vllm:8003/v1
+    depends_on:
+      litellm-proxy:
+        condition: service_healthy
     networks:
       - codelab-network
     healthcheck:
@@ -82,6 +83,51 @@ services:
       timeout: ${HEALTHCHECK_TIMEOUT}
       retries: ${HEALTHCHECK_RETRIES}
       start_period: ${HEALTHCHECK_START_PERIOD}
+
+  litellm-proxy:
+    image: ghcr.io/berriai/litellm:main-latest
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./litellm_config.yaml:/app/config.yaml
+    environment:
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AZURE_API_KEY=${AZURE_API_KEY}
+      - AZURE_API_BASE=${AZURE_API_BASE}
+      - AZURE_API_VERSION=${AZURE_API_VERSION}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OLLAMA_API_BASE=http://ollama:11434
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--detailed_debug"]
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - codelab-network
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/').read()"]
+      interval: ${HEALTHCHECK_INTERVAL}
+      timeout: ${HEALTHCHECK_TIMEOUT}
+      retries: ${HEALTHCHECK_RETRIES}
+      start_period: ${HEALTHCHECK_START_PERIOD}
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+    networks:
+      - codelab-network
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: ${HEALTHCHECK_INTERVAL}
+      timeout: ${HEALTHCHECK_TIMEOUT}
+      retries: ${HEALTHCHECK_RETRIES}
+      start_period: 30s
 
 #  vllm:
 #    image: vllm-cpu:latest
@@ -126,6 +172,10 @@ services:
 #      - "8003:8003"
 #    networks:
 #      - codelab-network
+
+volumes:
+  ollama-data:
+    driver: local
 
 networks:
   codelab-network:
