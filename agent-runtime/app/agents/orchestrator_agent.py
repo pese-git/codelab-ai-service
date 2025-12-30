@@ -202,7 +202,7 @@ class OrchestratorAgent(BaseAgent):
         """
         Fallback classification using simple keyword matching.
         
-        Used when LLM classification fails.
+        Used when LLM classification fails or for testing.
         
         Args:
             message: User message to classify
@@ -213,14 +213,29 @@ class OrchestratorAgent(BaseAgent):
         message_lower = message.lower()
         
         # Simple keyword matching as fallback
-        if any(kw in message_lower for kw in ["create", "write", "implement", "fix", "code"]):
+        if any(kw in message_lower for kw in ["create", "write", "implement", "fix", "code", "refactor", "modify"]):
             return AgentType.CODER
-        elif any(kw in message_lower for kw in ["design", "architecture", "plan", "spec"]):
+        elif any(kw in message_lower for kw in ["design", "architecture", "plan", "spec", "blueprint"]):
             return AgentType.ARCHITECT
-        elif any(kw in message_lower for kw in ["debug", "error", "bug", "problem", "why"]):
+        elif any(kw in message_lower for kw in ["debug", "error", "bug", "problem", "why", "investigate", "crash"]):
             return AgentType.DEBUG
-        elif any(kw in message_lower for kw in ["explain", "what is", "how does", "help"]):
+        elif any(kw in message_lower for kw in ["explain", "what is", "how does", "help", "understand"]):
             return AgentType.ASK
         else:
             # Default to Coder
             return AgentType.CODER
+    
+    def classify_task(self, message: str) -> AgentType:
+        """
+        Synchronous classification for testing purposes.
+        
+        Uses fallback keyword matching.
+        For production, use classify_task_with_llm() instead.
+        
+        Args:
+            message: User message to classify
+            
+        Returns:
+            AgentType: Type of agent that should handle this task
+        """
+        return self._fallback_classify(message)
