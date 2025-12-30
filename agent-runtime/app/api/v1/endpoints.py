@@ -10,10 +10,7 @@ from fastapi.responses import JSONResponse
 from sse_starlette.sse import EventSourceResponse
 
 from app.core.config import AppConfig
-from app.core.dependencies import get_chat_service
-from app.core.agent.prompts import SYSTEM_PROMPT
-from app.models.schemas import AgentStreamRequest, HealthResponse, Message, AgentInfo
-from app.services.chat_service import ChatService
+from app.models.schemas import AgentStreamRequest, HealthResponse, AgentInfo
 from app.services.session_manager import session_manager
 from app.services.llm_stream_service import stream_response
 from app.services.multi_agent_orchestrator import multi_agent_orchestrator
@@ -277,22 +274,3 @@ async def get_current_agent(session_id: str):
     }
 
 
-@router.post("/agent/message/stream/legacy")
-async def message_stream_legacy(
-    message: Message,
-    chat_service: ChatService = Depends(get_chat_service)
-):
-    """
-    DEPRECATED: Legacy endpoint for backward compatibility.
-    Use /agent/message/stream instead.
-    """
-    try:
-        logger.warning("Using deprecated legacy endpoint")
-        result = await chat_service.stream_message(message)
-        return JSONResponse(content=result)
-    except Exception as e:
-        logger.error(f"Exception in legacy endpoint: {e}", exc_info=True)
-        return JSONResponse(
-            content={"error": "Internal server error"},
-            status_code=500
-        )
