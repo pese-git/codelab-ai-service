@@ -180,7 +180,7 @@ class AgentStreamRequest(BaseModel):
 class StreamChunk(BaseModel):
     """SSE event chunk for streaming responses"""
     
-    type: Literal["assistant_message", "tool_call", "error", "done"] = Field(
+    type: Literal["assistant_message", "tool_call", "error", "done", "switch_agent", "agent_switched"] = Field(
         description="Type of the stream chunk"
     )
     content: Optional[str] = Field(default=None, description="Text content for assistant messages")
@@ -217,6 +217,66 @@ class StreamChunk(BaseModel):
                     "type": "error",
                     "error": "Failed to process request",
                     "is_final": True
+                },
+                {
+                    "type": "switch_agent",
+                    "metadata": {"target_agent": "coder", "reason": "Coding task detected"},
+                    "is_final": True
+                },
+                {
+                    "type": "agent_switched",
+                    "content": "Switched to coder agent",
+                    "metadata": {"from_agent": "orchestrator", "to_agent": "coder"},
+                    "is_final": False
                 }
             ]
+        }
+
+
+# Multi-agent specific schemas
+
+class AgentSwitchRequest(BaseModel):
+    """Request to switch to a different agent"""
+    
+    type: Literal["switch_agent"]
+    agent_type: str = Field(
+        description="Target agent type: orchestrator, coder, architect, debug, ask"
+    )
+    content: str = Field(description="Message for the new agent")
+    reason: Optional[str] = Field(
+        default=None,
+        description="Reason for the switch"
+    )
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "type": "switch_agent",
+                "agent_type": "coder",
+                "content": "Create a new widget",
+                "reason": "User requested coder agent"
+            }
+        }
+
+
+class AgentInfo(BaseModel):
+    """Information about an agent"""
+    
+    type: str = Field(description="Agent type")
+    name: str = Field(description="Agent name")
+    description: str = Field(description="Agent description")
+    allowed_tools: List[str] = Field(description="List of allowed tools")
+    has_file_restrictions: bool = Field(
+        description="Whether agent has file editing restrictions"
+    )
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "type": "coder",
+                "name": "Coder Agent",
+                "description": "Specialized in writing and modifying code",
+                "allowed_tools": ["read_file", "write_file", "execute_command"],
+                "has_file_restrictions": False
+            }
         }
