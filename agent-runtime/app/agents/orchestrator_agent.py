@@ -48,11 +48,11 @@ Available agents:
    - General knowledge queries
 
 Analyze the user's request and respond with ONLY a JSON object in this format:
-{
+{{
   "agent": "coder|architect|debug|ask",
   "confidence": "high|medium|low",
   "reasoning": "brief explanation of why this agent was chosen"
-}
+}}
 
 User request: {user_message}
 
@@ -144,7 +144,7 @@ class OrchestratorAgent(BaseAgent):
                     {"role": "user", "content": classification_prompt}
                 ],
                 stream=False,
-                temperature=0.3  # Lower temperature for more consistent classification
+                extra_params={"temperature": 0.3}  # Lower temperature for more consistent classification
             )
             
             # Extract response content
