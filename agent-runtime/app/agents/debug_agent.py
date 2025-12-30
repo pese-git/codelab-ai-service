@@ -1,0 +1,104 @@
+"""
+Debug Agent - specialized in troubleshooting and error investigation.
+
+Handles debugging, error analysis, and root cause investigation.
+Cannot modify files - read-only access.
+"""
+import logging
+from typing import AsyncGenerator, Dict, Any
+from app.agents.base_agent import BaseAgent, AgentType
+from app.agents.prompts.debug import DEBUG_PROMPT
+from app.models.schemas import StreamChunk
+from app.services.llm_stream_service import stream_response
+from app.services.session_manager import session_manager
+
+logger = logging.getLogger("agent-runtime.debug_agent")
+
+
+class DebugAgent(BaseAgent):
+    """
+    Specialized agent for debugging and error investigation.
+    
+    Capabilities:
+    - Analyze error messages and stack traces
+    - Investigate bugs
+    - Find root causes
+    - Run diagnostic commands
+    
+    Restrictions:
+    - Cannot modify files (read-only)
+    - Can only analyze and suggest fixes
+    """
+    
+    def __init__(self):
+        """Initialize Debug agent"""
+        super().__init__(
+            agent_type=AgentType.DEBUG,
+            system_prompt=DEBUG_PROMPT,
+            allowed_tools=[
+                "read_file",
+                "list_files",
+                "search_in_code",
+                "execute_command",  # For running tests and diagnostics
+                "attempt_completion",
+                "ask_followup_question"
+            ]
+            # No file_restrictions needed - write_file is not in allowed_tools
+        )
+        logger.info("Debug agent initialized (read-only mode)")
+    
+    async def process(
+        self, 
+        session_id: str,
+        message: str,
+        context: Dict[str, Any]
+    ) -> AsyncGenerator[StreamChunk, None]:
+        """
+        Process message through Debug agent.
+        
+        Args:
+            session_id: Session identifier
+            message: User message to process
+            context: Agent context with history
+            
+        Yields:
+            StreamChunk: Chunks for SSE streaming
+        """
+        logger.info(f"Debug agent processing message for session {session_id}")
+        
+        # Get session history
+        history = session_manager.get_history(session_id)
+        
+        # Update system prompt
+        if history and history[0].get("role") == "system":
+            history[0]["content"] = self.system_prompt
+        else:
+            history.insert(0, {"role": "system", "content": self.system_prompt})
+        
+        # Delegate to LLM stream service
+        async for chunk in stream_response(session_id, history):
+            # Validate tool usage
+            if chunk.type == "tool_call":
+                if not self.can_use_tool(chunk.tool_name):
+                    logger.warning(
+                        f"Debug agent attempted to use forbidden tool: {chunk.tool_name}"
+                    )
+                    
+                    # Special message for write_file attempts
+                    if chunk.tool_name == "write_file":
+                        error_msg = (
+                            f"Debug agent cannot modify files. "
+                            f"Debug agent can only analyze and suggest fixes. "
+                            f"For code changes, please switch to Coder agent."
+                        )
+                    else:
+                        error_msg = f"Tool '{chunk.tool_name}' is not allowed for Debug agent"
+                    
+                    yield StreamChunk(
+                        type="error",
+                        error=error_msg,
+                        is_final=True
+                    )
+                    return
+            
+            yield chunk
