@@ -4,7 +4,13 @@ from fastapi import APIRouter, WebSocket, status, Depends
 from starlette.websockets import WebSocketDisconnect
 
 from app.core.config import AppConfig, logger
-from app.models.websocket import WSErrorResponse, WSUserMessage, WSToolResult
+from app.models.websocket import (
+    WSErrorResponse,
+    WSUserMessage,
+    WSToolResult,
+    WSAgentSwitched,
+    WSSwitchAgent
+)
 from app.models.rest import HealthResponse
 from app.core.dependencies import (
     get_session_manager,
@@ -59,6 +65,9 @@ async def websocket_endpoint(
                     elif msg_type == "tool_result":
                         msg = WSToolResult.model_validate(ide_msg)
                         logger.info(f"[{session_id}] Received tool_result: call_id={msg.call_id}, has_error={msg.error is not None}")
+                    elif msg_type == "switch_agent":
+                        msg = WSSwitchAgent.model_validate(ide_msg)
+                        logger.info(f"[{session_id}] Received switch_agent: target={msg.agent_type}")
                     else:
                         logger.warning(f"[{session_id}] Unknown message type: {msg_type}")
                         err = WSErrorResponse.model_construct(
