@@ -1,160 +1,216 @@
 import logging
-import pprint
 from datetime import datetime
 from threading import RLock
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
-from app.models.schemas import SessionState
+from app.models.schemas import Message, SessionState
 
 logger = logging.getLogger("agent-runtime.session_manager")
 
 
 class SessionManager:
     """
-    Управляет всеми сессиями: создание, доступ, изменение сообщений.
-    В будущем можно заменить in-memory storage на persistent storage (например, Redis/BoltDB).
+    Manages all agent sessions: creation, access, and message history.
+    
+    Thread-safe in-memory storage for session states.
+    Can be replaced with persistent storage (Redis/PostgreSQL) in the future.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._sessions: Dict[str, SessionState] = {}
         self._lock = RLock()
 
     def exists(self, session_id: str) -> bool:
+        """Check if session exists"""
         with self._lock:
             exists = session_id in self._sessions
             logger.debug(f"Session exists check: {session_id} -> {exists}")
             return exists
 
     def create(self, session_id: str, system_prompt: Optional[str] = None) -> SessionState:
-        from app.models.schemas import Message
-
+        """
+        Create a new session with optional system prompt.
+        
+        Args:
+            session_id: Unique session identifier
+            system_prompt: Optional system prompt to initialize the session
+            
+        Returns:
+            Created SessionState
+            
+        Raises:
+            ValueError: If session already exists
+        """
         with self._lock:
             if session_id in self._sessions:
-                logger.error(f"[SessionManager] Attempt to create duplicate session: {session_id}")
+                logger.error(f"Attempt to create duplicate session: {session_id}")
                 raise ValueError(f"Session {session_id} already exists")
+            
             state = SessionState.model_construct(session_id=session_id)
             if system_prompt:
-                state.messages.append(Message.model_construct(role="system", content=system_prompt))
+                state.messages.append(
+                    Message.model_construct(role="system", content=system_prompt)
+                )
+            
             self._sessions[session_id] = state
-            logger.info(
-                f"[SessionManager] Created session: {session_id}. State:\n"
-                + pprint.pformat(state.model_dump(), indent=2, width=120)
-            )
+            logger.info(f"Created session: {session_id} with {len(state.messages)} initial messages")
             return state
 
     def get(self, session_id: str) -> Optional[SessionState]:
+        """Get session by ID"""
         with self._lock:
             session = self._sessions.get(session_id)
-            logger.debug(
-                f"[SessionManager] Get session: {session_id} -> {'found' if session else 'not found'}"
-            )
+            if session:
+                logger.debug(f"Retrieved session: {session_id}")
+            else:
+                logger.debug(f"Session not found: {session_id}")
             return session
 
     def get_or_create(self, session_id: str, system_prompt: Optional[str] = None) -> SessionState:
+        """
+        Get existing session or create new one if it doesn't exist.
+        
+        Args:
+            session_id: Unique session identifier
+            system_prompt: Optional system prompt for new sessions
+            
+        Returns:
+            Existing or newly created SessionState
+        """
         with self._lock:
             if session_id not in self._sessions:
-                logger.info(f"[SessionManager] Creating new session in get_or_create: {session_id}")
+                logger.info(f"Creating new session: {session_id}")
                 return self.create(session_id, system_prompt)
-            logger.debug(f"[SessionManager] Found existing session in get_or_create: {session_id}")
+            
+            logger.debug(f"Found existing session: {session_id}")
             return self._sessions[session_id]
 
-    def append_message(self, session_id: str, role: str, content: str, name: Optional[str] = None):
-        from app.models.schemas import Message
-
+    def append_message(
+        self, 
+        session_id: str, 
+        role: str, 
+        content: str, 
+        name: Optional[str] = None
+    ) -> None:
+        """
+        Append a message to session history.
+        
+        Args:
+            session_id: Session identifier
+            role: Message role (user, assistant, system, tool)
+            content: Message content
+            name: Optional name (e.g., tool name)
+            
+        Raises:
+            ValueError: If session not found
+        """
         with self._lock:
             state = self.get(session_id)
             if not state:
-                logger.error(f"[SessionManager] append_message: Session {session_id} not found")
+                logger.error(f"Cannot append message: session {session_id} not found")
                 raise ValueError(f"Session {session_id} not found")
+            
             msg = Message.model_construct(role=role, content=content, name=name)
             state.messages.append(msg)
             state.last_activity = datetime.now()
+            
             logger.debug(
-                f"[SessionManager] Appended message to {session_id}:\n"
-                + pprint.pformat(msg.model_dump(), indent=2, width=120)
-            )
-            logger.debug(
-                f"[SessionManager] New session messages for {session_id}:\n"
-                + pprint.pformat([m.model_dump() if hasattr(m, 'model_dump') else m for m in state.messages], indent=2, width=120)
+                f"Appended {role} message to {session_id}: "
+                f"{len(content)} chars, total messages: {len(state.messages)}"
             )
 
-    def append_tool_result(self, session_id: str, call_id: str, tool_name: str, result: str):
+    def append_tool_result(
+        self, 
+        session_id: str, 
+        call_id: str, 
+        tool_name: str, 
+        result: str
+    ) -> None:
         """
-        Добавляет tool_result в историю сессии как tool message.
-        Используется для добавления результатов выполнения инструментов.
+        Append tool execution result to session history.
         
-        Note: Используем роль 'tool' вместо 'function' для совместимости с Azure OpenAI.
-        Tool messages требуют поле 'tool_call_id' согласно OpenAI API spec.
+        Creates a tool message with tool_call_id for OpenAI API compatibility.
+        The tool_call_id must match the id from the assistant's tool_call.
+        
+        Args:
+            session_id: Session identifier
+            call_id: Tool call ID (must match assistant message tool_call id)
+            tool_name: Name of the executed tool
+            result: Tool execution result as string
+            
+        Raises:
+            ValueError: If session not found
         """
         with self._lock:
             state = self.get(session_id)
             if not state:
-                logger.error(f"[SessionManager] append_tool_result: Session {session_id} not found")
+                logger.error(f"Cannot append tool result: session {session_id} not found")
                 raise ValueError(f"Session {session_id} not found")
             
             logger.info(
-                f"[SessionManager] Creating tool message: call_id={call_id}, tool_name={tool_name}, "
-                f"result_len={len(result)}"
+                f"Appending tool result to {session_id}: "
+                f"call_id={call_id}, tool={tool_name}, result_len={len(result)}"
             )
             
-            # Создаем tool message с tool_call_id (стандарт OpenAI API)
-            # КРИТИЧНО: tool_call_id должен совпадать с id из assistant message tool_calls
-            msg = {
+            # Create tool message following OpenAI API spec
+            # CRITICAL: tool_call_id must match the id from assistant message tool_calls
+            tool_message = {
                 "role": "tool",
                 "content": result,
-                "tool_call_id": call_id,  # ВАЖНО: Должен совпадать с id из tool_call
+                "tool_call_id": call_id,
                 "name": tool_name
             }
-            state.messages.append(msg)
+            
+            state.messages.append(tool_message)
             state.last_activity = datetime.now()
             
-            logger.info(
-                f"[SessionManager] Appended tool_result to {session_id}: "
-                f"tool_call_id={call_id}, tool_name={tool_name}"
-            )
             logger.debug(
-                f"[SessionManager] Tool message details:\n"
-                + pprint.pformat(msg, indent=2, width=120)
+                f"Tool result appended: call_id={call_id}, "
+                f"total messages: {len(state.messages)}"
             )
 
     def get_history(self, session_id: str) -> List[dict]:
         """
-        Возвращает историю сообщений сессии в виде списка dict.
-        Используется для передачи в LLM.
+        Get session message history as list of dicts for LLM.
+        
+        Args:
+            session_id: Session identifier
+            
+        Returns:
+            List of message dictionaries
         """
         with self._lock:
             state = self.get(session_id)
             if not state:
-                logger.warning(f"[SessionManager] get_history: Session {session_id} not found")
+                logger.warning(f"Cannot get history: session {session_id} not found")
                 return []
-            # Обрабатываем как Pydantic модели, так и dict объекты
+            
+            # Convert messages to dict format
             history = []
-            for m in state.messages:
-                if isinstance(m, dict):
-                    history.append(m)
+            for msg in state.messages:
+                if isinstance(msg, dict):
+                    history.append(msg)
                 else:
-                    history.append(m.model_dump())
-            logger.debug(
-                f"[SessionManager] Retrieved history for {session_id}: {len(history)} messages"
-            )
+                    history.append(msg.model_dump())
+            
+            logger.debug(f"Retrieved history for {session_id}: {len(history)} messages")
             return history
 
     def all_sessions(self) -> List[SessionState]:
+        """Get all active sessions"""
         with self._lock:
-            logger.debug(
-                f"[SessionManager] all_sessions called, found {len(self._sessions)} sessions"
-            )
-            return list(self._sessions.values())
+            sessions = list(self._sessions.values())
+            logger.debug(f"Retrieved all sessions: {len(sessions)} total")
+            return sessions
 
-    def delete(self, session_id: str):
+    def delete(self, session_id: str) -> None:
+        """Delete a session"""
         with self._lock:
             if session_id in self._sessions:
-                logger.info(f"[SessionManager] Deleting session: {session_id}")
+                logger.info(f"Deleting session: {session_id}")
                 del self._sessions[session_id]
             else:
-                logger.warning(
-                    f"[SessionManager] Tried to delete non-existent session: {session_id}"
-                )
+                logger.warning(f"Cannot delete: session {session_id} not found")
 
 
 # Singleton instance for global use

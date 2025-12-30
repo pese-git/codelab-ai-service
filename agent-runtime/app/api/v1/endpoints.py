@@ -1,88 +1,84 @@
+"""
+API v1 endpoints for agent runtime service.
+"""
 import json
-import pprint
+import logging
 import traceback
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from sse_starlette.sse import EventSourceResponse
 
-from app.core.config import AppConfig, logger
-from app.models.schemas import AgentStreamRequest, HealthResponse, Message
+from app.core.config import AppConfig
 from app.core.dependencies import get_chat_service
+from app.core.agent.prompts import SYSTEM_PROMPT
+from app.models.schemas import AgentStreamRequest, HealthResponse, Message
 from app.services.chat_service import ChatService
 from app.services.session_manager import session_manager
 from app.services.llm_stream_service import stream_response
-from app.core.agent.prompts import SYSTEM_PROMPT
 
+logger = logging.getLogger("agent-runtime.api")
 router = APIRouter()
 
 
 @router.get("/health", response_model=HealthResponse)
 async def health_check() -> HealthResponse:
-    logger.info("[Agent] Health check called")
+    """Health check endpoint"""
+    logger.debug("Health check called")
     return HealthResponse.model_construct(
-        status="healthy", service="agent-runtime", version=AppConfig.VERSION
+        status="healthy", 
+        service="agent-runtime", 
+        version=AppConfig.VERSION
     )
 
 
 @router.post("/agent/message/stream")
 async def message_stream_sse(request: AgentStreamRequest):
     """
-    Новый SSE streaming endpoint для Agent Runtime.
+    SSE streaming endpoint for Agent Runtime.
     
-    Принимает:
-    - user_message: обычное сообщение пользователя
-    - tool_result: результат выполнения инструмента от Gateway
+    Accepts:
+    - user_message: Regular user message
+    - tool_result: Tool execution result from Gateway
     
-    Возвращает:
-    - SSE stream с чанками (assistant_message, tool_call, error)
+    Returns:
+    - SSE stream with chunks (assistant_message, tool_call, error)
     
-    При получении tool_call от LLM - отправляет его в stream и завершает генерацию.
-    Ожидает следующего запроса с tool_result для продолжения.
+    When tool_call is received from LLM, it's sent in stream and generation stops.
+    Expects next request with tool_result to continue.
     """
     async def event_generator():
         try:
-            logger.info(
-                f"[Agent] SSE stream started for session: {request.session_id}"
-            )
-            logger.debug(
-                f"[Agent][TRACE] Request message:\n"
-                + pprint.pformat(request.message, indent=2, width=120)
-            )
+            logger.info(f"SSE stream started for session: {request.session_id}")
+            logger.debug(f"Message type: {request.message.get('type', 'user_message')}")
             
-            # Получаем или создаем сессию
+            # Get or create session
             session = session_manager.get_or_create(
                 request.session_id, 
                 system_prompt=SYSTEM_PROMPT
             )
             
-            # Обрабатываем входящее сообщение
+            # Process incoming message
             message_type = request.message.get("type", "user_message")
             
             if message_type == "tool_result":
-                # Это результат выполнения инструмента
+                # Tool execution result from Gateway
                 call_id = request.message.get("call_id")
                 tool_name = request.message.get("tool_name")
                 result = request.message.get("result")
                 
                 logger.info(
-                    f"[Agent] Received tool_result from Gateway: "
-                    f"call_id={call_id}, tool_name={tool_name}, session={request.session_id}"
-                )
-                logger.debug(
-                    f"[Agent][TRACE] Tool result message:\n"
-                    + pprint.pformat(request.message, indent=2, width=120)
+                    f"Received tool_result: call_id={call_id}, "
+                    f"tool={tool_name}, session={request.session_id}"
                 )
                 
-                # КРИТИЧНО: Проверяем наличие call_id
+                # CRITICAL: Validate call_id presence
                 if not call_id:
-                    logger.error(
-                        f"[Agent][ERROR] tool_result missing call_id! This will cause Azure OpenAI error. "
-                        f"message={request.message}"
-                    )
-                    raise ValueError("tool_result must contain call_id")
+                    error_msg = "tool_result must contain call_id"
+                    logger.error(f"Missing call_id in tool_result: {request.message}")
+                    raise ValueError(error_msg)
                 
-                # Добавляем tool_result в историю как tool message
+                # Add tool_result to history as tool message
                 result_str = json.dumps(result) if not isinstance(result, str) else result
                 session_manager.append_tool_result(
                     request.session_id,
@@ -92,11 +88,11 @@ async def message_stream_sse(request: AgentStreamRequest):
                 )
                 
             else:
-                # Это обычное user message
+                # Regular user message
                 content = request.message.get("content", "")
                 logger.info(
-                    f"[Agent] Received user_message: session={request.session_id}, "
-                    f"content_len={len(content)}"
+                    f"Received user_message: session={request.session_id}, "
+                    f"length={len(content)}"
                 )
                 
                 session_manager.append_message(
@@ -105,25 +101,22 @@ async def message_stream_sse(request: AgentStreamRequest):
                     content=content
                 )
             
-            # Получаем историю для LLM
+            # Get history for LLM
             history = session_manager.get_history(request.session_id)
             
-            logger.debug(
-                f"[Agent][TRACE] History for LLM ({len(history)} messages):\n"
-                + pprint.pformat(history, indent=2, width=120)
-            )
+            logger.debug(f"Processing with {len(history)} messages in history")
             
-            # Генерируем ответ через LLM stream service
+            # Generate response through LLM stream service
             async for chunk in stream_response(request.session_id, history):
-                # Используем exclude_none=True чтобы не отправлять null поля
+                # Use exclude_none=True to avoid sending null fields
                 chunk_dict = chunk.model_dump(exclude_none=True)
                 chunk_json = json.dumps(chunk_dict)
                 
                 logger.debug(
-                    f"[Agent] Sending chunk: type={chunk.type}, is_final={chunk.is_final}"
+                    f"Sending chunk: type={chunk.type}, is_final={chunk.is_final}"
                 )
                 
-                # Отправляем chunk как SSE event
+                # Send chunk as SSE event
                 event_data = {
                     "event": "message",
                     "data": chunk_json
@@ -131,15 +124,15 @@ async def message_stream_sse(request: AgentStreamRequest):
                 
                 yield event_data
                 
-                # Если это финальный chunk - завершаем stream
+                # If this is final chunk - stop stream
                 if chunk.is_final:
                     logger.info(
-                        f"[Agent] Stream completed for session {request.session_id}: "
+                        f"Stream completed for session {request.session_id}: "
                         f"final_type={chunk.type}"
                     )
                     break
             
-            # Отправляем done event
+            # Send done event
             yield {
                 "event": "done",
                 "data": json.dumps({"status": "completed"})
@@ -147,14 +140,11 @@ async def message_stream_sse(request: AgentStreamRequest):
             
         except Exception as e:
             logger.error(
-                f"[Agent][ERROR] Exception in SSE stream for session {request.session_id}: {e}",
+                f"Exception in SSE stream for session {request.session_id}: {e}",
                 exc_info=True
             )
-            logger.error(
-                "[Agent][ERROR] Traceback:\n" + traceback.format_exc()
-            )
             
-            # Отправляем error event
+            # Send error event
             yield {
                 "event": "error",
                 "data": json.dumps({
@@ -167,17 +157,22 @@ async def message_stream_sse(request: AgentStreamRequest):
     return EventSourceResponse(event_generator())
 
 
-# Старый endpoint для обратной совместимости
 @router.post("/agent/message/stream/legacy")
-async def message_stream_legacy(message: Message, chat_service: ChatService = Depends(get_chat_service)):
+async def message_stream_legacy(
+    message: Message, 
+    chat_service: ChatService = Depends(get_chat_service)
+):
     """
-    DEPRECATED: Старый endpoint для обратной совместимости.
-    Используйте /agent/message/stream вместо этого.
+    DEPRECATED: Legacy endpoint for backward compatibility.
+    Use /agent/message/stream instead.
     """
     try:
-        logger.warning("[Agent] Using deprecated legacy endpoint")
+        logger.warning("Using deprecated legacy endpoint")
         result = await chat_service.stream_message(message)
         return JSONResponse(content=result)
-    except Exception:
-        logger.error(f"[TRACE][ERROR] Exception in /agent/message/stream/legacy\n{traceback.format_exc()}")
-        return JSONResponse(content={"error": "Internal server error"}, status_code=500)
+    except Exception as e:
+        logger.error(f"Exception in legacy endpoint: {e}", exc_info=True)
+        return JSONResponse(
+            content={"error": "Internal server error"}, 
+            status_code=500
+        )

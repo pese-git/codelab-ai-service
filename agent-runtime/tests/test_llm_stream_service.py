@@ -4,7 +4,7 @@ Unit tests for LLMStreamService.
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.services.llm_stream_service import stream_response, llm_stream
+from app.services.llm_stream_service import stream_response
 from app.models.schemas import StreamChunk, ToolCall
 
 
@@ -348,59 +348,6 @@ async def test_stream_response_list_content_handling(
     assert len(chunks) == 1
     assert chunks[0].type == "assistant_message"
     assert chunks[0].content == "Response text"
-
-
-@pytest.mark.asyncio
-async def test_llm_stream_deprecated_function(mock_session_manager):
-    """Test deprecated llm_stream function"""
-    session_id = "test_session"
-    
-    # Mock session
-    mock_session = MagicMock()
-    mock_session.messages = []
-    mock_session_manager.get.return_value = mock_session
-    mock_session_manager.get_history.return_value = [
-        {"role": "user", "content": "Hello"}
-    ]
-    
-    # Mock stream_response
-    async def mock_stream():
-        yield StreamChunk(
-            type="assistant_message",
-            content="Response",
-            token="Response",
-            is_final=True
-        )
-    
-    with patch("app.services.llm_stream_service.stream_response", return_value=mock_stream()):
-        # Execute
-        chunks = []
-        async for chunk in llm_stream(session_id):
-            chunks.append(chunk)
-        
-        # Verify
-        assert len(chunks) == 1
-        assert "event" in chunks[0]
-        assert "data" in chunks[0]
-
-
-@pytest.mark.asyncio
-async def test_llm_stream_session_not_found(mock_session_manager):
-    """Test llm_stream with non-existent session"""
-    session_id = "nonexistent"
-    
-    # Mock session not found
-    mock_session_manager.get.return_value = None
-    
-    # Execute
-    chunks = []
-    async for chunk in llm_stream(session_id):
-        chunks.append(chunk)
-    
-    # Verify error is returned
-    assert len(chunks) == 1
-    assert chunks[0]["event"] == "error"
-    assert "Session not found" in chunks[0]["data"]
 
 
 @pytest.mark.asyncio

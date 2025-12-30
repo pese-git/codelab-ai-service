@@ -1,61 +1,97 @@
-import json
+"""
+Tool registry for agent runtime.
+
+Defines available tools and their specifications for LLM.
+Local tools (echo, calculator) can be executed directly.
+Other tools (file operations, commands) are executed on IDE side via WebSocket.
+"""
 import logging
-from typing import Callable, Dict
+from typing import Any, Callable, Dict, List
 
 from app.models.schemas import ToolCall
-# DEPRECATED: ToolCallHandler не используется в текущей архитектуре
-# from app.services.tool_call_handler import tool_call_handler
 
 logger = logging.getLogger("agent-runtime.tool_registry")
 
 
-# ==== Локальные реализации инструментов ====
+# ===== Local Tool Implementations =====
+
 def echo_tool(text: str) -> str:
     """Echo any text string"""
     return text
 
 
-def math_tool(expr: str) -> str:
-    """Calculate a math expression (string: expr) using eval (NOT safe for prod)."""
+def calculator_tool(expr: str) -> str:
+    """
+    Calculate a math expression using eval.
+    
+    WARNING: Not safe for production use with untrusted input.
+    """
     try:
-        return str(eval(expr))
+        result = eval(expr)
+        return str(result)
     except Exception as e:
-        return f"error: {e}"
+        return f"Error: {e}"
 
 
-def tool_spec(fn, name: str, description: str, parameters: dict):
+# ===== Tool Registry =====
+
+# Local tools that can be executed in agent-runtime
+LOCAL_TOOLS: Dict[str, Callable] = {
+    "echo": echo_tool,
+    "calculator": calculator_tool
+}
+
+
+# ===== Tool Specifications for LLM =====
+
+def _create_tool_spec(
+    name: str, 
+    description: str, 
+    parameters: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Create OpenAI-compatible tool specification"""
     return {
         "type": "function",
-        "function": {"name": name, "description": description, "parameters": parameters},
+        "function": {
+            "name": name,
+            "description": description,
+            "parameters": parameters
+        }
     }
 
 
-TOOLS: Dict[str, Callable] = {"echo": echo_tool, "calculator": math_tool}
-# get_tool_registry теперь в app/core/dependencies.py
-
-TOOLS_SPEC = [
-    tool_spec(
-        echo_tool,
+TOOLS_SPEC: List[Dict[str, Any]] = [
+    # Local tools
+    _create_tool_spec(
         name="echo",
         description="Echo any text string",
         parameters={
             "type": "object",
-            "properties": {"text": {"type": "string", "description": "Text to echo"}},
-            "required": ["text"],
-        },
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "Text to echo"
+                }
+            },
+            "required": ["text"]
+        }
     ),
-    tool_spec(
-        math_tool,
+    _create_tool_spec(
         name="calculator",
         description="Calculate a math expression",
         parameters={
             "type": "object",
             "properties": {
-                "expr": {"type": "string", "description": "Math expression to evaluate"}
+                "expr": {
+                    "type": "string",
+                    "description": "Math expression to evaluate"
+                }
             },
-            "required": ["expr"],
-        },
+            "required": ["expr"]
+        }
     ),
+    
+    # IDE-side tools
     {
         "type": "function",
         "function": {
@@ -84,9 +120,9 @@ TOOLS_SPEC = [
                         "minimum": 1
                     }
                 },
-                "required": ["path"],
-            },
-        },
+                "required": ["path"]
+            }
+        }
     },
     {
         "type": "function",
@@ -120,15 +156,15 @@ TOOLS_SPEC = [
                         "default": True
                     }
                 },
-                "required": ["path", "content"],
-            },
-        },
+                "required": ["path", "content"]
+            }
+        }
     },
     {
         "type": "function",
         "function": {
             "name": "list_files",
-            "description": "List files and directories in the specified path within workspace. Returns file names, types (file/directory), sizes, and modification times.",
+            "description": "List files and directories in the specified path within workspace.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -138,12 +174,12 @@ TOOLS_SPEC = [
                     },
                     "recursive": {
                         "type": "boolean",
-                        "description": "If true, list files recursively in subdirectories. Default: false",
+                        "description": "If true, list files recursively in subdirectories",
                         "default": False
                     },
                     "include_hidden": {
                         "type": "boolean",
-                        "description": "If true, include hidden files (starting with .). Default: false",
+                        "description": "If true, include hidden files (starting with .)",
                         "default": False
                     },
                     "pattern": {
@@ -159,7 +195,7 @@ TOOLS_SPEC = [
         "type": "function",
         "function": {
             "name": "create_directory",
-            "description": "Create a new directory at the specified path within workspace. Can create parent directories if needed.",
+            "description": "Create a new directory at the specified path within workspace.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -169,7 +205,7 @@ TOOLS_SPEC = [
                     },
                     "recursive": {
                         "type": "boolean",
-                        "description": "If true, create parent directories as needed. Default: true",
+                        "description": "If true, create parent directories as needed",
                         "default": True
                     }
                 },
@@ -180,8 +216,8 @@ TOOLS_SPEC = [
     {
         "type": "function",
         "function": {
-            "name": "run_command",
-            "description": "Execute a shell command in the workspace. Supports Flutter, Dart, Git, and other development tools. Dangerous commands require user approval.",
+            "name": "execute_command",
+            "description": "Execute a shell command in the workspace. Dangerous commands require user approval.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -191,16 +227,16 @@ TOOLS_SPEC = [
                     },
                     "cwd": {
                         "type": "string",
-                        "description": "Working directory relative to workspace root. Default: workspace root"
+                        "description": "Working directory relative to workspace root"
                     },
                     "timeout": {
                         "type": "integer",
-                        "description": "Timeout in seconds. Default: 60, Max: 300",
+                        "description": "Timeout in seconds (default: 60, max: 300)",
                         "default": 60
                     },
                     "shell": {
                         "type": "boolean",
-                        "description": "Run command through shell. Default: false",
+                        "description": "Run command through shell",
                         "default": False
                     }
                 },
@@ -212,7 +248,7 @@ TOOLS_SPEC = [
         "type": "function",
         "function": {
             "name": "search_in_code",
-            "description": "Search for text patterns in code files using grep. Supports regex patterns and file filtering.",
+            "description": "Search for text patterns in code files using grep.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -222,7 +258,7 @@ TOOLS_SPEC = [
                     },
                     "path": {
                         "type": "string",
-                        "description": "Directory path to search in. Default: workspace root",
+                        "description": "Directory path to search in (default: workspace root)",
                         "default": "."
                     },
                     "file_pattern": {
@@ -231,96 +267,70 @@ TOOLS_SPEC = [
                     },
                     "case_sensitive": {
                         "type": "boolean",
-                        "description": "Case-sensitive search. Default: false",
+                        "description": "Case-sensitive search",
                         "default": False
                     },
                     "regex": {
                         "type": "boolean",
-                        "description": "Treat query as regex pattern. Default: false",
+                        "description": "Treat query as regex pattern",
                         "default": False
                     },
                     "max_results": {
                         "type": "integer",
-                        "description": "Maximum number of results. Default: 100, Max: 1000",
+                        "description": "Maximum number of results (default: 100, max: 1000)",
                         "default": 100
                     }
                 },
                 "required": ["query"]
             }
         }
-    },
+    }
 ]
 
 
-async def execute_tool(
-    session_id: str,
-    tool_call: ToolCall,
-    use_gateway: bool = False,
-):
+# ===== Tool Execution =====
+
+async def execute_local_tool(tool_call: ToolCall) -> str:
     """
-    DEPRECATED: В текущей архитектуре инструменты выполняются на стороне IDE через WebSocket.
+    Execute a local tool (echo, calculator).
     
-    Эта функция оставлена для обратной совместимости, но не должна использоваться.
-    Tool calls отправляются в SSE stream и обрабатываются IDE.
+    Args:
+        tool_call: Tool call to execute
+        
+    Returns:
+        Tool execution result as string
+        
+    Raises:
+        ValueError: If tool is not found in local registry
     """
-    import pprint
-
-    logger.warning(
-        f"[TOOL_REGISTRY] DEPRECATED: execute_tool called for {tool_call.tool_name}. "
-        "Tools should be executed on IDE side via WebSocket."
-    )
+    tool_fn = LOCAL_TOOLS.get(tool_call.tool_name)
     
-    logger.info(f"[TOOL_REGISTRY] Executing tool_id: {tool_call.id}")
-    logger.info(f"[TOOL_REGISTRY] Executing tool: {tool_call.tool_name}")
-    logger.info(
-        f"[TOOL_REGISTRY] Arguments: {pprint.pformat(tool_call.arguments, indent=2, width=120)}"
-    )
+    if not tool_fn:
+        raise ValueError(
+            f"Tool '{tool_call.tool_name}' not found in local registry. "
+            "Should be executed on IDE side."
+        )
     
-    # DEPRECATED: Gateway forwarding не используется в текущей архитектуре
-    # if use_gateway or tool_call.tool_name not in TOOLS:
-    #     try:
-    #         logger.info(
-    #             f"[TOOL_REGISTRY] Forwarding to gateway (session={session_id}):\n"
-    #             f"{pprint.pformat(tool_call.model_dump(), indent=2, width=120)}"
-    #         )
-    #         result = await tool_call_handler.execute(session_id or "none", tool_call)
-    #         logger.info(
-    #             f"[TOOL_REGISTRY] Gateway result: {pprint.pformat(result, indent=2, width=120)}"
-    #         )
-    #         return (
-    #             result
-    #             if result is not None
-    #             else f"Tool `{tool_call.tool_name}` failed via gateway!"
-    #         )
-    #     except Exception as ex:
-    #         logger.error(f"[TOOL_REGISTRY][ERROR] Gateway exception: {ex}", exc_info=True)
-    #         return f"Tool `{tool_call.tool_name}` gateway error: {ex}"
-    
-    # Локальный вызов (только для echo и calculator)
-    tool_fn = TOOLS.get(tool_call.tool_name)
-    if tool_fn:
-        try:
-            logger.info(f"[TOOL_REGISTRY] Calling local tool function: {tool_fn.__name__}")  # ty:ignore[unresolved-attribute]
-            args = tool_call.arguments.model_dump() if hasattr(tool_call.arguments, "model_dump") else dict(tool_call.arguments)
-            result = tool_fn(**args)
-            logger.info(
-                f"[TOOL_REGISTRY] Local result: {pprint.pformat(result, indent=2, width=120)}"
-            )
-            return result
-        except Exception as e:
-            logger.error(f"[TOOL_REGISTRY][ERROR] Local tool error: {e}", exc_info=True)
-            return f"Tool `{tool_call.tool_name}` local error: {e}"
-    
-    logger.warning(
-        f"[TOOL_REGISTRY] Tool `{tool_call.tool_name}` not found in local registry. "
-        "Should be executed on IDE side."
-    )
-    return f"Tool `{tool_call.tool_name}` should be executed on IDE side"
+    try:
+        logger.info(f"Executing local tool: {tool_call.tool_name}")
+        
+        # Convert arguments to dict if needed
+        args = (
+            tool_call.arguments.model_dump() 
+            if hasattr(tool_call.arguments, "model_dump") 
+            else dict(tool_call.arguments)
+        )
+        
+        result = tool_fn(**args)
+        logger.info(f"Local tool '{tool_call.tool_name}' executed successfully")
+        return result
+        
+    except Exception as e:
+        error_msg = f"Error executing tool '{tool_call.tool_name}': {e}"
+        logger.error(error_msg, exc_info=True)
+        return error_msg
 
 
-# Однократно — трейсы наличных tools и их спецификаций
-if TOOLS:
-    logger.info(f"[TOOL_REGISTRY] Registered local tools: {list(TOOLS.keys())}")
-logger.info(
-    f"[TOOL_REGISTRY] TOOLS_SPEC for LLM:\n{json.dumps(TOOLS_SPEC, indent=2, ensure_ascii=False)}"
-)
+# Log registered tools on module load
+logger.info(f"Registered local tools: {list(LOCAL_TOOLS.keys())}")
+logger.debug(f"Total tool specifications: {len(TOOLS_SPEC)}")
