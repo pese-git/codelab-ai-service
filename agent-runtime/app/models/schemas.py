@@ -126,24 +126,11 @@ class ToolCallRequest(BaseModel):
     timeout_seconds: int = Field(default=30, description="Timeout for tool execution")
 
 
-class PendingToolCall(BaseModel):
-    """Tracks a tool call waiting for execution result"""
-
-    tool_call: ToolCall
-    session_id: str
-    request_time: datetime = Field(default_factory=datetime.now)
-    timeout_seconds: int = 30
-    retry_count: int = 0
-    max_retries: int = 3
-
-
 class SessionState(BaseModel):
     """Maintains state for an active session"""
 
     session_id: str
     messages: List[Message] = Field(default_factory=list)
-    pending_tool_calls: Dict[str, PendingToolCall] = Field(default_factory=dict)
-    active_tool_calls: List[str] = Field(default_factory=list)
     last_activity: datetime = Field(default_factory=datetime.now)
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
