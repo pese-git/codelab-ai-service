@@ -20,7 +20,6 @@ class AgentContext(BaseModel):
     Tracks:
     - Current active agent
     - History of agent switches
-    - Task description
     - Additional metadata
     """
     
@@ -32,10 +31,6 @@ class AgentContext(BaseModel):
     agent_history: List[Dict[str, Any]] = Field(
         default_factory=list,
         description="History of agent switches"
-    )
-    task_description: Optional[str] = Field(
-        default=None,
-        description="Description of the current task"
     )
     metadata: Dict[str, Any] = Field(
         default_factory=dict,
@@ -97,16 +92,6 @@ class AgentContext(BaseModel):
             List of switch records
         """
         return self.agent_history.copy()
-    
-    def set_task_description(self, description: str) -> None:
-        """
-        Set or update the task description.
-        
-        Args:
-            description: Task description
-        """
-        self.task_description = description
-        logger.debug(f"Updated task description for session {self.session_id}")
     
     def add_metadata(self, key: str, value: Any) -> None:
         """
