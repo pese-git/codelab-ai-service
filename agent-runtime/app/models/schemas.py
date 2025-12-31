@@ -18,112 +18,11 @@ class Message(BaseModel):
     # session_id намеренно убирается из единичного сообщения: оно есть в SessionState
 
 
-class MessageResponse(BaseModel):
-    status: str
-    message: str
-
-
-class SSEToken(BaseModel):
-    token: str
-    is_final: bool
-    type: str = "assistant_message"  # "assistant_message", "tool_call", "tool_result"
-    metadata: Optional[Dict[str, Any]] = None  # Additional data for tool calls, etc.
-
-
-class WSToolCall(BaseModel):
-    """WebSocket message for tool call from Agent to IDE"""
-
-    type: Literal["tool_call"]
-    call_id: str = Field(description="Unique identifier for this tool call")
-    tool_name: str = Field(description="Name of the tool to execute")
-    arguments: Dict[str, Any] = Field(description="Arguments for the tool")
-    requires_approval: Optional[bool] = Field(
-        default=False,
-        description="Whether this tool call requires user approval before execution (HITL)"
-    )
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "type": "tool_call",
-                "call_id": "call_abc123",
-                "tool_name": "read_file",
-                "arguments": {"path": "/src/main.py"},
-                "requires_approval": False,
-            }
-        }
-
-
-class ToolExecutionStatus(str, Enum):
-    PENDING = "pending"
-    EXECUTING = "executing"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    TIMEOUT = "timeout"
-    CANCELLED = "cancelled"
-
-
-class ReadFileArgs(BaseModel):
-    """Аргументы для инструмента read_file"""
-    path: str = Field(description="Path to the file relative to project workspace")
-    encoding: Optional[str] = Field(default="utf-8", description="File encoding")
-    start_line: Optional[int] = Field(default=None, description="Starting line number (1-based, inclusive)", ge=1)
-    end_line: Optional[int] = Field(default=None, description="Ending line number (1-based, inclusive)", ge=1)
-
-
-class WriteFileArgs(BaseModel):
-    """Аргументы для инструмента write_file"""
-    path: str = Field(description="Path to the file relative to project workspace")
-    content: str = Field(description="Content to write to the file")
-    encoding: Optional[str] = Field(default="utf-8", description="File encoding")
-    create_dirs: Optional[bool] = Field(default=False, description="Create parent directories if they don't exist")
-    backup: Optional[bool] = Field(default=True, description="Create backup before overwriting existing file")
-
-
-class ToolArguments(BaseModel):
-    """Унифицированная модель аргументов для всех инструментов"""
-    read_file: Optional[ReadFileArgs] = None
-    write_file: Optional[WriteFileArgs] = None
-
 class ToolCall(BaseModel):
+    """Tool call parsed from LLM response"""
     id: str = Field(description="Unique identifier for this tool call")
     tool_name: str = Field(description="Name of the tool to execute")
-    arguments: ToolArguments = Field(description="Arguments for the tool")
-    created_at: datetime = Field(default_factory=datetime.now)
-    status: ToolExecutionStatus = Field(default=ToolExecutionStatus.PENDING)
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "id": "call_abc123",
-                "tool_name": "read_file",
-                "arguments": {"path": "/src/main.py"},
-                "status": "pending",
-            }
-        }
-
-
-class ToolResult(BaseModel):
-    call_id: str = Field(description="ID of the tool call this result belongs to")
-    result: Optional[Any] = Field(description="Result of tool execution")
-    error: Optional[str] = Field(description="Error message if execution failed")
-    executed_at: datetime = Field(default_factory=datetime.now)
-    execution_time_ms: Optional[int] = Field(description="Execution time in milliseconds")
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "call_id": "call_abc123",
-                "result": {"content": "file content here"},
-                "execution_time_ms": 150,
-            }
-        }
-
-
-class ToolCallRequest(BaseModel):
-    session_id: str
-    tool_call: ToolCall
-    timeout_seconds: int = Field(default=30, description="Timeout for tool execution")
+    arguments: Dict[str, Any] = Field(description="Arguments for the tool")
 
 
 class SessionState(BaseModel):
@@ -220,30 +119,6 @@ class StreamChunk(BaseModel):
 
 
 # Multi-agent specific schemas
-
-class AgentSwitchRequest(BaseModel):
-    """Request to switch to a different agent"""
-    
-    type: Literal["switch_agent"]
-    agent_type: str = Field(
-        description="Target agent type: orchestrator, coder, architect, debug, ask"
-    )
-    content: str = Field(description="Message for the new agent")
-    reason: Optional[str] = Field(
-        default=None,
-        description="Reason for the switch"
-    )
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "type": "switch_agent",
-                "agent_type": "coder",
-                "content": "Create a new widget",
-                "reason": "User requested coder agent"
-            }
-        }
-
 
 class AgentInfo(BaseModel):
     """Information about an agent"""
