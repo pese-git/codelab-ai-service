@@ -132,7 +132,6 @@ class SessionState(BaseModel):
     session_id: str
     messages: List[Message] = Field(default_factory=list)
     last_activity: datetime = Field(default_factory=datetime.now)
-    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
 class AgentStreamRequest(BaseModel):
