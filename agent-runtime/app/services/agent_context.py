@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 import logging
 
 from app.agents.base_agent import AgentType
+from app.services.database import Database, get_db
 
 logger = logging.getLogger("agent-runtime.agent_context")
 
@@ -49,6 +50,16 @@ class AgentContext(BaseModel):
         description="Number of agent switches in this session"
     )
     
+    # Database instance (not serialized)
+    _db: Optional[Database] = None
+    
+    class Config:
+        arbitrary_types_allowed = True
+    
+    def set_db(self, db: Database) -> None:
+        """Set database instance for persistence"""
+        self._db = db
+    
     def switch_agent(self, new_agent: AgentType, reason: str) -> None:
         """
         Switch to a different agent.
@@ -83,6 +94,28 @@ class AgentContext(BaseModel):
         self.current_agent = new_agent
         self.last_switch_at = datetime.now()
         self.switch_count += 1
+        
+        # Persist to database
+        if self._db:
+            self._persist()
+    
+    def _persist(self) -> None:
+        """Persist context to database"""
+        if not self._db:
+            return
+            
+        try:
+            self._db.save_agent_context(
+                session_id=self.session_id,
+                current_agent=self.current_agent.value,
+                agent_history=self.agent_history,
+                metadata=self.metadata,
+                created_at=self.created_at,
+                last_switch_at=self.last_switch_at,
+                switch_count=self.switch_count
+            )
+        except Exception as e:
+            logger.error(f"Error persisting agent context {self.session_id}: {e}", exc_info=True)
     
     def get_agent_history(self) -> List[Dict[str, Any]]:
         """
@@ -102,6 +135,8 @@ class AgentContext(BaseModel):
             value: Metadata value
         """
         self.metadata[key] = value
+        if self._db:
+            self._persist()  # Persist to database
     
     def get_metadata(self, key: str, default: Any = None) -> Any:
         """
@@ -127,10 +162,35 @@ class AgentContextManager:
     - Session management
     """
     
-    def __init__(self):
+    def __init__(self, db: Optional[Database] = None):
         """Initialize the context manager"""
         self._contexts: Dict[str, AgentContext] = {}
+        self._db = db or get_db()
+        self._load_all_contexts()
         logger.info("AgentContextManager initialized")
+    
+    def _load_all_contexts(self) -> None:
+        """Load all agent contexts from database into memory cache"""
+        try:
+            session_ids = self._db.list_all_contexts()
+            for session_id in session_ids:
+                context_data = self._db.load_agent_context(session_id)
+                if context_data:
+                    context = AgentContext(
+                        session_id=context_data["session_id"],
+                        current_agent=AgentType(context_data["current_agent"]),
+                        agent_history=context_data["agent_history"],
+                        metadata=context_data["metadata"],
+                        created_at=context_data["created_at"],
+                        last_switch_at=context_data["last_switch_at"],
+                        switch_count=context_data["switch_count"]
+                    )
+                    context.set_db(self._db)
+                    self._contexts[session_id] = context
+            
+            logger.info(f"Loaded {len(self._contexts)} agent contexts from database")
+        except Exception as e:
+            logger.error(f"Error loading agent contexts from database: {e}", exc_info=True)
     
     def get_or_create(
         self, 
@@ -152,7 +212,9 @@ class AgentContextManager:
                 session_id=session_id,
                 current_agent=initial_agent
             )
+            context.set_db(self._db)
             self._contexts[session_id] = context
+            context._persist()  # Persist to database
             
             logger.info(
                 f"Created new agent context for session {session_id} "
@@ -197,6 +259,7 @@ class AgentContextManager:
         """
         if session_id in self._contexts:
             del self._contexts[session_id]
+            self._db.delete_agent_context(session_id)  # Delete from database
             logger.info(f"Deleted agent context for session {session_id}")
             return True
         
@@ -254,4 +317,24 @@ class AgentContextManager:
 
 
 # Singleton instance
-agent_context_manager = AgentContextManager()
+_agent_context_manager_instance: Optional[AgentContextManager] = None
+
+
+def get_agent_context_manager(db: Database = None) -> AgentContextManager:
+    """
+    Get AgentContextManager instance for dependency injection.
+    
+    Args:
+        db: Optional database instance
+        
+    Returns:
+        AgentContextManager instance
+    """
+    global _agent_context_manager_instance
+    if _agent_context_manager_instance is None:
+        _agent_context_manager_instance = AgentContextManager(db)
+    return _agent_context_manager_instance
+
+
+# Convenience accessor for backward compatibility
+agent_context_manager = get_agent_context_manager()

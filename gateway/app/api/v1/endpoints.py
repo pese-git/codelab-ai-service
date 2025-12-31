@@ -1,6 +1,7 @@
 import json
 import httpx
-from fastapi import APIRouter, WebSocket, status, Depends
+from fastapi import APIRouter, WebSocket, status, Depends, Request
+from fastapi.responses import JSONResponse
 from starlette.websockets import WebSocketDisconnect
 
 from app.core.config import AppConfig, logger
@@ -27,6 +28,127 @@ async def health_check():
     return HealthResponse.model_construct(
         status="healthy", service="gateway", version=AppConfig.VERSION
     )
+
+
+# ==================== Agent Runtime Proxy Endpoints ====================
+
+@router.get("/agents")
+async def list_agents():
+    """
+    Proxy endpoint: Get list of all registered agents from Agent Runtime.
+    
+    Proxies to: GET /agents on Agent Runtime
+    """
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            response = await client.get(
+                f"{AppConfig.AGENT_URL}/agents",
+                headers={"X-Internal-Auth": AppConfig.INTERNAL_API_KEY},
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Agent Runtime error: {e.response.status_code}, {e.response.text}")
+            return JSONResponse(
+                status_code=e.response.status_code,
+                content={"error": f"Agent Runtime error: {e.response.status_code}"}
+            )
+        except Exception as e:
+            logger.error(f"Error proxying to Agent Runtime: {e}", exc_info=True)
+            return JSONResponse(
+                status_code=500,
+                content={"error": f"Gateway error: {str(e)}"}
+            )
+
+
+@router.get("/agents/{session_id}/current")
+async def get_current_agent(session_id: str):
+    """
+    Proxy endpoint: Get current active agent for a session.
+    
+    Proxies to: GET /agents/{session_id}/current on Agent Runtime
+    """
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            response = await client.get(
+                f"{AppConfig.AGENT_URL}/agents/{session_id}/current",
+                headers={"X-Internal-Auth": AppConfig.INTERNAL_API_KEY},
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Agent Runtime error: {e.response.status_code}, {e.response.text}")
+            return JSONResponse(
+                status_code=e.response.status_code,
+                content={"error": f"Agent Runtime error: {e.response.status_code}"}
+            )
+        except Exception as e:
+            logger.error(f"Error proxying to Agent Runtime: {e}", exc_info=True)
+            return JSONResponse(
+                status_code=500,
+                content={"error": f"Gateway error: {str(e)}"}
+            )
+
+
+@router.get("/sessions/{session_id}/history")
+async def get_session_history(session_id: str):
+    """
+    Proxy endpoint: Get message history for a session.
+    
+    Proxies to: GET /sessions/{session_id}/history on Agent Runtime
+    """
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            response = await client.get(
+                f"{AppConfig.AGENT_URL}/sessions/{session_id}/history",
+                headers={"X-Internal-Auth": AppConfig.INTERNAL_API_KEY},
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Agent Runtime error: {e.response.status_code}, {e.response.text}")
+            return JSONResponse(
+                status_code=e.response.status_code,
+                content={"error": f"Agent Runtime error: {e.response.status_code}"}
+            )
+        except Exception as e:
+            logger.error(f"Error proxying to Agent Runtime: {e}", exc_info=True)
+            return JSONResponse(
+                status_code=500,
+                content={"error": f"Gateway error: {str(e)}"}
+            )
+
+
+@router.get("/sessions")
+async def list_sessions():
+    """
+    Proxy endpoint: List all active sessions.
+    
+    Proxies to: GET /sessions on Agent Runtime
+    """
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            response = await client.get(
+                f"{AppConfig.AGENT_URL}/sessions",
+                headers={"X-Internal-Auth": AppConfig.INTERNAL_API_KEY},
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Agent Runtime error: {e.response.status_code}, {e.response.text}")
+            return JSONResponse(
+                status_code=e.response.status_code,
+                content={"error": f"Agent Runtime error: {e.response.status_code}"}
+            )
+        except Exception as e:
+            logger.error(f"Error proxying to Agent Runtime: {e}", exc_info=True)
+            return JSONResponse(
+                status_code=500,
+                content={"error": f"Gateway error: {str(e)}"}
+            )
+
+
+# ==================== WebSocket Endpoint ====================
 
 @router.websocket("/ws/{session_id}")
 async def websocket_endpoint(

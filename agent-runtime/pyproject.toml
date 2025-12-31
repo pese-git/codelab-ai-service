@@ -14,6 +14,7 @@ dependencies = [
     "sse-starlette==1.6.5",
     "langchain>=0.2.5",
     "smolagents>=1.23.0",
+    "sqlalchemy>=2.0.0",
 ]
 
 [build-system]

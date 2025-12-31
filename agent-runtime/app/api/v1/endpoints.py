@@ -386,3 +386,73 @@ async def get_current_agent(session_id: str):
     }
 
 
+@router.get("/sessions/{session_id}/history")
+async def get_session_history(session_id: str):
+    """
+    Get message history for a session.
+    
+    This endpoint allows the IDE to restore chat history after restart.
+    
+    Args:
+        session_id: Session identifier
+        
+    Returns:
+        Session history with messages and metadata
+    """
+    logger.debug(f"Getting history for session {session_id}")
+    
+    # Check if session exists
+    if not session_manager.exists(session_id):
+        return JSONResponse(
+            content={"error": f"Session {session_id} not found"},
+            status_code=404
+        )
+    
+    # Get session state
+    session_state = session_manager.get(session_id)
+    
+    # Get message history
+    messages = session_manager.get_history(session_id)
+    
+    # Get current agent info
+    current_agent = multi_agent_orchestrator.get_current_agent(session_id)
+    agent_history = multi_agent_orchestrator.get_agent_history(session_id)
+    
+    return {
+        "session_id": session_id,
+        "messages": messages,
+        "message_count": len(messages),
+        "last_activity": session_state.last_activity.isoformat() if session_state else None,
+        "current_agent": current_agent.value if current_agent else None,
+        "agent_history": agent_history
+    }
+
+
+@router.get("/sessions")
+async def list_sessions():
+    """
+    List all active sessions.
+    
+    Returns:
+        List of session IDs with basic info
+    """
+    logger.debug("Listing all sessions")
+    
+    sessions = session_manager.all_sessions()
+    
+    session_list = []
+    for session in sessions:
+        current_agent = multi_agent_orchestrator.get_current_agent(session.session_id)
+        session_list.append({
+            "session_id": session.session_id,
+            "message_count": len(session.messages),
+            "last_activity": session.last_activity.isoformat(),
+            "current_agent": current_agent.value if current_agent else None
+        })
+    
+    return {
+        "sessions": session_list,
+        "total": len(session_list)
+    }
+
+

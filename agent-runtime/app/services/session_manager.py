@@ -4,6 +4,7 @@ from threading import RLock
 from typing import Dict, List, Optional, Union
 
 from app.models.schemas import Message, SessionState
+from app.services.database import Database, get_db
 
 logger = logging.getLogger("agent-runtime.session_manager")
 
@@ -12,13 +13,54 @@ class SessionManager:
     """
     Manages all agent sessions: creation, access, and message history.
     
-    Thread-safe in-memory storage for session states.
-    Can be replaced with persistent storage (Redis/PostgreSQL) in the future.
+    Thread-safe storage with SQLite persistence for session states.
+    Sessions are cached in memory and automatically persisted to database.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, db: Optional[Database] = None) -> None:
         self._sessions: Dict[str, SessionState] = {}
         self._lock = RLock()
+        self._db = db or get_db()
+        self._load_all_sessions()
+    
+    def _load_all_sessions(self) -> None:
+        """Load all sessions from database into memory cache"""
+        try:
+            session_ids = self._db.list_all_sessions()
+            for session_id in session_ids:
+                session_data = self._db.load_session(session_id)
+                if session_data:
+                    state = SessionState(
+                        session_id=session_data["session_id"],
+                        messages=session_data["messages"],
+                        last_activity=session_data["last_activity"]
+                    )
+                    self._sessions[session_id] = state
+            
+            logger.info(f"Loaded {len(self._sessions)} sessions from database")
+        except Exception as e:
+            logger.error(f"Error loading sessions from database: {e}", exc_info=True)
+    
+    def _persist_session(self, session_id: str) -> None:
+        """Persist session to database"""
+        try:
+            state = self._sessions.get(session_id)
+            if state:
+                # Convert messages to dict format
+                messages = []
+                for msg in state.messages:
+                    if isinstance(msg, dict):
+                        messages.append(msg)
+                    else:
+                        messages.append(msg.model_dump())
+                
+                self._db.save_session(
+                    session_id=session_id,
+                    messages=messages,
+                    last_activity=state.last_activity
+                )
+        except Exception as e:
+            logger.error(f"Error persisting session {session_id}: {e}", exc_info=True)
 
     def exists(self, session_id: str) -> bool:
         """Check if session exists"""
@@ -53,6 +95,7 @@ class SessionManager:
                 )
             
             self._sessions[session_id] = state
+            self._persist_session(session_id)  # Persist to database
             logger.info(f"Created session: {session_id} with {len(state.messages)} initial messages")
             return state
 
@@ -86,10 +129,10 @@ class SessionManager:
             return self._sessions[session_id]
 
     def append_message(
-        self, 
-        session_id: str, 
-        role: str, 
-        content: str, 
+        self,
+        session_id: str,
+        role: str,
+        content: str,
         name: Optional[str] = None
     ) -> None:
         """
@@ -114,16 +157,18 @@ class SessionManager:
             state.messages.append(msg)
             state.last_activity = datetime.now()
             
+            self._persist_session(session_id)  # Persist to database
+            
             logger.debug(
                 f"Appended {role} message to {session_id}: "
                 f"{len(content)} chars, total messages: {len(state.messages)}"
             )
 
     def append_tool_result(
-        self, 
-        session_id: str, 
-        call_id: str, 
-        tool_name: str, 
+        self,
+        session_id: str,
+        call_id: str,
+        tool_name: str,
         result: str
     ) -> None:
         """
@@ -163,6 +208,8 @@ class SessionManager:
             
             state.messages.append(tool_message)
             state.last_activity = datetime.now()
+            
+            self._persist_session(session_id)  # Persist to database
             
             logger.debug(
                 f"Tool result appended: call_id={call_id}, "
@@ -209,9 +256,30 @@ class SessionManager:
             if session_id in self._sessions:
                 logger.info(f"Deleting session: {session_id}")
                 del self._sessions[session_id]
+                self._db.delete_session(session_id)  # Delete from database
             else:
                 logger.warning(f"Cannot delete: session {session_id} not found")
 
 
 # Singleton instance for global use
-session_manager = SessionManager()
+_session_manager_instance: Optional[SessionManager] = None
+
+
+def get_session_manager(db: Database = None) -> SessionManager:
+    """
+    Get SessionManager instance for dependency injection.
+    
+    Args:
+        db: Optional database instance
+        
+    Returns:
+        SessionManager instance
+    """
+    global _session_manager_instance
+    if _session_manager_instance is None:
+        _session_manager_instance = SessionManager(db)
+    return _session_manager_instance
+
+
+# Convenience accessor for backward compatibility
+session_manager = get_session_manager()
