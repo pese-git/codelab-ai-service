@@ -11,10 +11,12 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.core.config import AppConfig
 from app.models.schemas import AgentStreamRequest, HealthResponse, AgentInfo
+from app.models.hitl_models import HITLUserDecision, HITLDecision
 from app.services.session_manager import session_manager
 from app.services.llm_stream_service import stream_response
 from app.services.multi_agent_orchestrator import multi_agent_orchestrator
 from app.services.agent_router import agent_router
+from app.services.hitl_manager import hitl_manager
 from app.agents.base_agent import AgentType
 
 logger = logging.getLogger("agent-runtime.api")
@@ -64,7 +66,117 @@ async def message_stream_sse(request: AgentStreamRequest):
             # Process incoming message
             message_type = request.message.get("type", "user_message")
             
-            if message_type == "tool_result":
+            if message_type == "hitl_decision":
+                # HITL user decision (approve/edit/reject)
+                call_id = request.message.get("call_id")
+                decision_str = request.message.get("decision")
+                modified_arguments = request.message.get("modified_arguments")
+                feedback = request.message.get("feedback")
+                
+                logger.info(
+                    f"Received HITL decision: call_id={call_id}, "
+                    f"decision={decision_str}, session={request.session_id}"
+                )
+                
+                # Validate decision
+                try:
+                    decision = HITLDecision(decision_str)
+                except ValueError:
+                    error_msg = f"Invalid HITL decision: {decision_str}"
+                    logger.error(error_msg)
+                    yield {
+                        "event": "error",
+                        "data": json.dumps({
+                            "type": "error",
+                            "error": error_msg,
+                            "is_final": True
+                        })
+                    }
+                    return
+                
+                # Get pending state
+                pending_state = hitl_manager.get_pending(request.session_id, call_id)
+                if not pending_state:
+                    error_msg = f"No pending HITL state found for call_id={call_id}"
+                    logger.error(error_msg)
+                    yield {
+                        "event": "error",
+                        "data": json.dumps({
+                            "type": "error",
+                            "error": error_msg,
+                            "is_final": True
+                        })
+                    }
+                    return
+                
+                # Log decision to audit
+                hitl_manager.log_decision(
+                    session_id=request.session_id,
+                    call_id=call_id,
+                    tool_name=pending_state.tool_name,
+                    original_arguments=pending_state.arguments,
+                    decision=decision,
+                    modified_arguments=modified_arguments,
+                    feedback=feedback
+                )
+                
+                # Process decision
+                if decision == HITLDecision.APPROVE:
+                    # Execute tool with original arguments
+                    logger.info(f"HITL APPROVED: executing {pending_state.tool_name}")
+                    result = {
+                        "status": "approved",
+                        "tool_name": pending_state.tool_name,
+                        "arguments": pending_state.arguments
+                    }
+                    
+                elif decision == HITLDecision.EDIT:
+                    # Execute tool with modified arguments
+                    logger.info(f"HITL EDITED: executing {pending_state.tool_name} with modified args")
+                    result = {
+                        "status": "approved_with_edits",
+                        "tool_name": pending_state.tool_name,
+                        "arguments": modified_arguments or pending_state.arguments
+                    }
+                    
+                elif decision == HITLDecision.REJECT:
+                    # Don't execute, send feedback to LLM
+                    logger.info(f"HITL REJECTED: {pending_state.tool_name}, feedback={feedback}")
+                    result = {
+                        "status": "rejected",
+                        "tool_name": pending_state.tool_name,
+                        "feedback": feedback or "User rejected this operation"
+                    }
+                
+                # Remove pending state
+                hitl_manager.remove_pending(request.session_id, call_id)
+                
+                # Add tool result to history
+                result_str = json.dumps(result)
+                session_manager.append_tool_result(
+                    request.session_id,
+                    call_id=call_id,
+                    tool_name=pending_state.tool_name,
+                    result=result_str
+                )
+                
+                # Continue with LLM (empty message to continue after decision)
+                async for chunk in multi_agent_orchestrator.process_message(
+                    session_id=request.session_id,
+                    message=""
+                ):
+                    chunk_dict = chunk.model_dump(exclude_none=True)
+                    chunk_json = json.dumps(chunk_dict)
+                    
+                    yield {
+                        "event": "message",
+                        "data": chunk_json
+                    }
+                    
+                    if chunk.is_final:
+                        break
+                
+            elif message_type == "tool_result":
                 # Tool execution result from Gateway
                 call_id = request.message.get("call_id")
                 tool_name = request.message.get("tool_name")

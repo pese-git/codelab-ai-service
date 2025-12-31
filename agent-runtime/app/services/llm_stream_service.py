@@ -2,10 +2,11 @@
 LLM streaming service for agent runtime.
 
 Handles streaming responses from LLM, including tool calls and assistant messages.
+Integrates with HITL (Human-in-the-Loop) for tool approval workflow.
 """
 import json
 import logging
-from typing import AsyncGenerator, Dict, List, Optional
+from typing import AsyncGenerator, Dict, List, Optional, Tuple
 
 from app.core.config import AppConfig
 from app.models.schemas import StreamChunk
@@ -13,40 +14,10 @@ from app.services.llm_proxy_client import llm_proxy_client
 from app.services.session_manager import session_manager
 from app.services.tool_parser import parse_tool_calls
 from app.services.tool_registry import TOOLS_SPEC
+from app.services.hitl_policy_service import hitl_policy_service
+from app.services.hitl_manager import hitl_manager
 
 logger = logging.getLogger("agent-runtime.llm_stream")
-
-# Dangerous command patterns that require user approval
-DANGEROUS_COMMAND_PATTERNS = [
-    "rm -rf", "sudo", "chmod", "chown", "mkfs",
-    "dd if=", "> /dev/", ":(){ :|:& };:", "curl", "wget"
-]
-
-# Tools that always require user approval (HITL)
-APPROVAL_REQUIRED_TOOLS = ["write_file", "delete_file", "move_file"]
-
-
-def _requires_approval(tool_name: str, arguments: Dict) -> bool:
-    """
-    Determine if a tool call requires user approval (HITL).
-    
-    Args:
-        tool_name: Name of the tool
-        arguments: Tool arguments
-        
-    Returns:
-        True if approval is required
-    """
-    # Check if tool is in approval-required list
-    if tool_name in APPROVAL_REQUIRED_TOOLS:
-        return True
-    
-    # For execute_command, check for dangerous patterns
-    if tool_name == "execute_command":
-        command = arguments.get("command", "").lower()
-        return any(pattern in command for pattern in DANGEROUS_COMMAND_PATTERNS)
-    
-    return False
 
 
 async def stream_response(
@@ -131,10 +102,24 @@ async def stream_response(
                 f"Tool call detected: {tool_call.tool_name} (call_id={tool_call.id})"
             )
             
-            # Check if approval is required
-            requires_approval = _requires_approval(tool_call.tool_name, tool_call.arguments)
+            # Check if approval is required using HITL policy
+            requires_approval, reason = hitl_policy_service.requires_approval(tool_call.tool_name)
             
-            logger.info(f"Tool '{tool_call.tool_name}' requires_approval={requires_approval}")
+            logger.info(
+                f"Tool '{tool_call.tool_name}' requires_approval={requires_approval}"
+                f"{f', reason={reason}' if reason else ''}"
+            )
+            
+            # If approval required, save pending state
+            if requires_approval:
+                hitl_manager.add_pending(
+                    session_id=session_id,
+                    call_id=tool_call.id,
+                    tool_name=tool_call.tool_name,
+                    arguments=tool_call.arguments,
+                    reason=reason
+                )
+                logger.info(f"Added HITL pending state for call_id={tool_call.id}")
             
             # Save assistant message with tool_call to history
             assistant_msg = {

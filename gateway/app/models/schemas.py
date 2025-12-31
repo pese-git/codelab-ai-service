@@ -4,7 +4,8 @@ from .websocket import (
     WSToolResult,
     WSErrorResponse,
     WSAgentSwitched,
-    WSSwitchAgent
+    WSSwitchAgent,
+    WSHITLDecision
 )
 from .rest import HealthResponse, AgentRequest, AgentResponse
 from .tracking import ToolCallTracking
