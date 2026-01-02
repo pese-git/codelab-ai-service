@@ -148,6 +148,38 @@ async def list_sessions():
             )
 
 
+@router.post("/sessions")
+async def create_session():
+    """
+    Proxy endpoint: Create a new session.
+    
+    Proxies to: POST /sessions on Agent Runtime
+    
+    Returns:
+        Session information with session_id
+    """
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            response = await client.post(
+                f"{AppConfig.AGENT_URL}/sessions",
+                headers={"X-Internal-Auth": AppConfig.INTERNAL_API_KEY},
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Agent Runtime error: {e.response.status_code}, {e.response.text}")
+            return JSONResponse(
+                status_code=e.response.status_code,
+                content={"error": f"Agent Runtime error: {e.response.status_code}"}
+            )
+        except Exception as e:
+            logger.error(f"Error proxying to Agent Runtime: {e}", exc_info=True)
+            return JSONResponse(
+                status_code=500,
+                content={"error": f"Gateway error: {str(e)}"}
+            )
+
+
 # ==================== WebSocket Endpoint ====================
 
 @router.websocket("/ws/{session_id}")

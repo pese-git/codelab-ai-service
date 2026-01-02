@@ -456,3 +456,39 @@ async def list_sessions():
     }
 
 
+@router.post("/sessions")
+async def create_session():
+    """
+    Create a new session explicitly.
+    
+    This endpoint allows the IDE to create a session before opening WebSocket.
+    The session will be created in the database and a unique session_id will be returned.
+    
+    Returns:
+        Session information with session_id
+    """
+    logger.info("Creating new session")
+    
+    # Generate unique session ID
+    import uuid
+    session_id = f"session_{uuid.uuid4().hex[:16]}"
+    
+    # Create session with empty system prompt (will be set by agent)
+    session = session_manager.get_or_create(
+        session_id,
+        system_prompt=""
+    )
+    
+    # Initialize with orchestrator agent
+    multi_agent_orchestrator.get_current_agent(session_id)
+    
+    logger.info(f"Created new session: {session_id}")
+    
+    return {
+        "session_id": session_id,
+        "message_count": 0,
+        "current_agent": "orchestrator",
+        "created_at": session.last_activity.isoformat()
+    }
+
+
