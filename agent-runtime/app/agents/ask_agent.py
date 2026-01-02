@@ -40,7 +40,8 @@ class AskAgent(BaseAgent):
                 "read_file",
                 "search_in_code",
                 "list_files",
-                "attempt_completion"
+                "attempt_completion",
+                "switch_mode"  # Allow switching to other agents
             ]
             # Minimal tools - only for reading and context
         )
@@ -104,5 +105,29 @@ class AskAgent(BaseAgent):
                         is_final=True
                     )
                     return
+            
+            # Check for switch_mode tool result
+            if chunk.type == "tool_result" and chunk.tool_name == "switch_mode":
+                # Parse the switch mode marker
+                if chunk.content and chunk.content.startswith("__SWITCH_MODE__|"):
+                    parts = chunk.content.split("|")
+                    if len(parts) >= 3:
+                        target_mode = parts[1]
+                        reason = parts[2] if len(parts) > 2 else "Agent requested switch"
+                        
+                        logger.info(
+                            f"Ask agent requesting switch to {target_mode}: {reason}"
+                        )
+                        
+                        # Emit switch_agent chunk
+                        yield StreamChunk(
+                            type="switch_agent",
+                            content=f"Switching to {target_mode} agent",
+                            metadata={
+                                "target_agent": target_mode,
+                                "reason": reason
+                            }
+                        )
+                        return
             
             yield chunk

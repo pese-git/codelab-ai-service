@@ -33,12 +33,32 @@ def calculator_tool(expr: str) -> str:
         return f"Error: {e}"
 
 
+def switch_mode_tool(mode: str, reason: str = "Agent requested switch") -> str:
+    """
+    Request to switch to a different agent mode.
+    
+    This is a special tool that returns a marker for agent switching.
+    The actual switch is handled by the orchestrator.
+    
+    Args:
+        mode: Target agent mode (orchestrator, coder, architect, debug, ask)
+        reason: Reason for switching
+        
+    Returns:
+        Special marker string that will be processed by the agent
+    """
+    # Return a special marker that will be detected by the agent
+    # The agent will then emit a switch_agent chunk
+    return f"__SWITCH_MODE__|{mode}|{reason}"
+
+
 # ===== Tool Registry =====
 
 # Local tools that can be executed in agent-runtime
 LOCAL_TOOLS: Dict[str, Callable] = {
     "echo": echo_tool,
-    "calculator": calculator_tool
+    "calculator": calculator_tool,
+    "switch_mode": switch_mode_tool
 }
 
 
@@ -88,6 +108,31 @@ TOOLS_SPEC: List[Dict[str, Any]] = [
                 }
             },
             "required": ["expr"]
+        }
+    ),
+    _create_tool_spec(
+        name="switch_mode",
+        description=(
+            "Switch to a different agent mode when the current agent cannot handle the task. "
+            "Use this when you need capabilities that are outside your scope. "
+            "Available modes: orchestrator (task routing), coder (code changes), "
+            "architect (planning), debug (troubleshooting), ask (Q&A only)"
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "mode": {
+                    "type": "string",
+                    "enum": ["orchestrator", "coder", "architect", "debug", "ask"],
+                    "description": "Target agent mode to switch to"
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Reason for switching modes",
+                    "default": "Task requires different agent capabilities"
+                }
+            },
+            "required": ["mode"]
         }
     ),
     
