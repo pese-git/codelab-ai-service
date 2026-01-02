@@ -76,8 +76,36 @@ class ArchitectAgent(BaseAgent):
         else:
             history.insert(0, {"role": "system", "content": self.system_prompt})
         
-        # Delegate to LLM stream service
-        async for chunk in stream_response(session_id, history):
+        # Delegate to LLM stream service with allowed tools
+        async for chunk in stream_response(session_id, history, self.allowed_tools):
+            # Handle switch_mode tool call directly (don't send to IDE)
+            if chunk.type == "tool_call" and chunk.tool_name == "switch_mode":
+                target_mode = chunk.arguments.get("mode", "orchestrator")
+                reason = chunk.arguments.get("reason", "Agent requested switch")
+                
+                logger.info(
+                    f"Architect agent requesting switch to {target_mode}: {reason}"
+                )
+                
+                # Add tool result to history before switching
+                session_manager.append_tool_result(
+                    session_id=session_id,
+                    call_id=chunk.call_id,
+                    tool_name="switch_mode",
+                    result=f"Switching to {target_mode} agent"
+                )
+                
+                # Emit switch_agent chunk
+                yield StreamChunk(
+                    type="switch_agent",
+                    content=f"Switching to {target_mode} agent",
+                    metadata={
+                        "target_agent": target_mode,
+                        "reason": reason
+                    }
+                )
+                return
+            
             # Validate tool usage
             if chunk.type == "tool_call":
                 if not self.can_use_tool(chunk.tool_name):
@@ -106,30 +134,6 @@ class ArchitectAgent(BaseAgent):
                                 f"For code changes, please switch to Coder agent."
                             ),
                             is_final=True
-                        )
-                        return
-            
-            # Check for switch_mode tool result
-            if chunk.type == "tool_result" and chunk.tool_name == "switch_mode":
-                # Parse the switch mode marker
-                if chunk.content and chunk.content.startswith("__SWITCH_MODE__|"):
-                    parts = chunk.content.split("|")
-                    if len(parts) >= 3:
-                        target_mode = parts[1]
-                        reason = parts[2] if len(parts) > 2 else "Agent requested switch"
-                        
-                        logger.info(
-                            f"Architect agent requesting switch to {target_mode}: {reason}"
-                        )
-                        
-                        # Emit switch_agent chunk
-                        yield StreamChunk(
-                            type="switch_agent",
-                            content=f"Switching to {target_mode} agent",
-                            metadata={
-                                "target_agent": target_mode,
-                                "reason": reason
-                            }
                         )
                         return
             

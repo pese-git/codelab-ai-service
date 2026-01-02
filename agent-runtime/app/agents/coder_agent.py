@@ -72,8 +72,8 @@ class CoderAgent(BaseAgent):
         else:
             history.insert(0, {"role": "system", "content": self.system_prompt})
         
-        # Delegate to LLM stream service
-        async for chunk in stream_response(session_id, history):
+        # Delegate to LLM stream service with allowed tools
+        async for chunk in stream_response(session_id, history, self.allowed_tools):
             # Validate tool usage
             if chunk.type == "tool_call":
                 if not self.can_use_tool(chunk.tool_name):

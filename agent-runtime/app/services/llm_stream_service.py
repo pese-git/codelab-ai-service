@@ -21,8 +21,9 @@ logger = logging.getLogger("agent-runtime.llm_stream")
 
 
 async def stream_response(
-    session_id: str, 
-    history: List[dict]
+    session_id: str,
+    history: List[dict],
+    allowed_tools: Optional[List[str]] = None
 ) -> AsyncGenerator[StreamChunk, None]:
     """
     Generate streaming response from LLM.
@@ -33,6 +34,7 @@ async def stream_response(
     Args:
         session_id: Session identifier
         history: Message history for LLM
+        allowed_tools: List of tool names allowed for this agent (None = all tools)
         
     Yields:
         StreamChunk: Chunks for SSE streaming (assistant_message, tool_call, or error)
@@ -43,21 +45,33 @@ async def stream_response(
         )
         logger.debug(f"Last message: {history[-1] if history else 'none'}")
 
+        # Filter tools based on allowed_tools
+        tools_to_use = TOOLS_SPEC
+        if allowed_tools is not None:
+            tools_to_use = [
+                tool for tool in TOOLS_SPEC
+                if tool["function"]["name"] in allowed_tools
+            ]
+            logger.debug(
+                f"Filtered tools: {len(tools_to_use)}/{len(TOOLS_SPEC)} "
+                f"(allowed: {allowed_tools})"
+            )
+
         # Prepare LLM request
         llm_request = {
             "model": AppConfig.LLM_MODEL,
             "messages": history,
             "stream": False,
-            "tools": TOOLS_SPEC,
+            "tools": tools_to_use,
         }
 
-        logger.debug(f"Calling LLM with model: {AppConfig.LLM_MODEL}")
+        logger.debug(f"Calling LLM with model: {AppConfig.LLM_MODEL}, tools: {len(tools_to_use)}")
 
         # Call LLM proxy
         response_data = await llm_proxy_client.chat_completion(
-            model=AppConfig.LLM_MODEL, 
-            messages=history, 
-            tools=TOOLS_SPEC, 
+            model=AppConfig.LLM_MODEL,
+            messages=history,
+            tools=tools_to_use,
             stream=False
         )
         
