@@ -78,7 +78,7 @@ class MessageModel(Base):
     session_db_id = Column(Integer, ForeignKey("sessions.id", ondelete="CASCADE"), 
                           nullable=False, index=True)
     role = Column(String(50), nullable=False, index=True)
-    content = Column(Text, nullable=False)
+    content = Column(Text, nullable=True)  # Nullable for tool_calls messages
     timestamp = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
     name = Column(String(255), nullable=True)  # For tool names
     tool_call_id = Column(String(255), nullable=True)  # For tool responses
@@ -96,18 +96,19 @@ class MessageModel(Base):
             "role IN ('user', 'assistant', 'system', 'tool')",
             name='valid_role'
         ),
-        CheckConstraint(
-            "length(content) > 0",
-            name='non_empty_content'
-        ),
     )
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for LLM API"""
         result = {
             "role": self.role,
-            "content": self.content
         }
+        
+        # Content can be None for assistant messages with tool_calls
+        if self.content is not None:
+            result["content"] = self.content
+        else:
+            result["content"] = None
         
         if self.name:
             result["name"] = self.name
@@ -311,10 +312,19 @@ class Database:
             
             # Add messages
             for msg in messages:
+                # Content can be None for assistant messages with tool_calls
+                content = msg.get("content")
+                if content is None and msg.get("tool_calls"):
+                    # For tool_calls messages, content can be None or empty string
+                    content = None
+                elif content is None:
+                    # For other messages, use empty string as default
+                    content = ""
+                
                 message = MessageModel(
                     session_db_id=session.id,
                     role=msg.get("role", "user"),
-                    content=msg.get("content", ""),
+                    content=content,
                     timestamp=datetime.utcnow(),
                     name=msg.get("name"),
                     tool_call_id=msg.get("tool_call_id"),
