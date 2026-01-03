@@ -90,7 +90,7 @@ async def get_current_agent(session_id: str):
             )
 
 
-@router.get("/sessions/{session_id}")
+@router.get("/sessions/{session_id}/history")
 async def get_session_history(session_id: str):
     """
     Proxy endpoint: Get message history for a session.
