@@ -181,10 +181,11 @@ async def message_stream_sse(request: AgentStreamRequest):
                 call_id = request.message.get("call_id")
                 tool_name = request.message.get("tool_name")
                 result = request.message.get("result")
+                error = request.message.get("error")
                 
                 logger.info(
                     f"Received tool_result: call_id={call_id}, "
-                    f"tool={tool_name}, session={request.session_id}"
+                    f"tool={tool_name}, has_error={error is not None}, session={request.session_id}"
                 )
                 
                 # CRITICAL: Validate call_id presence
@@ -194,8 +195,8 @@ async def message_stream_sse(request: AgentStreamRequest):
                     raise ValueError(error_msg)
                 
                 # Check if this was a pending approval (restored request)
-                # If so, remove it from database
-                if hitl_manager.has_pending(request.session_id, call_id):
+                was_pending = hitl_manager.has_pending(request.session_id, call_id)
+                if was_pending:
                     logger.info(f"Removing pending approval for restored tool: call_id={call_id}")
                     hitl_manager.remove_pending(request.session_id, call_id)
                 
@@ -208,21 +209,40 @@ async def message_stream_sse(request: AgentStreamRequest):
                     result=result_str
                 )
                 
-                # Continue with current agent (empty message)
-                async for chunk in multi_agent_orchestrator.process_message(
-                    session_id=request.session_id,
-                    message=""  # Empty message, continue after tool_result
-                ):
-                    chunk_dict = chunk.model_dump(exclude_none=True)
-                    chunk_json = json.dumps(chunk_dict)
-                    
+                # Check if this is a rejection from restored tool
+                # If error message contains "User rejected", don't continue with LLM
+                is_user_rejection = error and isinstance(error, str) and "User rejected" in error
+                
+                if was_pending and is_user_rejection:
+                    logger.info(
+                        f"Tool was rejected by user, not continuing with LLM: "
+                        f"call_id={call_id}, tool={tool_name}"
+                    )
+                    # Send final message indicating rejection was processed
                     yield {
                         "event": "message",
-                        "data": chunk_json
+                        "data": json.dumps({
+                            "type": "assistant_message",
+                            "text": f"Tool {tool_name} was rejected by user.",
+                            "is_final": True
+                        })
                     }
-                    
-                    if chunk.is_final:
-                        break
+                else:
+                    # Continue with current agent (empty message)
+                    async for chunk in multi_agent_orchestrator.process_message(
+                        session_id=request.session_id,
+                        message=""  # Empty message, continue after tool_result
+                    ):
+                        chunk_dict = chunk.model_dump(exclude_none=True)
+                        chunk_json = json.dumps(chunk_dict)
+                        
+                        yield {
+                            "event": "message",
+                            "data": chunk_json
+                        }
+                        
+                        if chunk.is_final:
+                            break
                 
             elif message_type == "switch_agent":
                 # Explicit agent switch request
