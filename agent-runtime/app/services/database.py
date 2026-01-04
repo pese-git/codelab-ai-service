@@ -6,6 +6,7 @@ Provides thread-safe database operations for:
 - Agent context persistence
 - Message history storage (normalized)
 - Agent switch history tracking
+- Pending approval requests (HITL)
 
 Improved version with:
 - Normalized schema (separate tables for messages and switches)
@@ -28,6 +29,9 @@ from sqlalchemy import (
 from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.dialects.postgresql import JSON as PGJSON
+
+# Import PendingApproval model
+from app.models.db_models import PendingApproval
 
 logger = logging.getLogger("agent-runtime.database")
 
@@ -757,6 +761,128 @@ class Database:
                 logger.info(f"Permanently deleted {sessions_deleted} old sessions")
             
             return sessions_deleted
+    
+    # ==================== Pending Approval Operations ====================
+    
+    def save_pending_approval(
+        self,
+        session_id: str,
+        call_id: str,
+        tool_name: str,
+        arguments: Dict[str, Any],
+        reason: Optional[str] = None
+    ) -> None:
+        """
+        Save pending approval request to database.
+        
+        Args:
+            session_id: Session identifier
+            call_id: Tool call identifier (used as approval_id)
+            tool_name: Name of the tool requiring approval
+            arguments: Tool arguments
+            reason: Reason why approval is required
+        """
+        with self.session_scope() as db:
+            # Check if approval already exists
+            existing = db.query(PendingApproval).filter(
+                PendingApproval.call_id == call_id
+            ).first()
+            
+            if existing:
+                logger.warning(f"Pending approval already exists for call_id={call_id}")
+                return
+            
+            # Create new pending approval
+            approval = PendingApproval(
+                approval_id=call_id,  # Use call_id as approval_id
+                session_id=session_id,
+                call_id=call_id,
+                tool_name=tool_name,
+                arguments=arguments,  # SQLAlchemy handles JSONB serialization
+                reason=reason,
+                status='pending'
+            )
+            
+            db.add(approval)
+            logger.info(f"Saved pending approval: session={session_id}, call_id={call_id}, tool={tool_name}")
+    
+    def get_pending_approvals(self, session_id: str) -> List[Dict[str, Any]]:
+        """
+        Get all pending approval requests for a session.
+        
+        Args:
+            session_id: Session identifier
+            
+        Returns:
+            List of pending approval dictionaries
+        """
+        with self.session_scope() as db:
+            approvals = db.query(PendingApproval).filter(
+                PendingApproval.session_id == session_id,
+                PendingApproval.status == 'pending'
+            ).order_by(PendingApproval.created_at.asc()).all()
+            
+            return [
+                {
+                    'call_id': approval.call_id,
+                    'tool_name': approval.tool_name,
+                    'arguments': approval.arguments,  # JSONB auto-deserialized
+                    'reason': approval.reason,
+                    'created_at': approval.created_at
+                }
+                for approval in approvals
+            ]
+    
+    def delete_pending_approval(self, call_id: str) -> bool:
+        """
+        Delete pending approval request from database.
+        
+        Args:
+            call_id: Tool call identifier
+            
+        Returns:
+            True if deleted, False if not found
+        """
+        with self.session_scope() as db:
+            approval = db.query(PendingApproval).filter(
+                PendingApproval.call_id == call_id
+            ).first()
+            
+            if not approval:
+                logger.warning(f"Pending approval not found for call_id={call_id}")
+                return False
+            
+            db.delete(approval)
+            logger.info(f"Deleted pending approval: call_id={call_id}")
+            return True
+    
+    def update_approval_status(
+        self,
+        call_id: str,
+        status: str
+    ) -> bool:
+        """
+        Update status of pending approval.
+        
+        Args:
+            call_id: Tool call identifier
+            status: New status (approved, rejected, cancelled)
+            
+        Returns:
+            True if updated, False if not found
+        """
+        with self.session_scope() as db:
+            approval = db.query(PendingApproval).filter(
+                PendingApproval.call_id == call_id
+            ).first()
+            
+            if not approval:
+                logger.warning(f"Pending approval not found for call_id={call_id}")
+                return False
+            
+            approval.status = status
+            logger.info(f"Updated approval status: call_id={call_id}, status={status}")
+            return True
 
 
 # ==================== Dependency Injection ====================

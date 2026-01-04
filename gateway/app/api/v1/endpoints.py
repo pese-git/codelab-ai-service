@@ -180,6 +180,54 @@ async def create_session():
             )
 
 
+@router.get("/sessions/{session_id}/pending-approvals")
+async def get_pending_approvals(session_id: str):
+    """
+    Proxy endpoint: Get pending approval requests for a session.
+    
+    This endpoint is used by the IDE to restore pending approvals
+    after restart or reinstall.
+    
+    Proxies to: GET /sessions/{session_id}/pending-approvals on Agent Runtime
+    
+    Args:
+        session_id: Session identifier
+        
+    Returns:
+        List of pending approval requests
+    """
+    logger.debug(f"Proxying pending-approvals request for session {session_id}")
+    
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            response = await client.get(
+                f"{AppConfig.AGENT_URL}/sessions/{session_id}/pending-approvals",
+                headers={"X-Internal-Auth": AppConfig.INTERNAL_API_KEY},
+            )
+            
+            if response.status_code == 404:
+                return JSONResponse(
+                    status_code=404,
+                    content={"error": f"Session {session_id} not found"}
+                )
+            
+            response.raise_for_status()
+            return response.json()
+            
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Agent Runtime error: {e.response.status_code}, {e.response.text}")
+            return JSONResponse(
+                status_code=e.response.status_code,
+                content={"error": f"Agent Runtime error: {e.response.status_code}"}
+            )
+        except Exception as e:
+            logger.error(f"Error proxying pending-approvals request: {e}", exc_info=True)
+            return JSONResponse(
+                status_code=500,
+                content={"error": f"Gateway error: {str(e)}"}
+            )
+
+
 # ==================== WebSocket Endpoint ====================
 
 @router.websocket("/ws/{session_id}")

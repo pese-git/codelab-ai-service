@@ -3,6 +3,8 @@ HITL Manager for managing pending tool calls and user decisions.
 
 Integrates with AgentContext to store pending states and provides
 methods for adding, retrieving, and resolving HITL approvals.
+
+Now with database persistence for approval requests.
 """
 import logging
 from datetime import datetime
@@ -14,6 +16,7 @@ from app.models.hitl_models import (
     HITLDecision,
     HITLAuditLog
 )
+from app.services.database import get_database
 
 # Lazy import to avoid circular dependency
 if TYPE_CHECKING:
@@ -36,10 +39,15 @@ class HITLManager:
     """
     Manager for HITL pending states and user decisions.
     
-    Uses AgentContext.metadata to store:
-    - hitl_pending_calls: Dict[call_id, HITLPendingState]
-    - hitl_audit_logs: List[HITLAuditLog]
+    Uses both AgentContext.metadata (for fast access) and Database (for persistence):
+    - hitl_pending_calls: Dict[call_id, HITLPendingState] (in memory)
+    - hitl_audit_logs: List[HITLAuditLog] (in memory)
+    - pending_approvals table: Persistent storage (in database)
     """
+    
+    def __init__(self):
+        """Initialize HITL Manager with database access"""
+        self.db = get_database()
     
     def add_pending(
         self,
@@ -52,6 +60,7 @@ class HITLManager:
     ) -> HITLPendingState:
         """
         Add a tool call to pending HITL approval.
+        Saves to both database (persistent) and AgentContext (fast access).
         
         Args:
             session_id: Session identifier
@@ -59,7 +68,7 @@ class HITLManager:
             tool_name: Name of the tool
             arguments: Tool arguments
             reason: Reason for requiring approval
-            timeout_seconds: Timeout for user decision
+            timeout_seconds: Timeout for user decision (deprecated, kept for compatibility)
             
         Returns:
             Created HITLPendingState
@@ -79,7 +88,20 @@ class HITLManager:
             timeout_seconds=timeout_seconds
         )
         
-        # Store in context metadata
+        # Store in database (source of truth for persistence)
+        try:
+            self.db.save_pending_approval(
+                session_id=session_id,
+                call_id=call_id,
+                tool_name=tool_name,
+                arguments=arguments,
+                reason=reason
+            )
+        except Exception as e:
+            logger.error(f"Failed to save pending approval to database: {e}", exc_info=True)
+            # Continue anyway - we still have in-memory state
+        
+        # Also store in context metadata for fast access
         context.metadata[HITL_PENDING_KEY][call_id] = pending_state.model_dump()
         
         logger.info(
@@ -117,6 +139,7 @@ class HITLManager:
     def get_all_pending(self, session_id: str) -> List[HITLPendingState]:
         """
         Get all pending HITL states for a session.
+        Loads from database (source of truth).
         
         Args:
             session_id: Session identifier
@@ -124,16 +147,35 @@ class HITLManager:
         Returns:
             List of HITLPendingState objects
         """
-        context = _get_agent_context_manager().get(session_id)
-        if not context:
-            return []
-        
-        pending_calls = context.metadata.get(HITL_PENDING_KEY, {})
-        return [HITLPendingState(**data) for data in pending_calls.values()]
+        try:
+            # Load from database (source of truth)
+            pending_list = self.db.get_pending_approvals(session_id)
+            
+            return [
+                HITLPendingState(
+                    call_id=p['call_id'],
+                    tool_name=p['tool_name'],
+                    arguments=p['arguments'],
+                    reason=p.get('reason'),
+                    created_at=p['created_at']
+                )
+                for p in pending_list
+            ]
+        except Exception as e:
+            logger.error(f"Failed to load pending approvals from database: {e}", exc_info=True)
+            
+            # Fallback to in-memory state
+            context = _get_agent_context_manager().get(session_id)
+            if not context:
+                return []
+            
+            pending_calls = context.metadata.get(HITL_PENDING_KEY, {})
+            return [HITLPendingState(**data) for data in pending_calls.values()]
     
     def remove_pending(self, session_id: str, call_id: str) -> bool:
         """
         Remove a pending HITL state.
+        Removes from both database and AgentContext.
         
         Args:
             session_id: Session identifier
@@ -142,15 +184,20 @@ class HITLManager:
         Returns:
             True if removed, False if not found
         """
-        context = _get_agent_context_manager().get(session_id)
-        if not context:
-            return False
+        # Remove from database
+        try:
+            self.db.delete_pending_approval(call_id)
+        except Exception as e:
+            logger.error(f"Failed to delete pending approval from database: {e}", exc_info=True)
         
-        pending_calls = context.metadata.get(HITL_PENDING_KEY, {})
-        if call_id in pending_calls:
-            del pending_calls[call_id]
-            logger.info(f"Removed pending HITL state: call_id={call_id}")
-            return True
+        # Remove from context metadata
+        context = _get_agent_context_manager().get(session_id)
+        if context:
+            pending_calls = context.metadata.get(HITL_PENDING_KEY, {})
+            if call_id in pending_calls:
+                del pending_calls[call_id]
+                logger.info(f"Removed pending HITL state: call_id={call_id}")
+                return True
         
         return False
     

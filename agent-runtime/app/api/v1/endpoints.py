@@ -492,3 +492,52 @@ async def create_session():
     }
 
 
+@router.get("/sessions/{session_id}/pending-approvals")
+async def get_pending_approvals(session_id: str):
+    """
+    Get all pending approval requests for a session.
+    
+    This endpoint is used by the IDE to restore pending approvals
+    after restart or reinstall.
+    
+    Args:
+        session_id: Session identifier
+        
+    Returns:
+        List of pending approval requests with their details
+    """
+    logger.debug(f"Getting pending approvals for session {session_id}")
+    
+    # Check if session exists
+    if not session_manager.exists(session_id):
+        return JSONResponse(
+            content={"error": f"Session {session_id} not found"},
+            status_code=404
+        )
+    
+    # Get pending approvals from HITL manager (which loads from database)
+    try:
+        pending_approvals = hitl_manager.get_all_pending(session_id)
+        
+        return {
+            "session_id": session_id,
+            "pending_approvals": [
+                {
+                    "call_id": p.call_id,
+                    "tool_name": p.tool_name,
+                    "arguments": p.arguments,
+                    "reason": p.reason,
+                    "created_at": p.created_at.isoformat() if p.created_at else None
+                }
+                for p in pending_approvals
+            ],
+            "count": len(pending_approvals)
+        }
+    except Exception as e:
+        logger.error(f"Failed to get pending approvals: {e}", exc_info=True)
+        return JSONResponse(
+            content={"error": "Failed to retrieve pending approvals"},
+            status_code=500
+        )
+
+
