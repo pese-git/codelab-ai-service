@@ -7,9 +7,19 @@ from app.core.config import AppConfig, logger
 
 class InternalAuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        if request.url.path in ("/health",) or request.url.path.startswith("/ws/"):
+        # Публичные endpoints без аутентификации
+        public_paths = (
+            "/health",
+            "/docs",
+            "/openapi.json",
+            "/redoc",
+        )
+        
+        # Разрешить WebSocket соединения и публичные пути
+        if request.url.path in public_paths or request.url.path.startswith("/ws/"):
             return await call_next(request)
-        # Только для внутренних endpoint-ов
+        
+        # Для всех остальных endpoints требуется аутентификация
         auth = request.headers.get("x-internal-auth")
         logger.debug(
             f"[gateway][AUTH] Incoming X-Internal-Auth: '{auth}', INTERNAL_API_KEY: '{AppConfig.INTERNAL_API_KEY}'"

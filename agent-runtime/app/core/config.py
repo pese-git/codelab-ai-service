@@ -1,19 +1,59 @@
+"""
+Application configuration for agent runtime service.
+
+Loads configuration from environment variables with sensible defaults.
+"""
 import logging
 import os
 
 from dotenv import load_dotenv
 
+# Load environment variables from .env file
 load_dotenv()
 
 
 class AppConfig:
-    LLM_PROXY_URL: str = os.getenv("AGENT_RUNTIME__LLM_PROXY_URL", "http://localhost:8002")
-    GATEWAY_URL: str = os.getenv("AGENT_RUNTIME__GATEWAY_URL", "http://localhost:8000")
-    LLM_MODEL: str = os.getenv("AGENT_RUNTIME__LLM_MODEL", "fake-llm")
-    INTERNAL_API_KEY: str = os.getenv("AGENT_RUNTIME__INTERNAL_API_KEY", "change-me-internal-key")
-    LOG_LEVEL: str = os.getenv("AGENT_RUNTIME__LOG_LEVEL", "INFO")
-    VERSION: str = os.getenv("AGENT_RUNTIME__VERSION", "0.1.0")
+    """Application configuration loaded from environment variables"""
+    
+    # Service URLs
+    LLM_PROXY_URL: str = os.getenv(
+        "AGENT_RUNTIME__LLM_PROXY_URL", 
+        "http://localhost:8002"
+    )
+    GATEWAY_URL: str = os.getenv(
+        "AGENT_RUNTIME__GATEWAY_URL", 
+        "http://localhost:8000"
+    )
+    
+    # LLM Configuration
+    LLM_MODEL: str = os.getenv(
+        "AGENT_RUNTIME__LLM_MODEL", 
+        "fake-llm"
+    )
+    
+    # Security
+    INTERNAL_API_KEY: str = os.getenv(
+        "AGENT_RUNTIME__INTERNAL_API_KEY", 
+        "change-me-internal-key"
+    )
+    
+    # Logging
+    LOG_LEVEL: str = os.getenv(
+        "AGENT_RUNTIME__LOG_LEVEL", 
+        "INFO"
+    )
+    
+    # Service metadata
+    VERSION: str = os.getenv(
+        "AGENT_RUNTIME__VERSION", 
+        "0.1.0"
+    )
 
 
-logging.basicConfig(level=AppConfig.LOG_LEVEL)
+# Configure logging
+logging.basicConfig(
+    level=AppConfig.LOG_LEVEL,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
 logger = logging.getLogger("agent-runtime")

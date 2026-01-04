@@ -33,6 +33,9 @@ services:
       dockerfile: Dockerfile
     ports:
       - "${AGENT_RUNTIME_PORT}:${AGENT_RUNTIME_PORT}"
+    volumes:
+      # Монтируем директорию data для персистентности SQLite базы данных
+      - ./agent-runtime/data:/app/data
     environment:
       - ENVIRONMENT=${ENVIRONMENT}
       - PORT=${AGENT_RUNTIME_PORT}
@@ -43,6 +46,8 @@ services:
       - AGENT_RUNTIME__MAX_CONCURRENT_REQUESTS=${AGENT_RUNTIME__MAX_CONCURRENT_REQUESTS}
       - AGENT_RUNTIME__REQUEST_TIMEOUT=${AGENT_RUNTIME__REQUEST_TIMEOUT}
       - AGENT_RUNTIME__LLM_MODEL=${AGENT_RUNTIME__LLM_MODEL}
+      # Путь к базе данных SQLite (будет храниться на хост-машине)
+      - AGENT_RUNTIME__DB_URL=sqlite:///data/agent_runtime.db
     depends_on:
       llm-proxy:
         condition: service_healthy
