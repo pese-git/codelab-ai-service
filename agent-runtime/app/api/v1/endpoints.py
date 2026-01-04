@@ -193,6 +193,12 @@ async def message_stream_sse(request: AgentStreamRequest):
                     logger.error(f"Missing call_id in tool_result: {request.message}")
                     raise ValueError(error_msg)
                 
+                # Check if this was a pending approval (restored request)
+                # If so, remove it from database
+                if hitl_manager.has_pending(request.session_id, call_id):
+                    logger.info(f"Removing pending approval for restored tool: call_id={call_id}")
+                    hitl_manager.remove_pending(request.session_id, call_id)
+                
                 # Add tool_result to history as tool message
                 result_str = json.dumps(result) if not isinstance(result, str) else result
                 session_manager.append_tool_result(
