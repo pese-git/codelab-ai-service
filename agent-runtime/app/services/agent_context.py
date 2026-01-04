@@ -4,7 +4,7 @@ Agent context management for multi-agent system.
 Maintains state and history for each agent session.
 """
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 import logging
 
@@ -38,7 +38,7 @@ class AgentContext(BaseModel):
         description="Additional context metadata"
     )
     created_at: datetime = Field(
-        default_factory=datetime.now,
+        default_factory=lambda: datetime.now(timezone.utc),
         description="Context creation timestamp"
     )
     last_switch_at: Optional[datetime] = Field(
@@ -80,7 +80,7 @@ class AgentContext(BaseModel):
             "from": self.current_agent.value,
             "to": new_agent.value,
             "reason": reason,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
         self.agent_history.append(switch_record)
         
@@ -92,7 +92,7 @@ class AgentContext(BaseModel):
         
         # Update state
         self.current_agent = new_agent
-        self.last_switch_at = datetime.now()
+        self.last_switch_at = datetime.now(timezone.utc)
         self.switch_count += 1
         
         # Persist to database
@@ -296,7 +296,7 @@ class AgentContextManager:
         Returns:
             Number of sessions cleaned up
         """
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         sessions_to_delete = []
         
         for session_id, context in self._contexts.items():

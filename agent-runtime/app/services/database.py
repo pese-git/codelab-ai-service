@@ -16,7 +16,7 @@ Improved version with:
 """
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from contextlib import contextmanager
@@ -42,8 +42,8 @@ class SessionModel(Base):
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     session_id = Column(String(255), unique=True, nullable=False, index=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    last_activity = Column(DateTime, nullable=False, index=True, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    last_activity = Column(DateTime, nullable=False, index=True, default=lambda: datetime.now(timezone.utc))
     is_active = Column(Boolean, default=True, index=True)
     deleted_at = Column(DateTime, nullable=True)  # Soft delete
     
@@ -75,11 +75,11 @@ class MessageModel(Base):
     __tablename__ = "messages"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    session_db_id = Column(Integer, ForeignKey("sessions.id", ondelete="CASCADE"), 
+    session_db_id = Column(Integer, ForeignKey("sessions.id", ondelete="CASCADE"),
                           nullable=False, index=True)
     role = Column(String(50), nullable=False, index=True)
     content = Column(Text, nullable=True)  # Nullable for tool_calls messages
-    timestamp = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    timestamp = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
     name = Column(String(255), nullable=True)  # For tool names
     tool_call_id = Column(String(255), nullable=True)  # For tool responses
     tool_calls = Column(Text, nullable=True)  # JSON serialized tool calls
@@ -127,12 +127,12 @@ class AgentContextModel(Base):
     __tablename__ = "agent_contexts"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    session_db_id = Column(Integer, ForeignKey("sessions.id", ondelete="CASCADE"), 
+    session_db_id = Column(Integer, ForeignKey("sessions.id", ondelete="CASCADE"),
                           unique=True, nullable=False, index=True)
     current_agent = Column(String(100), nullable=False, index=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, 
-                       onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc),
+                       onupdate=lambda: datetime.now(timezone.utc))
     switch_count = Column(Integer, nullable=False, default=0)
     metadata_json = Column(Text, nullable=True)  # JSON serialized metadata
     
@@ -159,11 +159,11 @@ class AgentSwitchModel(Base):
     __tablename__ = "agent_switches"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    context_db_id = Column(Integer, ForeignKey("agent_contexts.id", ondelete="CASCADE"), 
+    context_db_id = Column(Integer, ForeignKey("agent_contexts.id", ondelete="CASCADE"),
                           nullable=False, index=True)
     from_agent = Column(String(100), nullable=True)  # NULL for first agent
     to_agent = Column(String(100), nullable=False)
-    switched_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    switched_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
     reason = Column(Text, nullable=True)
     metadata_json = Column(Text, nullable=True)  # JSON serialized metadata
     
@@ -276,6 +276,8 @@ class Database:
         """
         Save or update session state with messages.
         
+        Uses atomic transaction to prevent data loss between delete and insert operations.
+        
         Args:
             session_id: Session identifier
             messages: List of messages in the session
@@ -292,7 +294,7 @@ class Database:
                 # Create new session
                 session = SessionModel(
                     session_id=session_id,
-                    created_at=datetime.utcnow(),
+                    created_at=datetime.now(timezone.utc),
                     last_activity=last_activity,
                     is_active=True
                 )
@@ -305,12 +307,9 @@ class Database:
                 session.is_active = True
                 logger.debug(f"Updated session {session_id} in database")
             
-            # Clear existing messages and add new ones
-            db.query(MessageModel).filter(
-                MessageModel.session_db_id == session.id
-            ).delete()
-            
-            # Add messages
+            # Atomic replacement: prepare new messages first, then replace in single transaction
+            # This ensures we don't lose data if operation fails midway
+            new_messages = []
             for msg in messages:
                 # Content can be None for assistant messages with tool_calls
                 content = msg.get("content")
@@ -325,12 +324,22 @@ class Database:
                     session_db_id=session.id,
                     role=msg.get("role", "user"),
                     content=content,
-                    timestamp=datetime.utcnow(),
+                    timestamp=datetime.now(timezone.utc),
                     name=msg.get("name"),
                     tool_call_id=msg.get("tool_call_id"),
                     tool_calls=json.dumps(msg["tool_calls"]) if msg.get("tool_calls") else None,
                     metadata_json=json.dumps(msg.get("metadata", {})) if msg.get("metadata") else None
                 )
+                new_messages.append(message)
+            
+            # Now perform atomic replacement within the same transaction
+            # Delete old messages and add new ones - all commits together
+            db.query(MessageModel).filter(
+                MessageModel.session_db_id == session.id
+            ).delete()
+            
+            # Add all new messages
+            for message in new_messages:
                 db.add(message)
     
     def load_session(self, session_id: str) -> Optional[Dict[str, Any]]:
@@ -385,7 +394,7 @@ class Database:
             
             if soft:
                 # Soft delete
-                session.deleted_at = datetime.utcnow()
+                session.deleted_at = datetime.now(timezone.utc)
                 session.is_active = False
                 logger.info(f"Soft deleted session {session_id} from database")
             else:
@@ -533,7 +542,7 @@ class Database:
                     session_db_id=session.id,
                     current_agent=current_agent,
                     created_at=created_at,
-                    updated_at=datetime.utcnow(),
+                    updated_at=datetime.now(timezone.utc),
                     switch_count=switch_count,
                     metadata_json=metadata_json
                 )
@@ -543,7 +552,7 @@ class Database:
             else:
                 # Update existing context
                 context.current_agent = current_agent
-                context.updated_at = datetime.utcnow()
+                context.updated_at = datetime.now(timezone.utc)
                 context.switch_count = switch_count
                 context.metadata_json = metadata_json
                 logger.debug(f"Updated agent context for {session_id} in database")
@@ -559,10 +568,10 @@ class Database:
                     context_db_id=context.id,
                     from_agent=history_entry.get("from"),
                     to_agent=history_entry.get("to", current_agent),
-                    switched_at=datetime.fromisoformat(history_entry["timestamp"]) 
-                               if "timestamp" in history_entry else datetime.utcnow(),
+                    switched_at=datetime.fromisoformat(history_entry["timestamp"])
+                               if "timestamp" in history_entry else datetime.now(timezone.utc),
                     reason=history_entry.get("reason"),
-                    metadata_json=json.dumps(history_entry.get("metadata", {})) 
+                    metadata_json=json.dumps(history_entry.get("metadata", {}))
                                  if history_entry.get("metadata") else None
                 )
                 db.add(switch)
@@ -710,14 +719,14 @@ class Database:
             Number of sessions cleaned up
         """
         with self.session_scope() as db:
-            cutoff = datetime.utcnow() - timedelta(hours=max_age_hours)
+            cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
             
             # Soft delete old sessions
             sessions_updated = db.query(SessionModel).filter(
                 SessionModel.last_activity < cutoff,
                 SessionModel.deleted_at.is_(None)
             ).update({
-                "deleted_at": datetime.utcnow(),
+                "deleted_at": datetime.now(timezone.utc),
                 "is_active": False
             }, synchronize_session=False)
             
@@ -737,7 +746,7 @@ class Database:
             Number of sessions permanently deleted
         """
         with self.session_scope() as db:
-            cutoff = datetime.utcnow() - timedelta(days=days_old)
+            cutoff = datetime.now(timezone.utc) - timedelta(days=days_old)
             
             # Hard delete old soft-deleted sessions
             sessions_deleted = db.query(SessionModel).filter(

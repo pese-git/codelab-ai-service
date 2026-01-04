@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from threading import RLock
 from typing import Dict, List, Optional, Union
 
@@ -155,7 +155,7 @@ class SessionManager:
             
             msg = Message.model_construct(role=role, content=content, name=name)
             state.messages.append(msg)
-            state.last_activity = datetime.now()
+            state.last_activity = datetime.now(timezone.utc)
             
             self._persist_session(session_id)  # Persist to database
             
@@ -207,7 +207,7 @@ class SessionManager:
             }
             
             state.messages.append(tool_message)
-            state.last_activity = datetime.now()
+            state.last_activity = datetime.now(timezone.utc)
             
             self._persist_session(session_id)  # Persist to database
             
