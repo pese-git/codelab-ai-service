@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from app.core.config import logger
 from app.core.dependencies import AuthServiceDep, DBSession
 from app.schemas.oauth import GrantType, TokenErrorResponse, TokenRequest, TokenResponse
+from app.services.audit_service import audit_service
 from app.services.brute_force_protection import brute_force_protection
 from app.services.refresh_token_service import refresh_token_service
 
@@ -128,6 +129,16 @@ async def _handle_password_grant(
             ip_address,
         )
 
+        # Log failed login
+        await audit_service.log_login_failed(
+            db=db,
+            username=token_request.username,
+            client_id=token_request.client_id,
+            ip_address=ip_address,
+            user_agent=request.headers.get("User-Agent"),
+            reason="Invalid credentials",
+        )
+
         return _error_response(
             "invalid_grant",
             "Invalid username or password",
@@ -138,6 +149,16 @@ async def _handle_password_grant(
     await brute_force_protection.reset_failed_attempts(
         token_request.username,
         ip_address,
+    )
+
+    # Log successful login
+    await audit_service.log_login_success(
+        db=db,
+        user_id=user.id,
+        client_id=client.client_id,
+        ip_address=ip_address,
+        user_agent=request.headers.get("User-Agent"),
+        scope=token_response.scope,
     )
 
     # Save refresh token to database
@@ -223,6 +244,15 @@ async def _handle_refresh_grant(
         db,
         new_refresh_payload,
         parent_jti=old_refresh_payload.jti,
+    )
+
+    # Log token refresh
+    await audit_service.log_token_refresh(
+        db=db,
+        user_id=user.id,
+        client_id=client.client_id,
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("User-Agent"),
     )
 
     logger.info(

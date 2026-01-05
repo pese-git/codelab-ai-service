@@ -64,9 +64,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Rate limiting middleware
-from app.middleware import RateLimitMiddleware
+# Structured logging middleware
+from app.middleware import RateLimitMiddleware, StructuredLoggingMiddleware
 
+app.add_middleware(StructuredLoggingMiddleware)
 app.add_middleware(RateLimitMiddleware)
 
 
