@@ -61,6 +61,8 @@ services:
       - GATEWAY__WS_CLOSE_TIMEOUT=${GATEWAY__WS_CLOSE_TIMEOUT}
       - GATEWAY__MAX_CONCURRENT_REQUESTS=${GATEWAY__MAX_CONCURRENT_REQUESTS}
       - GATEWAY__REQUEST_TIMEOUT=${GATEWAY__REQUEST_TIMEOUT}
+      - GATEWAY__AUTH_SERVICE_URL=http://auth-service:8003
+      - GATEWAY__USE_JWT_AUTH=${GATEWAY__USE_JWT_AUTH:-false}
     depends_on:
       agent-runtime:
         condition: service_healthy
