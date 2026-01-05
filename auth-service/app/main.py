@@ -28,6 +28,11 @@ async def lifespan(app: FastAPI):
         await init_db()
         logger.info("✓ Database initialized")
         
+        # Seed default data
+        from app.core.seed import seed_default_data
+        await seed_default_data()
+        logger.info("✓ Default data seeded")
+        
     except Exception as e:
         logger.error(f"Failed to initialize: {e}")
         raise
