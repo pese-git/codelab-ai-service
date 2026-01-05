@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from app.core.config import logger
 from app.core.dependencies import AuthServiceDep, DBSession
 from app.schemas.oauth import GrantType, TokenErrorResponse, TokenRequest, TokenResponse
+from app.services.brute_force_protection import brute_force_protection
 from app.services.refresh_token_service import refresh_token_service
 
 router = APIRouter()
@@ -101,16 +102,43 @@ async def _handle_password_grant(
             "Missing required parameters: username and password",
         )
 
+    # Get client IP
+    ip_address = request.client.host if request.client else "unknown"
+
+    # Check brute-force lockout
+    is_locked, lockout_reason = await brute_force_protection.is_locked_out(
+        token_request.username,
+        ip_address,
+    )
+    if is_locked:
+        return _error_response(
+            "invalid_grant",
+            lockout_reason or "Account temporarily locked",
+            status_code=429,
+        )
+
     # Authenticate
     result = await auth_svc.authenticate_password_grant(db, token_request)
     token_response, user, client = result
 
     if not token_response:
+        # Record failed attempt
+        await brute_force_protection.record_failed_attempt(
+            token_request.username,
+            ip_address,
+        )
+
         return _error_response(
             "invalid_grant",
             "Invalid username or password",
             status_code=401,
         )
+
+    # Reset failed attempts on successful login
+    await brute_force_protection.reset_failed_attempts(
+        token_request.username,
+        ip_address,
+    )
 
     # Save refresh token to database
     # Extract payload from token_response

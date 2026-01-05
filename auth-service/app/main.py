@@ -64,6 +64,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Rate limiting middleware
+from app.middleware import RateLimitMiddleware
+
+app.add_middleware(RateLimitMiddleware)
+
 
 @app.get("/health")
 async def health_check():

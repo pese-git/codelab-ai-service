@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     public_key_path: str = "/app/keys/public_key.pem"
 
     # Security
+    enable_rate_limiting: bool = True  # Enable/disable rate limiting
     rate_limit_per_ip: int = 5  # requests per minute
     rate_limit_per_username: int = 10  # requests per hour
     brute_force_threshold: int = 5  # failed attempts
