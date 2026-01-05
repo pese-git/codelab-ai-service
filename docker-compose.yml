@@ -1,4 +1,49 @@
 services:
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    ports:
+      - "${AUTH_SERVICE_PORT:-8003}:8003"
+    volumes:
+      - ./auth-service/data:/app/data
+      - ./auth-service/keys:/app/keys
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT}
+      - PORT=8003
+      - AUTH_SERVICE__DB_URL=sqlite:///data/auth.db
+      - AUTH_SERVICE__REDIS_URL=redis://redis:6379/1
+      - AUTH_SERVICE__LOG_LEVEL=${AUTH_SERVICE__LOG_LEVEL:-DEBUG}
+      - AUTH_SERVICE__JWT_ISSUER=https://auth.codelab.local
+      - AUTH_SERVICE__JWT_AUDIENCE=codelab-api
+      - AUTH_SERVICE__ACCESS_TOKEN_LIFETIME=900
+      - AUTH_SERVICE__REFRESH_TOKEN_LIFETIME=2592000
+      - AUTH_SERVICE__PRIVATE_KEY_PATH=/app/keys/private_key.pem
+      - AUTH_SERVICE__PUBLIC_KEY_PATH=/app/keys/public_key.pem
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - codelab-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: ${HEALTHCHECK_INTERVAL}
+      timeout: ${HEALTHCHECK_TIMEOUT}
+      retries: ${HEALTHCHECK_RETRIES}
+      start_period: ${HEALTHCHECK_START_PERIOD}
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - codelab-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   gateway:
     build:
       context: ./gateway
