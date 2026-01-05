@@ -465,22 +465,31 @@ async def list_sessions(db: Database = Depends(get_db)):
     """
     logger.debug("Listing all sessions")
     
+    from sqlalchemy import func
+    from app.services.database import MessageModel
+    
     session_list = []
     
-    # Get all sessions with metadata in one query
+    # Get all sessions with message count in one optimized query using LEFT JOIN
     with db.session_scope() as db_session:
-        sessions = db_session.query(SessionModel).filter(
+        sessions_with_counts = db_session.query(
+            SessionModel,
+            func.count(MessageModel.id).label('message_count')
+        ).outerjoin(
+            MessageModel,
+            SessionModel.id == MessageModel.session_db_id
+        ).filter(
             SessionModel.deleted_at.is_(None)
-        ).order_by(SessionModel.last_activity.desc()).all()
+        ).group_by(
+            SessionModel.id
+        ).order_by(
+            SessionModel.last_activity.desc()
+        ).all()
         
-        for session_model in sessions:
+        for session_model, message_count in sessions_with_counts:
             session_id = session_model.session_id
             
-            # Load session data for message count
-            session_data = db.load_session(session_id)
-            message_count = len(session_data.get("messages", [])) if session_data else 0
-            
-            # Get current agent
+            # Get current agent (from in-memory cache, not DB)
             current_agent = multi_agent_orchestrator.get_current_agent(session_id)
             
             session_info = {
