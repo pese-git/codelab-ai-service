@@ -16,15 +16,28 @@ async def lifespan(app: FastAPI):
     logger.info(f"Environment: {settings.environment}")
     logger.info(f"Version: {settings.version}")
     
-    # Startup logic here
-    # - Initialize database connection
-    # - Initialize Redis connection
-    # - Load RSA keys
+    # Startup logic
+    try:
+        # Load RSA keys
+        from app.core.security import rsa_key_manager
+        rsa_key_manager.load_keys()
+        logger.info("✓ RSA keys loaded")
+        
+        # Initialize database
+        from app.models import init_db
+        await init_db()
+        logger.info("✓ Database initialized")
+        
+    except Exception as e:
+        logger.error(f"Failed to initialize: {e}")
+        raise
     
     yield
     
-    # Shutdown logic here
+    # Shutdown logic
     logger.info("Shutting down Auth Service...")
+    from app.models import close_db
+    await close_db()
 
 
 # Create FastAPI application
@@ -72,9 +85,12 @@ async def root():
 
 
 # Include routers
-# from app.api.v1 import oauth, jwks
+from app.api.v1 import jwks
+
+app.include_router(jwks.router, prefix="/.well-known", tags=["JWKS"])
+# OAuth router will be added in next iteration
+# from app.api.v1 import oauth
 # app.include_router(oauth.router, prefix="/oauth", tags=["OAuth2"])
-# app.include_router(jwks.router, prefix="/.well-known", tags=["JWKS"])
 
 
 if __name__ == "__main__":
