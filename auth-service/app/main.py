@@ -85,12 +85,10 @@ async def root():
 
 
 # Include routers
-from app.api.v1 import jwks
+from app.api.v1 import jwks, oauth
 
+app.include_router(oauth.router, prefix="/oauth", tags=["OAuth2"])
 app.include_router(jwks.router, prefix="/.well-known", tags=["JWKS"])
-# OAuth router will be added in next iteration
-# from app.api.v1 import oauth
-# app.include_router(oauth.router, prefix="/oauth", tags=["OAuth2"])
 
 
 if __name__ == "__main__":
