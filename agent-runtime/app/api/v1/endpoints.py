@@ -17,6 +17,7 @@ from app.services.llm_stream_service import stream_response
 from app.services.multi_agent_orchestrator import multi_agent_orchestrator
 from app.services.agent_router import agent_router
 from app.services.hitl_manager import hitl_manager
+from app.services.database import Database, get_db, SessionModel
 from app.agents.base_agent import AgentType
 
 logger = logging.getLogger("agent-runtime.api")
@@ -455,26 +456,43 @@ async def get_session_history(session_id: str):
 
 
 @router.get("/sessions")
-async def list_sessions():
+async def list_sessions(db: Database = Depends(get_db)):
     """
-    List all active sessions.
+    List all active sessions with metadata.
     
     Returns:
-        List of session IDs with basic info
+        List of sessions with title, description, and basic info
     """
     logger.debug("Listing all sessions")
     
-    sessions = session_manager.all_sessions()
-    
     session_list = []
-    for session in sessions:
-        current_agent = multi_agent_orchestrator.get_current_agent(session.session_id)
-        session_list.append({
-            "session_id": session.session_id,
-            "message_count": len(session.messages),
-            "last_activity": session.last_activity.isoformat(),
-            "current_agent": current_agent.value if current_agent else None
-        })
+    
+    # Get all sessions with metadata in one query
+    with db.session_scope() as db_session:
+        sessions = db_session.query(SessionModel).filter(
+            SessionModel.deleted_at.is_(None)
+        ).order_by(SessionModel.last_activity.desc()).all()
+        
+        for session_model in sessions:
+            session_id = session_model.session_id
+            
+            # Load session data for message count
+            session_data = db.load_session(session_id)
+            message_count = len(session_data.get("messages", [])) if session_data else 0
+            
+            # Get current agent
+            current_agent = multi_agent_orchestrator.get_current_agent(session_id)
+            
+            session_info = {
+                "session_id": session_id,
+                "message_count": message_count,
+                "last_activity": session_model.last_activity.isoformat() if session_model.last_activity else None,
+                "current_agent": current_agent.value if current_agent else None,
+                "title": session_model.title,
+                "description": session_model.description,
+                "created_at": session_model.created_at.isoformat() if session_model.created_at else None
+            }
+            session_list.append(session_info)
     
     return {
         "sessions": session_list,

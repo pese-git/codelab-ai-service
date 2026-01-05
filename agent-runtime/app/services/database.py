@@ -89,6 +89,8 @@ class SessionModel(Base):
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     session_id = Column(String(255), unique=True, nullable=False, index=True)
+    title = Column(String(500), nullable=True, comment="Session title from first user message")
+    description = Column(Text, nullable=True, comment="Session description from LLM summarization")
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     last_activity = Column(DateTime, nullable=False, index=True, default=lambda: datetime.now(timezone.utc))
     is_active = Column(Boolean, default=True, index=True)
@@ -110,6 +112,8 @@ class SessionModel(Base):
         return {
             "id": self.id,
             "session_id": self.session_id,
+            "title": self.title,
+            "description": self.description,
             "created_at": self.created_at,
             "last_activity": self.last_activity,
             "is_active": self.is_active,
@@ -324,6 +328,7 @@ class Database:
         Save or update session state with messages.
         
         Uses atomic transaction to prevent data loss between delete and insert operations.
+        Automatically sets title from first user message if not already set.
         
         Args:
             session_id: Session identifier
@@ -337,6 +342,7 @@ class Database:
                 SessionModel.deleted_at.is_(None)
             ).first()
             
+            is_new_session = False
             if not session:
                 # Create new session
                 session = SessionModel(
@@ -347,12 +353,22 @@ class Database:
                 )
                 db.add(session)
                 db.flush()  # Get ID
+                is_new_session = True
                 logger.info(f"Created new session {session_id} in database")
             else:
                 # Update existing session
                 session.last_activity = last_activity
                 session.is_active = True
                 logger.debug(f"Updated session {session_id} in database")
+            
+            # Auto-set title from first user message if not already set
+            if not session.title and messages:
+                first_user_msg = next((msg for msg in messages if msg.get("role") == "user"), None)
+                if first_user_msg and first_user_msg.get("content"):
+                    # Take first 500 chars as title
+                    content = first_user_msg["content"]
+                    session.title = content[:500] if len(content) > 500 else content
+                    logger.debug(f"Auto-set title for session {session_id}")
             
             # Atomic replacement: prepare new messages first, then replace in single transaction
             # This ensures we don't lose data if operation fails midway
@@ -925,6 +941,57 @@ class Database:
             
             approval.status = status
             logger.info(f"Updated approval status: call_id={call_id}, status={status}")
+            return True
+
+
+    def update_session_title(self, session_id: str, title: str) -> bool:
+        """
+        Update session title.
+        
+        Args:
+            session_id: Session identifier
+            title: New title (will be truncated to 500 chars)
+            
+        Returns:
+            True if updated, False if session not found
+        """
+        with self.session_scope() as db:
+            session = db.query(SessionModel).filter(
+                SessionModel.session_id == session_id,
+                SessionModel.deleted_at.is_(None)
+            ).first()
+            
+            if not session:
+                logger.warning(f"Session not found for title update: {session_id}")
+                return False
+            
+            session.title = title[:500] if len(title) > 500 else title
+            logger.info(f"Updated title for session {session_id}")
+            return True
+    
+    def update_session_description(self, session_id: str, description: str) -> bool:
+        """
+        Update session description (typically from LLM summarization).
+        
+        Args:
+            session_id: Session identifier
+            description: New description from LLM
+            
+        Returns:
+            True if updated, False if session not found
+        """
+        with self.session_scope() as db:
+            session = db.query(SessionModel).filter(
+                SessionModel.session_id == session_id,
+                SessionModel.deleted_at.is_(None)
+            ).first()
+            
+            if not session:
+                logger.warning(f"Session not found for description update: {session_id}")
+                return False
+            
+            session.description = description
+            logger.info(f"Updated description for session {session_id}")
             return True
 
 
