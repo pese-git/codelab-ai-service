@@ -14,16 +14,45 @@
 
 *Все сервисы масштабируемы и легко расширяются — реализация новых LLM, инструментов, очередей или версий API не требует переписывания других компонентов.*
 
+### 🔒 Nginx Reverse Proxy
+
+**Новое:** Все внешние запросы теперь проходят через Nginx reverse proxy (порт 80), который обеспечивает:
+- Единую точку входа для всех API
+- Изоляцию внутренних сервисов от прямого доступа
+- Поддержку WebSocket соединений
+- Гибкую маршрутизацию запросов
+
+**Маршрутизация через Nginx:**
+- `/oauth/*` → auth-service (OAuth2 endpoints)
+- `/.well-known/*` → auth-service (JWKS endpoints)
+- `/api/v1/*` → gateway (REST API)
+- `/api/v1/ws/{session_id}` → gateway (WebSocket)
+
+Подробная документация: [nginx/README.md](nginx/README.md)
+
 Актуальные routes и схемы обмена между сервисами:
 
-| Сервис         | REST/SSE endpoint                         | WebSocket endpoint         | Особенности                       |
+| Сервис         | Внешний доступ (через Nginx)              | Внутренний endpoint        | Особенности                       |
 |----------------|:------------------------------------------|----------------------------|------------------------------------|
-| gateway        | /health                                  | /ws/{session_id}           | Через WebSocket проксирует стримовые токены между IDE и agent-runtime |
-| agent-runtime  | /health, /agent/message/stream           |                            | Проксирует SSE к llm-proxy на /v1/chat/completions, нужен x-internal-auth |
-| llm-proxy      | /health, /v1/llm/models, /v1/chat/completions |                            | SSE, REST endpoint, все требуют x-internal-auth |
+| nginx          | :80 (все запросы)                        | -                          | Reverse proxy для auth и gateway |
+| auth-service   | /oauth/*, /.well-known/*                 | :8003 (внутренний)         | OAuth2 и JWKS endpoints |
+| gateway        | /api/v1/*, /ws                           | :8000 (внутренний)         | Через WebSocket проксирует стримовые токены между IDE и agent-runtime |
+| agent-runtime  | -                                        | :8001, /agent/message/stream | Проксирует SSE к llm-proxy на /v1/chat/completions, нужен x-internal-auth |
+| llm-proxy      | -                                        | :8002, /v1/llm/models, /v1/chat/completions | SSE, REST endpoint, все требуют x-internal-auth |
 
-**Документация по микросервисам и всем актуальным REST/WebSocket API** — см. внутренний  `README.md` соответствующего сервиса ([gateway/README.md](gateway/README.md), [agent-runtime/README.md](agent-runtime/README.md), [llm-proxy/README.md](llm-proxy/README.md)).
+**Документация по микросервисам и всем актуальным REST/WebSocket API** — см. внутренний  `README.md` соответствующего сервиса ([nginx/README.md](nginx/README.md), [auth-service/README.md](auth-service/README.md), [gateway/README.md](gateway/README.md), [agent-runtime/README.md](agent-runtime/README.md), [llm-proxy/README.md](llm-proxy/README.md)).
 
+### Nginx Reverse Proxy
+- Единая точка входа для всех API запросов
+- Маршрутизация между auth-service и gateway
+- Поддержка WebSocket и HTTP/REST
+- Изоляция внутренних сервисов
+
+### Auth Service
+- OAuth2 аутентификация и авторизация
+- JWT токены (access и refresh)
+- JWKS endpoints для публичных ключей
+- Управление пользователями и сессиями
 
 ### Gateway Service
 - WebSocket прокси между IDE и Agent
@@ -117,11 +146,20 @@ docker compose up -d
 ```
 
 Эта команда запустит все необходимые сервисы:
-- **gateway** (порт 8000) - WebSocket прокси между IDE и Agent
-- **agent-runtime** (порт 8001) - основная AI логика
-- **llm-proxy** (порт 8002) - унифицированный доступ к LLM провайдерам
-- **litellm-proxy** (порт 4000) - прокси для различных LLM API
-- **ollama** (порт 11434) - локальный сервер для запуска LLM моделей
+
+**Публичный сервис (доступен извне):**
+- **nginx** (порт 80) - reverse proxy для auth-service и gateway
+
+**Сервисы за Nginx (доступны только через proxy):**
+- **auth-service** (внутренний) - OAuth2 аутентификация
+- **gateway** (внутренний) - WebSocket прокси между IDE и Agent
+
+**Внутренние сервисы (доступны только внутри Docker сети):**
+- **agent-runtime** (внутренний) - основная AI логика
+- **llm-proxy** (внутренний) - унифицированный доступ к LLM провайдерам
+- **litellm-proxy** (внутренний) - прокси для различных LLM API
+- **ollama** (внутренний) - локальный сервер для запуска LLM моделей
+- **redis** (внутренний) - кэш и хранилище сессий
 
 ### 🤖 Загрузка локальных моделей в Ollama
 
@@ -177,34 +215,37 @@ docker compose up -d --build
 
 ## 🔍 Проверка работоспособности
 
-Проверьте статус сервисов (health):
+Проверьте статус публичных сервисов через Nginx:
 ```bash
-curl http://localhost:8000/health  # gateway
-curl http://localhost:8001/health  # agent-runtime
-curl http://localhost:8002/health  # llm-proxy
+curl http://localhost/                  # Информация о доступных endpoints
+curl http://localhost/nginx-health      # nginx proxy
+curl http://localhost/auth-health       # auth-service
+curl http://localhost/gateway-health    # gateway
 ```
+
+**Примечание:** Внутренние сервисы (agent-runtime, llm-proxy, litellm-proxy, ollama, redis) доступны только внутри Docker сети и не имеют прямого внешнего доступа для повышения безопасности.
 
 ## 🔌 Примеры работы с актуальными endpoint'ами
 
-### Примеры API запросов
+### Примеры API запросов через Nginx
 
 ```bash
-# Получить список LLM моделей
-curl -X GET http://localhost:8002/v1/llm/models \
-  -H "X-Internal-Auth: ${LLM_PROXY__INTERNAL_API_KEY}"
+# Аутентификация через auth-service (через Nginx)
+curl -X POST http://localhost/oauth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=password&username=user&password=pass"
 
-# Потоковое общение через agent-runtime (SSE)
-curl -X POST http://localhost:8001/agent/message/stream \
-  -H "X-Internal-Auth: ${AGENT_RUNTIME__INTERNAL_API_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{"session_id": "demo", "type": "user_message", "content": "Тест!"}'
+# Получение JWKS (публичные ключи)
+curl http://localhost/.well-known/jwks.json
 
-# Прямой запрос к LLM-proxy (SSE, token-by-token, совместимо с OpenAI)
-curl -X POST http://localhost:8002/v1/chat/completions \
-  -H "X-Internal-Auth: ${LLM_PROXY__INTERNAL_API_KEY}" \
+# Gateway API запрос (через Nginx)
+curl -X POST http://localhost/api/v1/sessions \
+  -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"model": "gpt-4", "messages": [{"role": "user", "content": "Say hello!"}], "stream": true, "temperature": 1}'
+  -d '{"data": "example"}'
 ```
+
+**Примечание:** Внутренние сервисы (agent-runtime, llm-proxy, litellm-proxy, ollama) доступны только внутри Docker сети. Gateway автоматически взаимодействует с ними через внутренние API с использованием X-Internal-Auth заголовков.
 
 Формат SSE-ответа:
 ```
@@ -217,9 +258,11 @@ data: [DONE]
 
 ## 🔌 WebSocket API
 
-Подключение к WebSocket:
+Подключение к WebSocket через Nginx:
 ```javascript
-const ws = new WebSocket('ws://localhost:8000/ws/{session_id}');
+// Подключение через Nginx (рекомендуется)
+const sessionId = 'my-session-id';
+const ws = new WebSocket(`ws://localhost/api/v1/ws/${sessionId}`);
 
 // Отправка сообщения
 ws.send(JSON.stringify({

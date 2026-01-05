@@ -5,8 +5,17 @@ from app.api.v1.endpoints import router as v1_router
 from app.core.config import AppConfig
 from app.middleware.internal_auth import InternalAuthMiddleware
 from app.middleware.jwt_auth import HybridAuthMiddleware
+from app.models.rest import HealthResponse
 
 app = FastAPI(title="Gateway Service")
+
+
+@app.get("/health", response_model=HealthResponse)
+async def health_check():
+    """Health check endpoint в корне приложения для Docker healthcheck"""
+    return HealthResponse.model_construct(
+        status="healthy", service="gateway", version=AppConfig.VERSION
+    )
 
 
 def custom_openapi():

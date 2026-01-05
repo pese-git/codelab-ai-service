@@ -1,10 +1,31 @@
 services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "${NGINX_PORT:-80}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      gateway:
+        condition: service_healthy
+    networks:
+      - codelab-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/nginx-health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
   auth-service:
     build:
       context: ./auth-service
       dockerfile: Dockerfile
-    ports:
-      - "${AUTH_SERVICE_PORT:-8003}:8003"
+    # Убираем внешний порт - доступ только через nginx
+    expose:
+      - "8003"
     volumes:
       - ./auth-service/data:/app/data
       - ./auth-service/keys:/app/keys
@@ -35,8 +56,9 @@ services:
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    # Внутренний сервис - доступ только внутри Docker сети
+    expose:
+      - "6379"
     networks:
       - codelab-network
     healthcheck:
@@ -49,8 +71,9 @@ services:
     build:
       context: ./gateway
       dockerfile: Dockerfile
-    ports:
-      - "${GATEWAY_PORT}:${GATEWAY_PORT}"
+    # Убираем внешний порт - доступ только через nginx
+    expose:
+      - "${GATEWAY_PORT}"
     environment:
       - ENVIRONMENT=${ENVIRONMENT}
       - PORT=${GATEWAY_PORT}
@@ -79,8 +102,9 @@ services:
     build:
       context: ./agent-runtime
       dockerfile: Dockerfile
-    ports:
-      - "${AGENT_RUNTIME_PORT}:${AGENT_RUNTIME_PORT}"
+    # Внутренний сервис - доступ только внутри Docker сети
+    expose:
+      - "${AGENT_RUNTIME_PORT}"
     volumes:
       # Монтируем директорию data для персистентности SQLite базы данных
       - ./agent-runtime/data:/app/data
@@ -112,8 +136,9 @@ services:
     build:
       context: ./llm-proxy
       dockerfile: Dockerfile
-    ports:
-      - "${LLM_PROXY_PORT}:${LLM_PROXY_PORT}"
+    # Внутренний сервис - доступ только внутри Docker сети
+    expose:
+      - "${LLM_PROXY_PORT}"
     environment:
       - ENVIRONMENT=${ENVIRONMENT}
       - PORT=${LLM_PROXY_PORT}
@@ -139,8 +164,9 @@ services:
 
   litellm-proxy:
     image: ghcr.io/berriai/litellm:main-latest
-    ports:
-      - "4000:4000"
+    # Внутренний сервис - доступ только внутри Docker сети
+    expose:
+      - "4000"
     volumes:
       - ./litellm_config.yaml:/app/config.yaml
     environment:
@@ -167,8 +193,9 @@ services:
 
   ollama:
     image: ollama/ollama:latest
-    ports:
-      - "11434:11434"
+    # Внутренний сервис - доступ только внутри Docker сети
+    expose:
+      - "11434"
     volumes:
       - ollama-data:/root/.ollama
     environment:
