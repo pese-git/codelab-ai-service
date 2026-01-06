@@ -53,7 +53,7 @@ class RefreshToken(Base):
 
     # Expiration
     expires_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         nullable=False,
         index=True,
     )
@@ -66,7 +66,7 @@ class RefreshToken(Base):
         index=True,
     )
     revoked_at: Mapped[datetime | None] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         nullable=True,
     )
 
@@ -79,7 +79,7 @@ class RefreshToken(Base):
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
