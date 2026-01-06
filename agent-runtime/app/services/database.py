@@ -103,7 +103,6 @@ class SessionModel(Base):
         default=lambda: str(uuid.uuid4()),
     )
     
-    session_id: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     title: Mapped[str | None] = mapped_column(String(500), nullable=True, comment="Session title from first user message")
     description: Mapped[str | None] = mapped_column(Text, nullable=True, comment="Session description from LLM summarization")
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
@@ -112,21 +111,26 @@ class SessionModel(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # Soft delete
     
     # Relationships
-    messages = relationship("MessageModel", back_populates="session", 
+    messages = relationship("MessageModel", back_populates="session",
                           cascade="all, delete-orphan", lazy="dynamic")
-    agent_context = relationship("AgentContextModel", back_populates="session", 
+    agent_context = relationship("AgentContextModel", back_populates="session",
                                 uselist=False, cascade="all, delete-orphan")
     
     __table_args__ = (
-        Index('idx_session_activity', 'session_id', 'last_activity'),
+        Index('idx_session_activity', 'id', 'last_activity'),
         Index('idx_active_sessions', 'is_active', 'last_activity'),
     )
+    
+    @property
+    def session_id(self) -> str:
+        """Alias for id (backward compatibility)"""
+        return self.id
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
         return {
             "id": self.id,
-            "session_id": self.session_id,
+            "session_id": self.session_id,  # Uses @property
             "title": self.title,
             "description": self.description,
             "created_at": self.created_at,
@@ -371,7 +375,7 @@ class Database:
         with self.session_scope() as db:
             # Get or create session
             session = db.query(SessionModel).filter(
-                SessionModel.session_id == session_id,
+                SessionModel.id == session_id,
                 SessionModel.deleted_at.is_(None)
             ).first()
             
@@ -379,7 +383,7 @@ class Database:
             if not session:
                 # Create new session
                 session = SessionModel(
-                    session_id=session_id,
+                    id=session_id,
                     created_at=datetime.now(timezone.utc),
                     last_activity=last_activity,
                     is_active=True
@@ -450,7 +454,7 @@ class Database:
         """
         with self.session_scope() as db:
             session = db.query(SessionModel).filter(
-                SessionModel.session_id == session_id,
+                SessionModel.id == session_id,
                 SessionModel.deleted_at.is_(None)
             ).first()
             
@@ -463,7 +467,7 @@ class Database:
             ).order_by(MessageModel.timestamp.asc()).all()
             
             return {
-                "session_id": session.session_id,
+                "session_id": session.id,  # Use id directly
                 "messages": [msg.to_dict() for msg in messages],
                 "last_activity": session.last_activity,
                 "created_at": session.created_at
@@ -482,7 +486,7 @@ class Database:
         """
         with self.session_scope() as db:
             session = db.query(SessionModel).filter(
-                SessionModel.session_id == session_id
+                SessionModel.id == session_id
             ).first()
             
             if not session:
@@ -511,7 +515,7 @@ class Database:
             List of session IDs
         """
         with self.session_scope() as db:
-            query = db.query(SessionModel.session_id)
+            query = db.query(SessionModel.id)
             
             if not include_deleted:
                 query = query.filter(SessionModel.deleted_at.is_(None))
@@ -538,7 +542,7 @@ class Database:
         """
         with self.session_scope() as db:
             session = db.query(SessionModel).filter(
-                SessionModel.session_id == session_id,
+                SessionModel.id == session_id,
                 SessionModel.deleted_at.is_(None)
             ).first()
             
@@ -566,7 +570,7 @@ class Database:
         """
         with self.session_scope() as db:
             session = db.query(SessionModel).filter(
-                SessionModel.session_id == session_id,
+                SessionModel.id == session_id,
                 SessionModel.deleted_at.is_(None)
             ).first()
             
@@ -617,7 +621,7 @@ class Database:
         with self.session_scope() as db:
             # Get session
             session = db.query(SessionModel).filter(
-                SessionModel.session_id == session_id,
+                SessionModel.id == session_id,
                 SessionModel.deleted_at.is_(None)
             ).first()
             
@@ -684,7 +688,7 @@ class Database:
         """
         with self.session_scope() as db:
             session = db.query(SessionModel).filter(
-                SessionModel.session_id == session_id,
+                SessionModel.id == session_id,
                 SessionModel.deleted_at.is_(None)
             ).first()
             
@@ -735,7 +739,7 @@ class Database:
         """
         with self.session_scope() as db:
             session = db.query(SessionModel).filter(
-                SessionModel.session_id == session_id
+                SessionModel.id == session_id
             ).first()
             
             if not session:
@@ -761,7 +765,7 @@ class Database:
             List of session IDs
         """
         with self.session_scope() as db:
-            results = db.query(SessionModel.session_id).join(
+            results = db.query(SessionModel.id).join(
                 AgentContextModel,
                 SessionModel.id == AgentContextModel.session_db_id
             ).filter(
@@ -787,7 +791,7 @@ class Database:
         """
         with self.session_scope() as db:
             session = db.query(SessionModel).filter(
-                SessionModel.session_id == session_id,
+                SessionModel.id == session_id,
                 SessionModel.deleted_at.is_(None)
             ).first()
             
@@ -990,7 +994,7 @@ class Database:
         """
         with self.session_scope() as db:
             session = db.query(SessionModel).filter(
-                SessionModel.session_id == session_id,
+                SessionModel.id == session_id,
                 SessionModel.deleted_at.is_(None)
             ).first()
             
@@ -1015,7 +1019,7 @@ class Database:
         """
         with self.session_scope() as db:
             session = db.query(SessionModel).filter(
-                SessionModel.session_id == session_id,
+                SessionModel.id == session_id,
                 SessionModel.deleted_at.is_(None)
             ).first()
             

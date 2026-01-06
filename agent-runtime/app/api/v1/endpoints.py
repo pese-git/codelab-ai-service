@@ -510,7 +510,7 @@ async def list_sessions(db: Database = Depends(get_db)):
 
 
 @router.post("/sessions")
-async def create_session():
+async def create_session(db: Database = Depends(get_db)):
     """
     Create a new session explicitly.
     
@@ -522,11 +522,19 @@ async def create_session():
     """
     logger.info("Creating new session")
     
-    # Generate unique session ID
-    import uuid
-    session_id = f"session_{uuid.uuid4().hex[:16]}"
+    # Create session in database first to get auto-generated UUID
+    from datetime import datetime, timezone
+    with db.session_scope() as db_session:
+        new_session = SessionModel(
+            created_at=datetime.now(timezone.utc),
+            last_activity=datetime.now(timezone.utc),
+            is_active=True
+        )
+        db_session.add(new_session)
+        db_session.flush()  # Get the auto-generated id
+        session_id = new_session.id
     
-    # Create session with empty system prompt (will be set by agent)
+    # Create session in memory (will load from DB if exists)
     session = session_manager.get_or_create(
         session_id,
         system_prompt=""
