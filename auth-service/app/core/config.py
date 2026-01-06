@@ -4,6 +4,7 @@ import logging
 import os
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -38,6 +39,7 @@ class Settings(BaseSettings):
     public_key_path: str = "/app/keys/public_key.pem"
 
     # Security
+    master_key: str | None = None  # Default admin password (if None, will be auto-generated)
     enable_rate_limiting: bool = True  # Enable/disable rate limiting
     rate_limit_per_ip: int = 5  # requests per minute
     rate_limit_per_username: int = 10  # requests per hour
@@ -49,6 +51,14 @@ class Settings(BaseSettings):
 
     # Version
     version: str = "0.1.0"
+
+    @field_validator('master_key', mode='before')
+    @classmethod
+    def validate_master_key(cls, v):
+        """Convert empty string to None"""
+        if v == "" or v is None:
+            return None
+        return v
 
     @property
     def is_production(self) -> bool:

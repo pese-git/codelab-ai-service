@@ -35,6 +35,7 @@ services:
       - AUTH_SERVICE__DB_URL=sqlite:///data/auth.db
       - AUTH_SERVICE__REDIS_URL=redis://redis:6379/1
       - AUTH_SERVICE__LOG_LEVEL=${AUTH_SERVICE__LOG_LEVEL:-DEBUG}
+      - AUTH_SERVICE__MASTER_KEY=${AUTH_SERVICE__MASTER_KEY}
       - AUTH_SERVICE__ENABLE_RATE_LIMITING=${AUTH_SERVICE__ENABLE_RATE_LIMITING:-false}
       - AUTH_SERVICE__JWT_ISSUER=https://auth.codelab.local
       - AUTH_SERVICE__JWT_AUDIENCE=codelab-api

@@ -1,14 +1,23 @@
 """Database seeding with default data"""
 
 import json
+import secrets
+import string
 
 from sqlalchemy import select
 
-from app.core.config import logger
+from app.core.config import logger, settings
 from app.models import OAuthClient, User
 from app.models.database import async_session_maker
 from app.schemas.oauth import GrantType
 from app.utils.crypto import hash_password
+
+
+def generate_secure_password(length: int = 16) -> str:
+    """Generate a secure random password"""
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+    password = ''.join(secrets.choice(alphabet) for _ in range(length))
+    return password
 
 
 async def seed_default_data():
@@ -33,9 +42,25 @@ async def _create_default_user(db):
         logger.debug("Admin user already exists")
         return
 
-    # Create admin user
+    # Create admin user with MASTER_KEY password or generate one
     try:
-        password_hash = hash_password("admin123")
+        # Debug: log the master_key value
+        logger.debug(f"settings.master_key value: '{settings.master_key}' (type: {type(settings.master_key)})")
+        
+        # Use MASTER_KEY if provided, otherwise generate secure password
+        if settings.master_key:
+            admin_password = settings.master_key
+            logger.info(f"Using MASTER_KEY from environment for admin password (length: {len(admin_password)})")
+        else:
+            admin_password = generate_secure_password()
+            logger.warning("=" * 80)
+            logger.warning("MASTER_KEY not set! Generated random admin password:")
+            logger.warning(f"Username: admin")
+            logger.warning(f"Password: {admin_password}")
+            logger.warning("PLEASE SAVE THIS PASSWORD - IT WILL NOT BE SHOWN AGAIN!")
+            logger.warning("=" * 80)
+        
+        password_hash = hash_password(admin_password)
         admin = User(
             username="admin",
             email="admin@codelab.local",
@@ -45,7 +70,7 @@ async def _create_default_user(db):
         )
 
         db.add(admin)
-        logger.info("✓ Admin user created (username: admin, password: admin123)")
+        logger.info("✓ Admin user created successfully")
     except Exception as e:
         logger.error(f"Failed to create admin user: {e}")
         raise
