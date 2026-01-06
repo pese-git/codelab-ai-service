@@ -17,16 +17,17 @@ Improved version with:
 """
 import json
 import logging
+import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from contextlib import contextmanager
 
 from sqlalchemy import (
-    create_engine, Column, String, Text, Integer, DateTime, Boolean,
+    create_engine, String, Text, Integer, DateTime, Boolean,
     ForeignKey, Index, CheckConstraint, func
 )
-from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
+from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship, Mapped, mapped_column
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.dialects.postgresql import JSON as PGJSON
 from sqlalchemy.types import JSON
@@ -47,16 +48,24 @@ class PendingApproval(Base):
     """
     __tablename__ = 'pending_approvals'
     
-    approval_id = Column(String(255), primary_key=True, comment="Unique approval identifier (same as call_id)")
-    session_id = Column(String(255), nullable=False, comment="Session identifier")
-    call_id = Column(String(255), nullable=False, comment="Tool call identifier")
-    tool_name = Column(String(255), nullable=False, comment="Name of the tool being called")
-    arguments = Column(JSON, nullable=False, comment="Tool arguments as JSON")
-    reason = Column(Text, nullable=True, comment="Reason why approval is required")
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), comment="When approval was requested")
-    status = Column(String(50), nullable=False, default='pending', comment="Status: pending, approved, rejected")
+    # Primary key
+    id: Mapped[str] = mapped_column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+    )
+    
+    approval_id: Mapped[str] = mapped_column(String(255), nullable=False, comment="Unique approval identifier (same as call_id)")
+    session_id: Mapped[str] = mapped_column(String(255), nullable=False, comment="Session identifier")
+    call_id: Mapped[str] = mapped_column(String(255), nullable=False, comment="Tool call identifier")
+    tool_name: Mapped[str] = mapped_column(String(255), nullable=False, comment="Name of the tool being called")
+    arguments: Mapped[dict] = mapped_column(JSON, nullable=False, comment="Tool arguments as JSON")
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True, comment="Reason why approval is required")
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), comment="When approval was requested")
+    status: Mapped[str] = mapped_column(String(50), nullable=False, default='pending', comment="Status: pending, approved, rejected")
     
     __table_args__ = (
+        Index('idx_pending_approvals_approval_id', 'approval_id'),
         Index('idx_pending_approvals_session_id', 'session_id'),
         Index('idx_pending_approvals_status', 'status'),
         Index('idx_pending_approvals_created_at', 'created_at'),
@@ -87,14 +96,20 @@ class SessionModel(Base):
     """SQLAlchemy model for session state"""
     __tablename__ = "sessions"
     
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    session_id = Column(String(255), unique=True, nullable=False, index=True)
-    title = Column(String(500), nullable=True, comment="Session title from first user message")
-    description = Column(Text, nullable=True, comment="Session description from LLM summarization")
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    last_activity = Column(DateTime, nullable=False, index=True, default=lambda: datetime.now(timezone.utc))
-    is_active = Column(Boolean, default=True, index=True)
-    deleted_at = Column(DateTime, nullable=True)  # Soft delete
+    # Primary key
+    id: Mapped[str] = mapped_column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+    )
+    
+    session_id: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    title: Mapped[str | None] = mapped_column(String(500), nullable=True, comment="Session title from first user message")
+    description: Mapped[str | None] = mapped_column(Text, nullable=True, comment="Session description from LLM summarization")
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    last_activity: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True, default=lambda: datetime.now(timezone.utc))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # Soft delete
     
     # Relationships
     messages = relationship("MessageModel", back_populates="session", 
@@ -125,17 +140,23 @@ class MessageModel(Base):
     """SQLAlchemy model for individual messages"""
     __tablename__ = "messages"
     
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    session_db_id = Column(Integer, ForeignKey("sessions.id", ondelete="CASCADE"),
+    # Primary key
+    id: Mapped[str] = mapped_column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+    )
+    
+    session_db_id: Mapped[str] = mapped_column(String(36), ForeignKey("sessions.id", ondelete="CASCADE"),
                           nullable=False, index=True)
-    role = Column(String(50), nullable=False, index=True)
-    content = Column(Text, nullable=True)  # Nullable for tool_calls messages
-    timestamp = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
-    name = Column(String(255), nullable=True)  # For tool names
-    tool_call_id = Column(String(255), nullable=True)  # For tool responses
-    tool_calls = Column(Text, nullable=True)  # JSON serialized tool calls
-    token_count = Column(Integer, nullable=True)
-    metadata_json = Column(Text, nullable=True)  # JSON serialized metadata
+    role: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    content: Mapped[str | None] = mapped_column(Text, nullable=True)  # Nullable for tool_calls messages
+    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    name: Mapped[str | None] = mapped_column(String(255), nullable=True)  # For tool names
+    tool_call_id: Mapped[str | None] = mapped_column(String(255), nullable=True)  # For tool responses
+    tool_calls: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON serialized tool calls
+    token_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON serialized metadata
     
     # Relationship
     session = relationship("SessionModel", back_populates="messages")
@@ -177,15 +198,21 @@ class AgentContextModel(Base):
     """SQLAlchemy model for agent context"""
     __tablename__ = "agent_contexts"
     
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    session_db_id = Column(Integer, ForeignKey("sessions.id", ondelete="CASCADE"),
+    # Primary key
+    id: Mapped[str] = mapped_column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+    )
+    
+    session_db_id: Mapped[str] = mapped_column(String(36), ForeignKey("sessions.id", ondelete="CASCADE"),
                           unique=True, nullable=False, index=True)
-    current_agent = Column(String(100), nullable=False, index=True)
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc),
+    current_agent: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc),
                        onupdate=lambda: datetime.now(timezone.utc))
-    switch_count = Column(Integer, nullable=False, default=0)
-    metadata_json = Column(Text, nullable=True)  # JSON serialized metadata
+    switch_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON serialized metadata
     
     # Relationships
     session = relationship("SessionModel", back_populates="agent_context")
@@ -209,14 +236,20 @@ class AgentSwitchModel(Base):
     """SQLAlchemy model for agent switch history"""
     __tablename__ = "agent_switches"
     
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    context_db_id = Column(Integer, ForeignKey("agent_contexts.id", ondelete="CASCADE"),
+    # Primary key
+    id: Mapped[str] = mapped_column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+    )
+    
+    context_db_id: Mapped[str] = mapped_column(String(36), ForeignKey("agent_contexts.id", ondelete="CASCADE"),
                           nullable=False, index=True)
-    from_agent = Column(String(100), nullable=True)  # NULL for first agent
-    to_agent = Column(String(100), nullable=False)
-    switched_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
-    reason = Column(Text, nullable=True)
-    metadata_json = Column(Text, nullable=True)  # JSON serialized metadata
+    from_agent: Mapped[str | None] = mapped_column(String(100), nullable=True)  # NULL for first agent
+    to_agent: Mapped[str] = mapped_column(String(100), nullable=False)
+    switched_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON serialized metadata
     
     # Relationship
     context = relationship("AgentContextModel", back_populates="switches")
