@@ -1,7 +1,7 @@
 """Refresh Token model"""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -80,7 +80,7 @@ class RefreshToken(Base):
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
 
@@ -90,7 +90,7 @@ class RefreshToken(Base):
     @property
     def is_expired(self) -> bool:
         """Check if token is expired"""
-        return datetime.utcnow() > self.expires_at
+        return datetime.now(timezone.utc) > self.expires_at
 
     @property
     def is_valid(self) -> bool:

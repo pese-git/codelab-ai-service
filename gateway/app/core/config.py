@@ -17,6 +17,8 @@ class AppConfig:
     # Auth Service settings
     AUTH_SERVICE_URL: str = os.getenv("GATEWAY__AUTH_SERVICE_URL", "http://auth-service:8003")
     USE_JWT_AUTH: bool = os.getenv("GATEWAY__USE_JWT_AUTH", "false").lower() == "true"
+    JWT_ISSUER: str = os.getenv("GATEWAY__JWT_ISSUER", "https://auth.codelab.local")
+    JWT_AUDIENCE: str = os.getenv("GATEWAY__JWT_AUDIENCE", "codelab-api")
     
     @property
     def JWKS_URL(self) -> str:

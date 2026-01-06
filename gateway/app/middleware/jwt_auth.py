@@ -14,9 +14,11 @@ from app.core.config import AppConfig, logger
 class JWTAuthMiddleware(BaseHTTPMiddleware):
     """Middleware for JWT token validation"""
 
-    def __init__(self, app, jwks_url: str, cache_ttl: int = 3600):
+    def __init__(self, app, jwks_url: str, issuer: str, audience: str, cache_ttl: int = 3600):
         super().__init__(app)
         self.jwks_url = jwks_url
+        self.issuer = issuer
+        self.audience = audience
         self.jwks_cache = None
         self.jwks_cache_time = 0
         self.cache_ttl = cache_ttl
@@ -70,8 +72,9 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
                 token,
                 jwks,
                 algorithms=["RS256"],
-                audience="codelab-api",
-                options={"verify_exp": True, "verify_aud": True},
+                audience=self.audience,
+                issuer=self.issuer,
+                options={"verify_exp": True, "verify_aud": True, "verify_iss": True},
             )
 
             # Check token type
@@ -112,9 +115,9 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
 class HybridAuthMiddleware(BaseHTTPMiddleware):
     """Hybrid middleware supporting both JWT and X-Internal-Auth"""
 
-    def __init__(self, app, jwks_url: str, internal_api_key: str):
+    def __init__(self, app, jwks_url: str, issuer: str, audience: str, internal_api_key: str):
         super().__init__(app)
-        self.jwt_middleware = JWTAuthMiddleware(app, jwks_url)
+        self.jwt_middleware = JWTAuthMiddleware(app, jwks_url, issuer, audience)
         self.internal_api_key = internal_api_key
 
     async def dispatch(self, request: Request, call_next):

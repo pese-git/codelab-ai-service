@@ -65,6 +65,8 @@ if config.USE_JWT_AUTH:
     app.add_middleware(
         HybridAuthMiddleware,
         jwks_url=config.JWKS_URL,
+        issuer=config.JWT_ISSUER,
+        audience=config.JWT_AUDIENCE,
         internal_api_key=config.INTERNAL_API_KEY,
     )
 else:

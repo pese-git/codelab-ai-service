@@ -1,6 +1,6 @@
 """User service for user management"""
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -138,7 +138,7 @@ class UserService:
             return None
 
         # Update last login time
-        user.last_login_at = datetime.utcnow()
+        user.last_login_at = datetime.now(timezone.utc)
         await db.commit()
 
         logger.info(f"Authentication successful: {user.id} ({user.username})")
@@ -178,7 +178,7 @@ class UserService:
         if user_data.is_verified is not None:
             user.is_verified = user_data.is_verified
 
-        user.updated_at = datetime.utcnow()
+        user.updated_at = datetime.now(timezone.utc)
 
         await db.commit()
         await db.refresh(user)

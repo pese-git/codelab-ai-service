@@ -1,6 +1,6 @@
 """Refresh Token service for token rotation"""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,7 +41,7 @@ class RefreshTokenService:
             user_id=payload.sub,
             client_id=payload.client_id,
             scope=payload.scope,
-            expires_at=datetime.fromtimestamp(payload.exp),
+            expires_at=datetime.fromtimestamp(payload.exp, tz=timezone.utc),
             parent_jti_hash=parent_jti_hash,
         )
 
@@ -130,7 +130,7 @@ class RefreshTokenService:
             return False
 
         token.revoked = True
-        token.revoked_at = datetime.utcnow()
+        token.revoked_at = datetime.now(timezone.utc)
 
         await db.commit()
 
@@ -152,7 +152,7 @@ class RefreshTokenService:
         """
         # Revoke the token itself
         token.revoked = True
-        token.revoked_at = datetime.utcnow()
+        token.revoked_at = datetime.now(timezone.utc)
 
         # Find and revoke all tokens in the chain
         # (tokens with same user_id and client_id)
@@ -167,7 +167,7 @@ class RefreshTokenService:
 
         for t in tokens_to_revoke:
             t.revoked = True
-            t.revoked_at = datetime.utcnow()
+            t.revoked_at = datetime.now(timezone.utc)
 
         await db.commit()
 
@@ -191,7 +191,7 @@ class RefreshTokenService:
         Returns:
             Number of deleted tokens
         """
-        cutoff_date = datetime.utcnow() - timedelta(days=days_to_keep)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_to_keep)
 
         result = await db.execute(
             select(RefreshToken).where(RefreshToken.expires_at < cutoff_date)

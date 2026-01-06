@@ -1,7 +1,7 @@
 """Token service for JWT operations"""
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from jose import JWTError, jwt
 
@@ -38,7 +38,7 @@ class TokenService:
         if lifetime is None:
             lifetime = settings.access_token_lifetime
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         exp = now + timedelta(seconds=lifetime)
 
         payload = AccessTokenPayload(
@@ -85,7 +85,7 @@ class TokenService:
         if lifetime is None:
             lifetime = settings.refresh_token_lifetime
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         exp = now + timedelta(seconds=lifetime)
 
         payload = RefreshTokenPayload(
