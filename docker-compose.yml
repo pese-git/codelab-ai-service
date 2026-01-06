@@ -32,7 +32,7 @@ services:
     environment:
       - ENVIRONMENT=${ENVIRONMENT}
       - PORT=8003
-      - AUTH_SERVICE__DB_URL=sqlite:///data/auth.db
+      - AUTH_SERVICE__DB_URL=${AUTH_SERVICE__DB_URL:-sqlite:///data/auth.db}
       - AUTH_SERVICE__REDIS_URL=redis://redis:6379/1
       - AUTH_SERVICE__LOG_LEVEL=${AUTH_SERVICE__LOG_LEVEL:-DEBUG}
       - AUTH_SERVICE__MASTER_KEY=${AUTH_SERVICE__MASTER_KEY}
@@ -45,6 +45,8 @@ services:
       - AUTH_SERVICE__PUBLIC_KEY_PATH=/app/keys/public_key.pem
     depends_on:
       redis:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     networks:
       - codelab-network
@@ -64,6 +66,32 @@ services:
       - codelab-network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:16-alpine
+    # Внутренний сервис - доступ только внутри Docker сети
+    # Для разработки можно раскомментировать порт:
+    # ports:
+    #   - "5432:5432"
+    expose:
+      - "5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-codelab}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-codelab_password}
+      - POSTGRES_DB=${POSTGRES_DB:-codelab}
+      # Создание дополнительных баз данных при инициализации
+      - POSTGRES_MULTIPLE_DATABASES=agent_runtime,auth_db
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/init-postgres.sh:/docker-entrypoint-initdb.d/01-init-databases.sh:ro
+      - ./scripts/init-databases.sql:/docker-entrypoint-initdb.d/02-init-databases.sql:ro
+    networks:
+      - codelab-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-codelab}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -119,10 +147,12 @@ services:
       - AGENT_RUNTIME__MAX_CONCURRENT_REQUESTS=${AGENT_RUNTIME__MAX_CONCURRENT_REQUESTS}
       - AGENT_RUNTIME__REQUEST_TIMEOUT=${AGENT_RUNTIME__REQUEST_TIMEOUT}
       - AGENT_RUNTIME__LLM_MODEL=${AGENT_RUNTIME__LLM_MODEL}
-      # Путь к базе данных SQLite (будет храниться на хост-машине)
-      - AGENT_RUNTIME__DB_URL=sqlite:///data/agent_runtime.db
+      # Database URL: SQLite по умолчанию, можно переопределить через .env
+      - AGENT_RUNTIME__DB_URL=${AGENT_RUNTIME__DB_URL:-sqlite:///data/agent_runtime.db}
     depends_on:
       llm-proxy:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     networks:
       - codelab-network
@@ -256,6 +286,8 @@ services:
 
 volumes:
   ollama-data:
+    driver: local
+  postgres-data:
     driver: local
 
 networks:

@@ -1046,7 +1046,8 @@ def get_database() -> Database:
     """
     global _database_instance
     if _database_instance is None:
-        _database_instance = Database()
+        from app.core.config import AppConfig
+        _database_instance = Database(db_url=AppConfig.DB_URL)
     return _database_instance
 
 
