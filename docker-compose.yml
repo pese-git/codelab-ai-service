@@ -1,10 +1,79 @@
 services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "${NGINX_PORT:-80}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      gateway:
+        condition: service_healthy
+    networks:
+      - codelab-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/nginx-health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    # Убираем внешний порт - доступ только через nginx
+    expose:
+      - "8003"
+    volumes:
+      - ./auth-service/data:/app/data
+      - ./auth-service/keys:/app/keys
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT}
+      - PORT=8003
+      - AUTH_SERVICE__DB_URL=sqlite:///data/auth.db
+      - AUTH_SERVICE__REDIS_URL=redis://redis:6379/1
+      - AUTH_SERVICE__LOG_LEVEL=${AUTH_SERVICE__LOG_LEVEL:-DEBUG}
+      - AUTH_SERVICE__ENABLE_RATE_LIMITING=${AUTH_SERVICE__ENABLE_RATE_LIMITING:-false}
+      - AUTH_SERVICE__JWT_ISSUER=https://auth.codelab.local
+      - AUTH_SERVICE__JWT_AUDIENCE=codelab-api
+      - AUTH_SERVICE__ACCESS_TOKEN_LIFETIME=900
+      - AUTH_SERVICE__REFRESH_TOKEN_LIFETIME=2592000
+      - AUTH_SERVICE__PRIVATE_KEY_PATH=/app/keys/private_key.pem
+      - AUTH_SERVICE__PUBLIC_KEY_PATH=/app/keys/public_key.pem
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - codelab-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: ${HEALTHCHECK_INTERVAL}
+      timeout: ${HEALTHCHECK_TIMEOUT}
+      retries: ${HEALTHCHECK_RETRIES}
+      start_period: ${HEALTHCHECK_START_PERIOD}
+
+  redis:
+    image: redis:7-alpine
+    # Внутренний сервис - доступ только внутри Docker сети
+    expose:
+      - "6379"
+    networks:
+      - codelab-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   gateway:
     build:
       context: ./gateway
       dockerfile: Dockerfile
-    ports:
-      - "${GATEWAY_PORT}:${GATEWAY_PORT}"
+    # Убираем внешний порт - доступ только через nginx
+    expose:
+      - "${GATEWAY_PORT}"
     environment:
       - ENVIRONMENT=${ENVIRONMENT}
       - PORT=${GATEWAY_PORT}
@@ -15,6 +84,8 @@ services:
       - GATEWAY__WS_CLOSE_TIMEOUT=${GATEWAY__WS_CLOSE_TIMEOUT}
       - GATEWAY__MAX_CONCURRENT_REQUESTS=${GATEWAY__MAX_CONCURRENT_REQUESTS}
       - GATEWAY__REQUEST_TIMEOUT=${GATEWAY__REQUEST_TIMEOUT}
+      - GATEWAY__AUTH_SERVICE_URL=http://auth-service:8003
+      - GATEWAY__USE_JWT_AUTH=${GATEWAY__USE_JWT_AUTH:-false}
     depends_on:
       agent-runtime:
         condition: service_healthy
@@ -31,8 +102,9 @@ services:
     build:
       context: ./agent-runtime
       dockerfile: Dockerfile
-    ports:
-      - "${AGENT_RUNTIME_PORT}:${AGENT_RUNTIME_PORT}"
+    # Внутренний сервис - доступ только внутри Docker сети
+    expose:
+      - "${AGENT_RUNTIME_PORT}"
     volumes:
       # Монтируем директорию data для персистентности SQLite базы данных
       - ./agent-runtime/data:/app/data
@@ -64,8 +136,9 @@ services:
     build:
       context: ./llm-proxy
       dockerfile: Dockerfile
-    ports:
-      - "${LLM_PROXY_PORT}:${LLM_PROXY_PORT}"
+    # Внутренний сервис - доступ только внутри Docker сети
+    expose:
+      - "${LLM_PROXY_PORT}"
     environment:
       - ENVIRONMENT=${ENVIRONMENT}
       - PORT=${LLM_PROXY_PORT}
@@ -91,8 +164,9 @@ services:
 
   litellm-proxy:
     image: ghcr.io/berriai/litellm:main-latest
-    ports:
-      - "4000:4000"
+    # Внутренний сервис - доступ только внутри Docker сети
+    expose:
+      - "4000"
     volumes:
       - ./litellm_config.yaml:/app/config.yaml
     environment:
@@ -119,8 +193,9 @@ services:
 
   ollama:
     image: ollama/ollama:latest
-    ports:
-      - "11434:11434"
+    # Внутренний сервис - доступ только внутри Docker сети
+    expose:
+      - "11434"
     volumes:
       - ollama-data:/root/.ollama
     environment:

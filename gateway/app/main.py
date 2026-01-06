@@ -1,17 +1,28 @@
 from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi
 
 from app.api.v1.endpoints import router as v1_router
+from app.core.config import AppConfig
 from app.middleware.internal_auth import InternalAuthMiddleware
-from fastapi.openapi.utils import get_openapi
+from app.middleware.jwt_auth import HybridAuthMiddleware
+from app.models.rest import HealthResponse
 
 app = FastAPI(title="Gateway Service")
 
 
+@app.get("/health", response_model=HealthResponse)
+async def health_check():
+    """Health check endpoint в корне приложения для Docker healthcheck"""
+    return HealthResponse.model_construct(
+        status="healthy", service="gateway", version=AppConfig.VERSION
+    )
+
+
 def custom_openapi():
     """
-    Customize OpenAPI schema to include internal authentication.
+    Customize OpenAPI schema to include authentication.
     
-    Adds X-Internal-Auth security scheme to all endpoints.
+    Adds security schemes for both JWT and X-Internal-Auth.
     """
     if app.openapi_schema:
         return app.openapi_schema
@@ -23,17 +34,22 @@ def custom_openapi():
         routes=app.routes,
     )
     
-    # Add X-Internal-Auth security scheme
+    # Add security schemes
     openapi_schema["components"]["securitySchemes"] = {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+        },
         "XInternalAuth": {
             "type": "apiKey",
             "in": "header",
-            "name": "x-internal-auth"
-        }
+            "name": "x-internal-auth",
+        },
     }
     
-    # Apply security globally to all endpoints
-    openapi_schema["security"] = [{"XInternalAuth": []}]
+    # Apply security globally (either JWT or Internal Auth)
+    openapi_schema["security"] = [{"BearerAuth": []}, {"XInternalAuth": []}]
     
     app.openapi_schema = openapi_schema
     return app.openapi_schema
@@ -41,8 +57,21 @@ def custom_openapi():
 
 # Override OpenAPI schema generator
 app.openapi = custom_openapi  # type: ignore[assignment]
+
 # Подключение middleware авторизации
-app.add_middleware(InternalAuthMiddleware)
+config = AppConfig()
+if config.USE_JWT_AUTH:
+    # Use hybrid middleware (JWT + X-Internal-Auth)
+    app.add_middleware(
+        HybridAuthMiddleware,
+        jwks_url=config.JWKS_URL,
+        issuer=config.JWT_ISSUER,
+        audience=config.JWT_AUDIENCE,
+        internal_api_key=config.INTERNAL_API_KEY,
+    )
+else:
+    # Use only X-Internal-Auth (legacy)
+    app.add_middleware(InternalAuthMiddleware)
 
 # Подключение роутов API v1
 app.include_router(v1_router, prefix="/api/v1")
