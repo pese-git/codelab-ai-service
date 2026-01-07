@@ -45,6 +45,8 @@ class PendingApproval(Base):
     
     Stores tool calls that require user approval (HITL - Human-in-the-Loop).
     This ensures approval requests persist across IDE restarts and reinstalls.
+    
+    Note: call_id serves as the unique identifier (no separate approval_id needed).
     """
     __tablename__ = 'pending_approvals'
     
@@ -55,9 +57,9 @@ class PendingApproval(Base):
         default=lambda: str(uuid.uuid4()),
     )
     
-    approval_id: Mapped[str] = mapped_column(String(255), nullable=False, comment="Unique approval identifier (same as call_id)")
+    # Removed redundant approval_id - call_id is sufficient as unique identifier
+    call_id: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, comment="Tool call identifier (unique)")
     session_id: Mapped[str] = mapped_column(String(255), nullable=False, comment="Session identifier")
-    call_id: Mapped[str] = mapped_column(String(255), nullable=False, comment="Tool call identifier")
     tool_name: Mapped[str] = mapped_column(String(255), nullable=False, comment="Name of the tool being called")
     arguments: Mapped[dict] = mapped_column(JSON, nullable=False, comment="Tool arguments as JSON")
     reason: Mapped[str | None] = mapped_column(Text, nullable=True, comment="Reason why approval is required")
@@ -65,7 +67,7 @@ class PendingApproval(Base):
     status: Mapped[str] = mapped_column(String(50), nullable=False, default='pending', comment="Status: pending, approved, rejected")
     
     __table_args__ = (
-        Index('idx_pending_approvals_approval_id', 'approval_id'),
+        Index('idx_pending_approvals_call_id', 'call_id'),
         Index('idx_pending_approvals_session_id', 'session_id'),
         Index('idx_pending_approvals_status', 'status'),
         Index('idx_pending_approvals_created_at', 'created_at'),
@@ -74,9 +76,8 @@ class PendingApproval(Base):
     def to_dict(self) -> Dict[str, Any]:
         """Convert model to dictionary for API responses"""
         return {
-            'approval_id': self.approval_id,
-            'session_id': self.session_id,
             'call_id': self.call_id,
+            'session_id': self.session_id,
             'tool_name': self.tool_name,
             'arguments': self.arguments,
             'reason': self.reason,
@@ -86,7 +87,7 @@ class PendingApproval(Base):
     
     def __repr__(self) -> str:
         return (
-            f"<PendingApproval(approval_id='{self.approval_id}', "
+            f"<PendingApproval(call_id='{self.call_id}', "
             f"session_id='{self.session_id}', tool_name='{self.tool_name}', "
             f"status='{self.status}')>"
         )
@@ -873,7 +874,7 @@ class Database:
         
         Args:
             session_id: Session identifier
-            call_id: Tool call identifier (used as approval_id)
+            call_id: Tool call identifier (unique)
             tool_name: Name of the tool requiring approval
             arguments: Tool arguments
             reason: Reason why approval is required
@@ -888,9 +889,8 @@ class Database:
                 logger.warning(f"Pending approval already exists for call_id={call_id}")
                 return
             
-            # Create new pending approval
+            # Create new pending approval (no redundant approval_id field)
             approval = PendingApproval(
-                approval_id=call_id,  # Use call_id as approval_id
                 session_id=session_id,
                 call_id=call_id,
                 tool_name=tool_name,

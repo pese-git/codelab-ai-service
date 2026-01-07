@@ -524,33 +524,48 @@ async def create_session(db: Database = Depends(get_db)):
     
     # Create session in database first to get auto-generated UUID
     from datetime import datetime, timezone
-    with db.session_scope() as db_session:
-        new_session = SessionModel(
-            created_at=datetime.now(timezone.utc),
-            last_activity=datetime.now(timezone.utc),
-            is_active=True
+    session_id = None
+    
+    try:
+        with db.session_scope() as db_session:
+            new_session = SessionModel(
+                created_at=datetime.now(timezone.utc),
+                last_activity=datetime.now(timezone.utc),
+                is_active=True
+            )
+            db_session.add(new_session)
+            db_session.flush()  # Get the auto-generated id
+            session_id = new_session.id
+            # Commit happens here when exiting context
+        
+        # Create in-memory session AFTER database commit
+        # This avoids blocking the database transaction with in-memory operations
+        session = session_manager.get_or_create(
+            session_id,
+            system_prompt=""
         )
-        db_session.add(new_session)
-        db_session.flush()  # Get the auto-generated id
-        session_id = new_session.id
-    
-    # Create session in memory (will load from DB if exists)
-    session = session_manager.get_or_create(
-        session_id,
-        system_prompt=""
-    )
-    
-    # Initialize with orchestrator agent
-    multi_agent_orchestrator.get_current_agent(session_id)
-    
-    logger.info(f"Created new session: {session_id}")
-    
-    return {
-        "session_id": session_id,
-        "message_count": 0,
-        "current_agent": "orchestrator",
-        "created_at": session.last_activity.isoformat()
-    }
+        
+        # Initialize with orchestrator agent
+        multi_agent_orchestrator.get_current_agent(session_id)
+        
+        logger.info(f"Created new session: {session_id}")
+        
+        return {
+            "session_id": session_id,
+            "message_count": 0,
+            "current_agent": "orchestrator",
+            "created_at": session.last_activity.isoformat()
+        }
+        
+    except Exception as e:
+        # If in-memory initialization failed after DB commit, clean up database record
+        if session_id:
+            logger.error(f"Failed to initialize session {session_id}, cleaning up: {e}")
+            try:
+                db.delete_session(session_id, soft=False)
+            except Exception as cleanup_error:
+                logger.error(f"Failed to cleanup session {session_id}: {cleanup_error}")
+        raise
 
 
 @router.get("/sessions/{session_id}/pending-approvals")
