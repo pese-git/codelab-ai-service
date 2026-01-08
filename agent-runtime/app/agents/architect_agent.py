@@ -67,6 +67,10 @@ class ArchitectAgent(BaseAgent):
         """
         logger.info(f"Architect agent processing message for session {session_id}")
         
+        # Get async session manager
+        if session_manager is None:
+            raise RuntimeError("SessionManager not initialized")
+        
         # Get session history
         history = session_manager.get_history(session_id)
         
@@ -76,8 +80,8 @@ class ArchitectAgent(BaseAgent):
         else:
             history.insert(0, {"role": "system", "content": self.system_prompt})
         
-        # Delegate to LLM stream service with allowed tools
-        async for chunk in stream_response(session_id, history, self.allowed_tools):
+        # Delegate to LLM stream service with allowed tools (pass session_mgr)
+        async for chunk in stream_response(session_id, history, session_manager, self.allowed_tools):
             # Handle switch_mode tool call directly (don't send to IDE)
             if chunk.type == "tool_call" and chunk.tool_name == "switch_mode":
                 target_mode = chunk.arguments.get("mode", "orchestrator")

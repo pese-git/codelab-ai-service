@@ -11,7 +11,7 @@ from typing import AsyncGenerator, Dict, List, Optional, Tuple
 from app.core.config import AppConfig
 from app.models.schemas import StreamChunk
 from app.services.llm_proxy_client import llm_proxy_client
-from app.services.session_manager import session_manager
+from app.services.session_manager_async import AsyncSessionManager
 from app.services.tool_parser import parse_tool_calls
 from app.services.tool_registry import TOOLS_SPEC
 from app.services.hitl_policy_service import hitl_policy_service
@@ -23,7 +23,8 @@ logger = logging.getLogger("agent-runtime.llm_stream")
 async def stream_response(
     session_id: str,
     history: List[dict],
-    allowed_tools: Optional[List[str]] = None
+    allowed_tools: Optional[List[str]] = None,
+    session_mgr: Optional[AsyncSessionManager] = None
 ) -> AsyncGenerator[StreamChunk, None]:
     """
     Generate streaming response from LLM.
@@ -35,10 +36,18 @@ async def stream_response(
         session_id: Session identifier
         history: Message history for LLM
         allowed_tools: List of tool names allowed for this agent (None = all tools)
+        session_mgr: Async session manager (optional, uses global if None)
         
     Yields:
         StreamChunk: Chunks for SSE streaming (assistant_message, tool_call, or error)
     """
+    # Get session manager from global if not provided
+    if session_mgr is None:
+        from app.services.session_manager_async import session_manager as global_mgr
+        session_mgr = global_mgr
+        if session_mgr is None:
+            raise RuntimeError("SessionManager not initialized")
+    
     try:
         logger.info(
             f"Starting LLM stream for session {session_id} with {len(history)} messages"
@@ -153,7 +162,10 @@ async def stream_response(
                 f"Saving assistant message with tool_call: {tool_call.tool_name}"
             )
             
-            session_manager.get(session_id).messages.append(assistant_msg)
+            # Append assistant message with tool_call to session
+            session_state = session_mgr.get(session_id)
+            if session_state:
+                session_state.messages.append(assistant_msg)
             
             # Send tool_call chunk
             chunk = StreamChunk(
@@ -181,7 +193,8 @@ async def stream_response(
             clean_content = str(clean_content) if clean_content else ""
 
         # Save assistant message to history
-        session_manager.append_message(session_id, "assistant", clean_content)
+        # Note: append_message schedules persistence but doesn't need await
+        await session_mgr.append_message(session_id, "assistant", clean_content)
 
         logger.info(f"Sending assistant message: {len(clean_content)} chars")
 
