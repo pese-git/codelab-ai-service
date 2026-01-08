@@ -2,6 +2,7 @@
 Unit tests for AsyncSessionManager.
 """
 import pytest
+import pytest_asyncio
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
@@ -9,25 +10,35 @@ from app.services.session_manager_async import AsyncSessionManager
 from app.models.schemas import SessionState, Message
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def session_manager():
     """Create a fresh AsyncSessionManager instance for each test"""
     manager = AsyncSessionManager()
     await manager.initialize()
+    # Cancel background writer to avoid warnings
+    if manager._write_task:
+        manager._write_task.cancel()
+        try:
+            await manager._write_task
+        except:
+            pass
     return manager
 
 
+@pytest.mark.asyncio
 async def test_session_manager_init(session_manager):
     """Test AsyncSessionManager initialization"""
     assert session_manager._sessions == {}
     assert session_manager._lock is not None
 
 
+@pytest.mark.asyncio
 async def test_exists_returns_false_for_nonexistent_session(session_manager):
     """Test exists returns False for non-existent session"""
     assert session_manager.exists("nonexistent") is False
 
 
+@pytest.mark.asyncio
 async def test_exists_returns_true_for_existing_session(session_manager):
     """Test exists returns True for existing session"""
     session_id = "test_session"
@@ -35,6 +46,7 @@ async def test_exists_returns_true_for_existing_session(session_manager):
     assert session_manager.exists(session_id) is True
 
 
+@pytest.mark.asyncio
 async def test_create_session_success(session_manager):
     """Test successful session creation"""
     session_id = "test_session"
@@ -46,6 +58,7 @@ async def test_create_session_success(session_manager):
     assert session_manager.exists(session_id)
 
 
+@pytest.mark.asyncio
 async def test_create_session_with_system_prompt(session_manager):
     """Test session creation with system prompt"""
     session_id = "test_session"
@@ -58,6 +71,7 @@ async def test_create_session_with_system_prompt(session_manager):
     assert state.messages[0].content == system_prompt
 
 
+@pytest.mark.asyncio
 async def test_create_duplicate_session_raises_error(session_manager):
     """Test creating duplicate session raises ValueError"""
     session_id = "test_session"
@@ -67,6 +81,7 @@ async def test_create_duplicate_session_raises_error(session_manager):
         await session_manager.create(session_id)
 
 
+@pytest.mark.asyncio
 async def test_get_existing_session(session_manager):
     """Test getting existing session"""
     session_id = "test_session"
@@ -78,12 +93,14 @@ async def test_get_existing_session(session_manager):
     assert retrieved_state.session_id == created_state.session_id
 
 
+@pytest.mark.asyncio
 async def test_get_nonexistent_session_returns_none(session_manager):
     """Test getting non-existent session returns None"""
     result = session_manager.get("nonexistent")
     assert result is None
 
 
+@pytest.mark.asyncio
 async def test_get_or_create_creates_new_session(session_manager):
     """Test get_or_create creates new session if not exists"""
     session_id = "test_session"
@@ -95,6 +112,7 @@ async def test_get_or_create_creates_new_session(session_manager):
     assert session_manager.exists(session_id)
 
 
+@pytest.mark.asyncio
 async def test_get_or_create_returns_existing_session(session_manager):
     """Test get_or_create returns existing session"""
     session_id = "test_session"
@@ -105,6 +123,7 @@ async def test_get_or_create_returns_existing_session(session_manager):
     assert retrieved_state.session_id == created_state.session_id
 
 
+@pytest.mark.asyncio
 async def test_append_message_success(session_manager):
     """Test appending message to session"""
     session_id = "test_session"
@@ -118,6 +137,7 @@ async def test_append_message_success(session_manager):
     assert state.messages[0].content == "Hello"
 
 
+@pytest.mark.asyncio
 async def test_append_message_with_name(session_manager):
     """Test appending message with name field"""
     session_id = "test_session"
@@ -130,6 +150,7 @@ async def test_append_message_with_name(session_manager):
     assert state.messages[0].name == "tool_result"
 
 
+@pytest.mark.asyncio
 async def test_append_message_updates_last_activity(session_manager):
     """Test appending message updates last_activity timestamp"""
     session_id = "test_session"
@@ -142,12 +163,14 @@ async def test_append_message_updates_last_activity(session_manager):
     assert updated_state.last_activity > initial_time
 
 
+@pytest.mark.asyncio
 async def test_append_message_to_nonexistent_session_raises_error(session_manager):
     """Test appending message to non-existent session raises ValueError"""
     with pytest.raises(ValueError, match="Session nonexistent not found"):
         await session_manager.append_message("nonexistent", "user", "Hello")
 
 
+@pytest.mark.asyncio
 async def test_append_tool_result_success(session_manager):
     """Test appending tool result to session"""
     session_id = "test_session"
@@ -169,18 +192,21 @@ async def test_append_tool_result_success(session_manager):
     assert tool_msg["name"] == tool_name
 
 
+@pytest.mark.asyncio
 async def test_append_tool_result_to_nonexistent_session_raises_error(session_manager):
     """Test appending tool result to non-existent session raises ValueError"""
     with pytest.raises(ValueError, match="Session nonexistent not found"):
         await session_manager.append_tool_result("nonexistent", "call_123", "tool", "result")
 
 
+@pytest.mark.asyncio
 async def test_get_history_returns_empty_for_nonexistent_session(session_manager):
     """Test get_history returns empty list for non-existent session"""
     history = session_manager.get_history("nonexistent")
     assert history == []
 
 
+@pytest.mark.asyncio
 async def test_get_history_returns_messages_as_dicts(session_manager):
     """Test get_history returns messages as dictionaries"""
     session_id = "test_session"
@@ -198,6 +224,7 @@ async def test_get_history_returns_messages_as_dicts(session_manager):
     assert history[1]["content"] == "Hi there"
 
 
+@pytest.mark.asyncio
 async def test_get_history_handles_mixed_message_types(session_manager):
     """Test get_history handles both Pydantic models and dict messages"""
     session_id = "test_session"
@@ -219,12 +246,14 @@ async def test_get_history_handles_mixed_message_types(session_manager):
     assert all(isinstance(msg, dict) for msg in history)
 
 
+@pytest.mark.asyncio
 async def test_all_sessions_returns_empty_list_initially(session_manager):
     """Test all_sessions returns empty list when no sessions exist"""
     sessions = session_manager.all_sessions()
     assert sessions == []
 
 
+@pytest.mark.asyncio
 async def test_all_sessions_returns_all_created_sessions(session_manager):
     """Test all_sessions returns all created sessions"""
     await session_manager.create("session1")
@@ -238,6 +267,7 @@ async def test_all_sessions_returns_all_created_sessions(session_manager):
     assert session_ids == {"session1", "session2", "session3"}
 
 
+@pytest.mark.asyncio
 async def test_delete_existing_session(session_manager):
     """Test deleting existing session"""
     session_id = "test_session"
@@ -250,12 +280,14 @@ async def test_delete_existing_session(session_manager):
     assert session_manager.get(session_id) is None
 
 
+@pytest.mark.asyncio
 async def test_delete_nonexistent_session_does_not_raise(session_manager):
     """Test deleting non-existent session does not raise error"""
     # Should not raise any exception
     await session_manager.delete("nonexistent")
 
 
+@pytest.mark.asyncio
 async def test_thread_safety_with_lock(session_manager):
     """Test that operations use lock for async safety"""
     session_id = "test_session"
@@ -274,6 +306,7 @@ async def test_thread_safety_with_lock(session_manager):
     assert len(state.messages) == 1
 
 
+@pytest.mark.asyncio
 async def test_multiple_messages_in_session(session_manager):
     """Test adding multiple messages to a session"""
     session_id = "test_session"

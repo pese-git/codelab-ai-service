@@ -167,6 +167,7 @@ class TestAgentContext:
 class TestAgentContextManager:
     """Test agent context manager"""
     
+    @pytest.mark.asyncio
     async def test_get_or_create(self):
         """Test getting or creating context"""
         manager = AsyncAgentContextManager()
@@ -177,6 +178,7 @@ class TestAgentContextManager:
         assert context.session_id == "session_1"
         assert context.current_agent == AgentType.ORCHESTRATOR
     
+    @pytest.mark.asyncio
     async def test_get_existing_context(self):
         """Test getting existing context"""
         manager = AsyncAgentContextManager()
@@ -187,6 +189,7 @@ class TestAgentContextManager:
         
         assert context1 is context2
     
+    @pytest.mark.asyncio
     async def test_delete_context(self):
         """Test deleting context"""
         manager = AsyncAgentContextManager()
@@ -200,6 +203,7 @@ class TestAgentContextManager:
         assert deleted is True
         assert not manager.exists("session_1")
     
+    @pytest.mark.asyncio
     async def test_session_count(self):
         """Test session count"""
         manager = AsyncAgentContextManager()
