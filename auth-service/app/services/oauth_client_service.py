@@ -103,27 +103,97 @@ class OAuthClientService:
         Returns:
             OAuth client if valid, None otherwise
         """
+        logger.info(
+            f"[TRACE] OAuthClientService.validate_client started",
+            extra={
+                "trace_point": "oauth_client_validate_start",
+                "client_id": client_id,
+                "has_secret": client_secret is not None,
+            }
+        )
+        
+        logger.debug(
+            f"[TRACE] Fetching client from database",
+            extra={"trace_point": "fetch_client", "client_id": client_id}
+        )
+        
         client = await self.get_by_client_id(db, client_id)
         if not client:
-            logger.warning(f"Client validation failed: client not found ({client_id})")
+            logger.warning(
+                f"[TRACE] Client validation failed: client not found",
+                extra={
+                    "trace_point": "client_not_found",
+                    "client_id": client_id,
+                }
+            )
             return None
+
+        logger.debug(
+            f"[TRACE] Client found in database",
+            extra={
+                "trace_point": "client_found",
+                "client_id": client_id,
+                "client_name": client.name,
+                "is_active": client.is_active,
+                "is_confidential": client.is_confidential,
+            }
+        )
 
         # Check if client is active
         if not client.is_active:
-            logger.warning(f"Client validation failed: client inactive ({client_id})")
+            logger.warning(
+                f"[TRACE] Client validation failed: client inactive",
+                extra={
+                    "trace_point": "client_inactive",
+                    "client_id": client_id,
+                }
+            )
             return None
+
+        logger.debug(
+            f"[TRACE] Client is active",
+            extra={"trace_point": "client_active", "client_id": client_id}
+        )
 
         # Validate client secret for confidential clients
         if client.is_confidential:
+            logger.debug(
+                f"[TRACE] Client is confidential, validating secret",
+                extra={"trace_point": "validate_secret", "client_id": client_id}
+            )
+            
             if not client_secret:
-                logger.warning(f"Client validation failed: missing secret ({client_id})")
+                logger.warning(
+                    f"[TRACE] Client validation failed: missing secret for confidential client",
+                    extra={
+                        "trace_point": "missing_secret",
+                        "client_id": client_id,
+                    }
+                )
                 return None
 
             if not verify_password(client_secret, client.client_secret_hash):
-                logger.warning(f"Client validation failed: invalid secret ({client_id})")
+                logger.warning(
+                    f"[TRACE] Client validation failed: invalid secret",
+                    extra={
+                        "trace_point": "invalid_secret",
+                        "client_id": client_id,
+                    }
+                )
                 return None
+            
+            logger.debug(
+                f"[TRACE] Client secret validated",
+                extra={"trace_point": "secret_validated", "client_id": client_id}
+            )
 
-        logger.debug(f"Client validated: {client_id}")
+        logger.info(
+            f"[TRACE] Client validated successfully",
+            extra={
+                "trace_point": "oauth_client_validate_success",
+                "client_id": client_id,
+            }
+        )
         return client
 
     def validate_grant_type(
