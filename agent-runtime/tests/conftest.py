@@ -19,13 +19,18 @@ async def mock_database():
     # Mock get_db to return a mock database session
     mock_db = AsyncMock()
     
-    # Mock execute to return a mock result with proper async methods
-    mock_result = AsyncMock()
-    mock_result.scalar_one_or_none = AsyncMock(return_value=None)
+    # Mock execute to return a mock result with proper methods
+    # scalar_one_or_none should return None directly (not a coroutine)
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none = MagicMock(return_value=None)
     mock_result.scalars = MagicMock(return_value=MagicMock(all=MagicMock(return_value=[])))
     mock_result.all = MagicMock(return_value=[])
     
-    mock_db.execute = AsyncMock(return_value=mock_result)
+    # execute returns the mock_result directly (not async)
+    async def mock_execute(*args, **kwargs):
+        return mock_result
+    
+    mock_db.execute = mock_execute
     mock_db.commit = AsyncMock()
     mock_db.flush = AsyncMock()
     mock_db.delete = AsyncMock()

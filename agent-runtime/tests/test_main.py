@@ -16,13 +16,6 @@ def client():
 
 
 @pytest.fixture
-def mock_session_manager():
-    """Mock session manager"""
-    with patch("app.api.v1.endpoints.session_manager") as mock:
-        yield mock
-
-
-@pytest.fixture
 def mock_stream_response():
     """Mock stream_response function"""
     with patch("app.api.v1.endpoints.stream_response") as mock:
@@ -38,16 +31,10 @@ def test_health(client):
     assert data["service"] == "agent-runtime"
 
 
-def test_agent_message_stream_success(client, mock_session_manager, mock_stream_response):
+def test_agent_message_stream_success(client, mock_stream_response):
     """Test successful agent message stream with mocked dependencies"""
     # Setup mocks
     session_id = "test_session"
-    mock_session = MagicMock()
-    mock_session.messages = []
-    mock_session_manager.get_or_create.return_value = mock_session
-    mock_session_manager.get_history.return_value = [
-        {"role": "user", "content": "Hello"}
-    ]
     
     # Mock stream response
     async def mock_stream():
