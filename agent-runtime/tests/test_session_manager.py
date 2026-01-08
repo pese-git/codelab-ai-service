@@ -3,7 +3,7 @@ Unit tests for AsyncSessionManager.
 """
 import pytest
 import pytest_asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 from app.services.session_manager_async import AsyncSessionManager
@@ -157,10 +157,15 @@ async def test_append_message_updates_last_activity(session_manager):
     state = await session_manager.create(session_id)
     initial_time = state.last_activity
     
+    # Small delay to ensure time difference
+    import asyncio
+    await asyncio.sleep(0.01)
+    
     await session_manager.append_message(session_id, "user", "Hello")
     
     updated_state = session_manager.get(session_id)
-    assert updated_state.last_activity > initial_time
+    # Compare timestamps (both should be timezone-aware UTC)
+    assert updated_state.last_activity.timestamp() > initial_time.timestamp()
 
 
 @pytest.mark.asyncio

@@ -3,39 +3,40 @@
 Test script for session and agent context persistence.
 
 This script tests that sessions and agent contexts are properly
-saved to and restored from the SQLite database.
+saved to and restored from the PostgreSQL database.
 """
 import sys
-import time
+import asyncio
 from pathlib import Path
 
 # Add app to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from app.services.session_manager import get_session_manager
-from app.services.agent_context import get_agent_context_manager
+from app.services.session_manager_async import AsyncSessionManager
+from app.services.agent_context_async import AsyncAgentContextManager
 from app.agents.base_agent import AgentType
 
 
-def test_session_persistence():
+async def test_session_persistence():
     """Test session persistence"""
     print("=" * 60)
     print("Testing Session Persistence")
     print("=" * 60)
     
     # Create session manager
-    sm = get_session_manager()
+    sm = AsyncSessionManager()
+    await sm.initialize()
     
     # Create a test session
     session_id = "test_session_123"
     print(f"\n1. Creating session: {session_id}")
-    session = sm.create(session_id, system_prompt="You are a helpful assistant")
+    session = await sm.create(session_id, system_prompt="You are a helpful assistant")
     print(f"   ✓ Session created with {len(session.messages)} messages")
     
     # Add some messages
     print("\n2. Adding messages to session")
-    sm.append_message(session_id, "user", "Hello, how are you?")
-    sm.append_message(session_id, "assistant", "I'm doing great! How can I help you?")
+    await sm.append_message(session_id, "user", "Hello, how are you?")
+    await sm.append_message(session_id, "assistant", "I'm doing great! How can I help you?")
     print(f"   ✓ Added 2 messages, total: {len(sm.get(session_id).messages)}")
     
     # Verify session exists
@@ -53,19 +54,20 @@ def test_session_persistence():
     return session_id
 
 
-def test_agent_context_persistence():
+async def test_agent_context_persistence():
     """Test agent context persistence"""
     print("\n" + "=" * 60)
     print("Testing Agent Context Persistence")
     print("=" * 60)
     
     # Create agent context manager
-    acm = get_agent_context_manager()
+    acm = AsyncAgentContextManager()
+    await acm.initialize()
     
     # Create a test context
     session_id = "test_context_456"
     print(f"\n1. Creating agent context: {session_id}")
-    context = acm.get_or_create(session_id)
+    context = await acm.get_or_create(session_id)
     print(f"   ✓ Context created with agent: {context.current_agent.value}")
     
     # Switch agent
@@ -94,7 +96,7 @@ def test_agent_context_persistence():
     return session_id
 
 
-def test_restoration():
+async def test_restoration():
     """Test restoration after 'restart'"""
     print("\n" + "=" * 60)
     print("Testing Restoration After Restart")
@@ -103,14 +105,14 @@ def test_restoration():
     print("\n1. Simulating restart by creating new manager instances...")
     
     # Create new instances (simulating restart)
-    from app.services.session_manager import SessionManager
-    from app.services.agent_context import AgentContextManager
+    new_sm = AsyncSessionManager()
+    await new_sm.initialize()
     
-    new_sm = SessionManager()
-    new_acm = AgentContextManager()
+    new_acm = AsyncAgentContextManager()
+    await new_acm.initialize()
     
-    print(f"   ✓ New SessionManager loaded {len(new_sm._sessions)} sessions")
-    print(f"   ✓ New AgentContextManager loaded {len(new_acm._contexts)} contexts")
+    print(f"   ✓ New AsyncSessionManager loaded {len(new_sm._sessions)} sessions")
+    print(f"   ✓ New AsyncAgentContextManager loaded {len(new_acm._contexts)} contexts")
     
     # Check if test session exists
     print("\n2. Checking if test sessions were restored...")
@@ -135,28 +137,31 @@ def test_restoration():
     print("\n✅ Restoration test completed successfully!")
 
 
-def cleanup():
+async def cleanup():
     """Cleanup test data"""
     print("\n" + "=" * 60)
     print("Cleanup")
     print("=" * 60)
     
-    sm = get_session_manager()
-    acm = get_agent_context_manager()
+    sm = AsyncSessionManager()
+    await sm.initialize()
+    
+    acm = AsyncAgentContextManager()
+    await acm.initialize()
     
     # Delete test sessions
     if sm.exists("test_session_123"):
-        sm.delete("test_session_123")
+        await sm.delete("test_session_123")
         print("   ✓ Deleted test_session_123")
     
     if acm.exists("test_context_456"):
-        acm.delete("test_context_456")
+        await acm.delete("test_context_456")
         print("   ✓ Deleted test_context_456")
     
     print("\n✅ Cleanup completed!")
 
 
-def main():
+async def main():
     """Run all tests"""
     print("\n" + "=" * 60)
     print("Session & Agent Context Persistence Test Suite")
@@ -164,16 +169,16 @@ def main():
     
     try:
         # Test session persistence
-        test_session_persistence()
+        await test_session_persistence()
         
         # Test agent context persistence
-        test_agent_context_persistence()
+        await test_agent_context_persistence()
         
         # Test restoration
-        test_restoration()
+        await test_restoration()
         
         # Cleanup
-        cleanup()
+        await cleanup()
         
         print("\n" + "=" * 60)
         print("🎉 ALL TESTS PASSED!")
@@ -189,4 +194,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
