@@ -15,7 +15,6 @@ from app.core.config import AppConfig
 from app.core.dependencies import DBSession, DBService, SessionManagerDep, AgentContextManagerDep
 from app.models.schemas import AgentStreamRequest, HealthResponse, AgentInfo
 from app.models.hitl_models import HITLUserDecision, HITLDecision
-from app.services.session_manager import session_manager  # Fallback for non-DI code
 from app.services.llm_stream_service import stream_response
 from app.services.multi_agent_orchestrator import multi_agent_orchestrator
 from app.services.agent_router import agent_router
@@ -61,8 +60,14 @@ async def message_stream_sse(request: AgentStreamRequest):
             logger.info(f"SSE stream started for session: {request.session_id}")
             logger.debug(f"Message type: {request.message.get('type', 'user_message')}")
             
+            # Get async session manager
+            from app.services.session_manager_async import session_manager as async_session_mgr
+            
+            if async_session_mgr is None:
+                raise RuntimeError("SessionManager not initialized")
+            
             # Get or create session (system prompt will be set by agent)
-            session = session_manager.get_or_create(
+            session = await async_session_mgr.get_or_create(
                 request.session_id,
                 system_prompt=""  # Agent will set its own prompt
             )
@@ -157,7 +162,7 @@ async def message_stream_sse(request: AgentStreamRequest):
                 
                 # Add tool result to history
                 result_str = json.dumps(result)
-                session_manager.append_tool_result(
+                await async_session_mgr.append_tool_result(
                     request.session_id,
                     call_id=call_id,
                     tool_name=pending_state.tool_name,
@@ -206,7 +211,7 @@ async def message_stream_sse(request: AgentStreamRequest):
                 
                 # Add tool_result to history as tool message
                 result_str = json.dumps(result) if not isinstance(result, str) else result
-                session_manager.append_tool_result(
+                await async_session_mgr.append_tool_result(
                     request.session_id,
                     call_id=call_id,
                     tool_name=tool_name,
@@ -275,7 +280,7 @@ async def message_stream_sse(request: AgentStreamRequest):
                 
                 # Add user message to history
                 if content:
-                    session_manager.append_message(
+                    await async_session_mgr.append_message(
                         request.session_id,
                         role="user",
                         content=content
@@ -306,7 +311,7 @@ async def message_stream_sse(request: AgentStreamRequest):
                     f"length={len(content)}"
                 )
                 
-                session_manager.append_message(
+                await async_session_mgr.append_message(
                     request.session_id,
                     role="user",
                     content=content
