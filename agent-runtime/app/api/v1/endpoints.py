@@ -4,12 +4,15 @@ API v1 endpoints for agent runtime service.
 import json
 import logging
 import traceback
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from sse_starlette.sse import EventSourceResponse
+from sqlalchemy import func
 
 from app.core.config import AppConfig
+from app.core.dependencies import DBSession, DBService
 from app.models.schemas import AgentStreamRequest, HealthResponse, AgentInfo
 from app.models.hitl_models import HITLUserDecision, HITLDecision
 from app.services.session_manager import session_manager
@@ -17,7 +20,7 @@ from app.services.llm_stream_service import stream_response
 from app.services.multi_agent_orchestrator import multi_agent_orchestrator
 from app.services.agent_router import agent_router
 from app.services.hitl_manager import hitl_manager
-from app.services.database import Database, get_db, SessionModel
+from app.services.database import SessionModel, MessageModel
 from app.agents.base_agent import AgentType
 
 logger = logging.getLogger("agent-runtime.api")
@@ -456,7 +459,7 @@ async def get_session_history(session_id: str):
 
 
 @router.get("/sessions")
-async def list_sessions(db: Database = Depends(get_db)):
+async def list_sessions(db: DBSession, db_service: DBService):
     """
     List all active sessions with metadata.
     
@@ -465,43 +468,45 @@ async def list_sessions(db: Database = Depends(get_db)):
     """
     logger.debug("Listing all sessions")
     
-    from sqlalchemy import func
-    from app.services.database import MessageModel
+    from sqlalchemy import select
     
     session_list = []
     
     # Get all sessions with message count in one optimized query using LEFT JOIN
-    with db.session_scope() as db_session:
-        sessions_with_counts = db_session.query(
+    result = await db.execute(
+        select(
             SessionModel,
             func.count(MessageModel.id).label('message_count')
         ).outerjoin(
             MessageModel,
             SessionModel.id == MessageModel.session_db_id
-        ).filter(
+        ).where(
             SessionModel.deleted_at.is_(None)
         ).group_by(
             SessionModel.id
         ).order_by(
             SessionModel.last_activity.desc()
-        ).all()
+        )
+    )
+    
+    sessions_with_counts = result.all()
+    
+    for session_model, message_count in sessions_with_counts:
+        session_id = session_model.session_id
         
-        for session_model, message_count in sessions_with_counts:
-            session_id = session_model.session_id
-            
-            # Get current agent (from in-memory cache, not DB)
-            current_agent = multi_agent_orchestrator.get_current_agent(session_id)
-            
-            session_info = {
-                "session_id": session_id,
-                "message_count": message_count,
-                "last_activity": session_model.last_activity.isoformat() if session_model.last_activity else None,
-                "current_agent": current_agent.value if current_agent else None,
-                "title": session_model.title,
-                "description": session_model.description,
-                "created_at": session_model.created_at.isoformat() if session_model.created_at else None
-            }
-            session_list.append(session_info)
+        # Get current agent (from in-memory cache, not DB)
+        current_agent = multi_agent_orchestrator.get_current_agent(session_id)
+        
+        session_info = {
+            "session_id": session_id,
+            "message_count": message_count,
+            "last_activity": session_model.last_activity.isoformat() if session_model.last_activity else None,
+            "current_agent": current_agent.value if current_agent else None,
+            "title": session_model.title,
+            "description": session_model.description,
+            "created_at": session_model.created_at.isoformat() if session_model.created_at else None
+        }
+        session_list.append(session_info)
     
     return {
         "sessions": session_list,
@@ -510,7 +515,7 @@ async def list_sessions(db: Database = Depends(get_db)):
 
 
 @router.post("/sessions")
-async def create_session(db: Database = Depends(get_db)):
+async def create_session(db: DBSession, db_service: DBService):
     """
     Create a new session explicitly.
     
@@ -523,20 +528,18 @@ async def create_session(db: Database = Depends(get_db)):
     logger.info("Creating new session")
     
     # Create session in database first to get auto-generated UUID
-    from datetime import datetime, timezone
     session_id = None
     
     try:
-        with db.session_scope() as db_session:
-            new_session = SessionModel(
-                created_at=datetime.now(timezone.utc),
-                last_activity=datetime.now(timezone.utc),
-                is_active=True
-            )
-            db_session.add(new_session)
-            db_session.flush()  # Get the auto-generated id
-            session_id = new_session.id
-            # Commit happens here when exiting context
+        new_session = SessionModel(
+            created_at=datetime.now(timezone.utc),
+            last_activity=datetime.now(timezone.utc),
+            is_active=True
+        )
+        db.add(new_session)
+        await db.flush()  # Get the auto-generated id
+        session_id = new_session.id
+        await db.commit()
         
         # Create in-memory session AFTER database commit
         # This avoids blocking the database transaction with in-memory operations
@@ -562,7 +565,7 @@ async def create_session(db: Database = Depends(get_db)):
         if session_id:
             logger.error(f"Failed to initialize session {session_id}, cleaning up: {e}")
             try:
-                db.delete_session(session_id, soft=False)
+                await db_service.delete_session(db, session_id, soft=False)
             except Exception as cleanup_error:
                 logger.error(f"Failed to cleanup session {session_id}: {cleanup_error}")
         raise

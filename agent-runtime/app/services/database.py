@@ -1,7 +1,7 @@
 """
 SQLAlchemy database module for persistent session and agent context storage.
 
-Provides thread-safe database operations for:
+Provides async database operations for:
 - Session state persistence
 - Agent context persistence
 - Message history storage (normalized)
@@ -9,25 +9,28 @@ Provides thread-safe database operations for:
 - Pending approval requests (HITL)
 
 Improved version with:
+- Async SQLAlchemy support (like auth-service)
 - Normalized schema (separate tables for messages and switches)
 - Foreign key relationships
 - Better indexing
 - Soft delete support
 - Query optimization
+- Proper dependency injection pattern
 """
 import json
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Any
-from contextlib import contextmanager
+from typing import Dict, List, Optional, Any, AsyncGenerator
+from contextlib import asynccontextmanager, contextmanager
 
 from sqlalchemy import (
     create_engine, String, Text, Integer, DateTime, Boolean,
-    ForeignKey, Index, CheckConstraint, func
+    ForeignKey, Index, CheckConstraint, func, event
 )
-from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship, Mapped, mapped_column
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.orm import declarative_base, relationship, Mapped, mapped_column
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.dialects.postgresql import JSON as PGJSON
 from sqlalchemy.types import JSON
@@ -63,7 +66,7 @@ class PendingApproval(Base):
     tool_name: Mapped[str] = mapped_column(String(255), nullable=False, comment="Name of the tool being called")
     arguments: Mapped[dict] = mapped_column(JSON, nullable=False, comment="Tool arguments as JSON")
     reason: Mapped[str | None] = mapped_column(Text, nullable=True, comment="Reason why approval is required")
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), comment="When approval was requested")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), comment="When approval was requested")
     status: Mapped[str] = mapped_column(String(50), nullable=False, default='pending', comment="Status: pending, approved, rejected")
     
     __table_args__ = (
@@ -106,10 +109,10 @@ class SessionModel(Base):
     
     title: Mapped[str | None] = mapped_column(String(500), nullable=True, comment="Session title from first user message")
     description: Mapped[str | None] = mapped_column(Text, nullable=True, comment="Session description from LLM summarization")
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    last_activity: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    last_activity: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True, default=lambda: datetime.now(timezone.utc))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
-    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # Soft delete
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # Soft delete
     
     # Relationships
     messages = relationship("MessageModel", back_populates="session",
@@ -156,7 +159,7 @@ class MessageModel(Base):
                           nullable=False, index=True)
     role: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     content: Mapped[str | None] = mapped_column(Text, nullable=True)  # Nullable for tool_calls messages
-    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)  # For tool names
     tool_call_id: Mapped[str | None] = mapped_column(String(255), nullable=True)  # For tool responses
     tool_calls: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON serialized tool calls
@@ -213,8 +216,8 @@ class AgentContextModel(Base):
     session_db_id: Mapped[str] = mapped_column(String(36), ForeignKey("sessions.id", ondelete="CASCADE"),
                           unique=True, nullable=False, index=True)
     current_agent: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc),
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc),
                        onupdate=lambda: datetime.now(timezone.utc))
     switch_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON serialized metadata
@@ -252,7 +255,7 @@ class AgentSwitchModel(Base):
                           nullable=False, index=True)
     from_agent: Mapped[str | None] = mapped_column(String(100), nullable=True)  # NULL for first agent
     to_agent: Mapped[str] = mapped_column(String(100), nullable=False)
-    switched_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    switched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON serialized metadata
     
@@ -275,89 +278,136 @@ class AgentSwitchModel(Base):
         }
 
 
-# ==================== Database Class ====================
+# ==================== Database Configuration ====================
 
-class Database:
+# Database URL from config
+db_url = None
+async_db_url = None
+engine = None
+async_session_maker = None
+
+
+def init_database(database_url: str):
     """
-    Thread-safe SQLAlchemy database manager for agent runtime.
+    Initialize database engine and session maker.
     
-    Stores:
-    - Session states with normalized message history
-    - Agent contexts with switch history
-    - Supports soft delete and query optimization
+    Args:
+        database_url: SQLAlchemy database URL
     """
+    global db_url, async_db_url, engine, async_session_maker
     
-    def __init__(self, db_url: str = "sqlite:///data/agent_runtime.db"):
-        """
-        Initialize database connection.
-        
-        Args:
-            db_url: SQLAlchemy database URL
-        """
-        self.db_url = db_url
-        
-        # Ensure data directory exists for SQLite
-        if db_url.startswith("sqlite:///"):
-            db_path = db_url.replace("sqlite:///", "")
-            Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-        
-        # Create engine with connection pooling
-        if "sqlite" in db_url:
-            self.engine = create_engine(
-                db_url,
-                connect_args={"check_same_thread": False},
-                poolclass=StaticPool,
-                echo=False
-            )
-        else:
-            self.engine = create_engine(
-                db_url,
-                pool_size=20,
-                max_overflow=40,
-                pool_pre_ping=True,
-                pool_recycle=3600,
-                echo=False
-            )
-        
-        # Create session factory
-        self.SessionLocal = sessionmaker(
-            autocommit=False,
-            autoflush=False,
-            bind=self.engine
-        )
-        
-        # Initialize database schema
-        self._init_schema()
-        
-        logger.info(f"Database initialized with URL: {db_url}")
+    db_url = database_url
     
-    def _init_schema(self):
-        """Initialize database schema"""
-        Base.metadata.create_all(bind=self.engine)
-        logger.info("Database schema initialized")
+    # Ensure data directory exists for SQLite
+    if db_url.startswith("sqlite:///"):
+        db_path = db_url.replace("sqlite:///", "")
+        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+        # Convert sqlite:/// to sqlite+aiosqlite:///
+        async_db_url = db_url.replace("sqlite:///", "sqlite+aiosqlite:///")
+    elif db_url.startswith("postgresql://"):
+        # Convert postgresql:// to postgresql+asyncpg://
+        async_db_url = db_url.replace("postgresql://", "postgresql+asyncpg://")
+    else:
+        async_db_url = db_url
     
-    def get_session(self) -> Session:
-        """Get database session"""
-        return self.SessionLocal()
+    # Create async engine
+    engine = create_async_engine(
+        async_db_url,
+        echo=False,
+        future=True,
+        pool_pre_ping=True,
+    )
     
-    @contextmanager
-    def session_scope(self):
-        """Context manager for database sessions with automatic commit/rollback"""
-        session = self.get_session()
+    # Create async session factory
+    async_session_maker = async_sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+    
+    logger.info(f"Database initialized with URL: {db_url}")
+
+
+# Enable WAL mode for SQLite (for better concurrency)
+if db_url and "sqlite" in db_url:
+    sync_engine = create_engine(
+        db_url,
+        echo=False,
+    )
+
+    @event.listens_for(sync_engine, "connect")
+    def set_sqlite_pragma(dbapi_conn, connection_record):
+        """Set SQLite pragmas for better performance"""
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.execute("PRAGMA cache_size=-64000")  # 64MB cache
+        cursor.execute("PRAGMA temp_store=MEMORY")
+        cursor.execute("PRAGMA busy_timeout=30000")  # 30 seconds
+        cursor.close()
+
+
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """
+    Dependency for getting async database session.
+    
+    Yields:
+        AsyncSession: Database session
+    """
+    if async_session_maker is None:
+        raise RuntimeError("Database not initialized. Call init_database() first.")
+    
+    async with async_session_maker() as session:
         try:
             yield session
-            session.commit()
-        except Exception as e:
-            session.rollback()
-            logger.error(f"Database error: {e}", exc_info=True)
+            await session.commit()
+        except Exception:
+            await session.rollback()
             raise
         finally:
-            session.close()
+            await session.close()
+
+
+async def init_db():
+    """Initialize database (create tables)"""
+    if engine is None:
+        raise RuntimeError("Database not initialized. Call init_database() first.")
+    
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    
+    logger.info("Database schema initialized")
+
+
+async def close_db():
+    """Close database connections"""
+    if engine is not None:
+        await engine.dispose()
+        logger.info("Database connections closed")
+
+
+# ==================== Database Service Class ====================
+
+class DatabaseService:
+    """
+    Async database service for agent runtime.
+    
+    Provides high-level operations for:
+    - Session management
+    - Agent context management
+    - Message history
+    - Pending approvals
+    """
+    
+    def __init__(self):
+        """Initialize database service"""
+        pass
     
     # ==================== Session Operations ====================
     
-    def save_session(
+    async def save_session(
         self,
+        db: AsyncSession,
         session_id: str,
         messages: List[Dict[str, Any]],
         last_activity: datetime
@@ -369,236 +419,183 @@ class Database:
         Automatically sets title from first user message if not already set.
         
         Args:
+            db: Database session
             session_id: Session identifier
             messages: List of messages in the session
             last_activity: Last activity timestamp
         """
-        with self.session_scope() as db:
-            # Get or create session
-            session = db.query(SessionModel).filter(
+        from sqlalchemy import select
+        
+        # Get or create session
+        result = await db.execute(
+            select(SessionModel).where(
                 SessionModel.id == session_id,
                 SessionModel.deleted_at.is_(None)
-            ).first()
+            )
+        )
+        session = result.scalar_one_or_none()
+        
+        if not session:
+            # Create new session
+            session = SessionModel(
+                id=session_id,
+                created_at=datetime.now(timezone.utc),
+                last_activity=last_activity,
+                is_active=True
+            )
+            db.add(session)
+            await db.flush()  # Get ID
+            logger.info(f"Created new session {session_id} in database")
+        else:
+            # Update existing session
+            session.last_activity = last_activity
+            session.is_active = True
+            logger.debug(f"Updated session {session_id} in database")
+        
+        # Auto-set title from first user message if not already set
+        if not session.title and messages:
+            first_user_msg = next((msg for msg in messages if msg.get("role") == "user"), None)
+            if first_user_msg and first_user_msg.get("content"):
+                # Take first 500 chars as title
+                content = first_user_msg["content"]
+                session.title = content[:500] if len(content) > 500 else content
+                logger.debug(f"Auto-set title for session {session_id}")
+        
+        # Atomic replacement: prepare new messages first, then replace in single transaction
+        new_messages = []
+        for msg in messages:
+            # Content can be None for assistant messages with tool_calls
+            content = msg.get("content")
+            if content is None and msg.get("tool_calls"):
+                content = None
+            elif content is None:
+                content = ""
             
-            is_new_session = False
-            if not session:
-                # Create new session
-                session = SessionModel(
-                    id=session_id,
-                    created_at=datetime.now(timezone.utc),
-                    last_activity=last_activity,
-                    is_active=True
-                )
-                db.add(session)
-                db.flush()  # Get ID
-                is_new_session = True
-                logger.info(f"Created new session {session_id} in database")
-            else:
-                # Update existing session
-                session.last_activity = last_activity
-                session.is_active = True
-                logger.debug(f"Updated session {session_id} in database")
-            
-            # Auto-set title from first user message if not already set
-            if not session.title and messages:
-                first_user_msg = next((msg for msg in messages if msg.get("role") == "user"), None)
-                if first_user_msg and first_user_msg.get("content"):
-                    # Take first 500 chars as title
-                    content = first_user_msg["content"]
-                    session.title = content[:500] if len(content) > 500 else content
-                    logger.debug(f"Auto-set title for session {session_id}")
-            
-            # Atomic replacement: prepare new messages first, then replace in single transaction
-            # This ensures we don't lose data if operation fails midway
-            new_messages = []
-            for msg in messages:
-                # Content can be None for assistant messages with tool_calls
-                content = msg.get("content")
-                if content is None and msg.get("tool_calls"):
-                    # For tool_calls messages, content can be None or empty string
-                    content = None
-                elif content is None:
-                    # For other messages, use empty string as default
-                    content = ""
-                
-                message = MessageModel(
-                    session_db_id=session.id,
-                    role=msg.get("role", "user"),
-                    content=content,
-                    timestamp=datetime.now(timezone.utc),
-                    name=msg.get("name"),
-                    tool_call_id=msg.get("tool_call_id"),
-                    tool_calls=json.dumps(msg["tool_calls"]) if msg.get("tool_calls") else None,
-                    metadata_json=json.dumps(msg.get("metadata", {})) if msg.get("metadata") else None
-                )
-                new_messages.append(message)
-            
-            # Now perform atomic replacement within the same transaction
-            # Delete old messages and add new ones - all commits together
-            db.query(MessageModel).filter(
-                MessageModel.session_db_id == session.id
-            ).delete()
-            
-            # Add all new messages
-            for message in new_messages:
-                db.add(message)
+            message = MessageModel(
+                session_db_id=session.id,
+                role=msg.get("role", "user"),
+                content=content,
+                timestamp=datetime.now(timezone.utc),
+                name=msg.get("name"),
+                tool_call_id=msg.get("tool_call_id"),
+                tool_calls=json.dumps(msg["tool_calls"]) if msg.get("tool_calls") else None,
+                metadata_json=json.dumps(msg.get("metadata", {})) if msg.get("metadata") else None
+            )
+            new_messages.append(message)
+        
+        # Delete old messages and add new ones
+        from sqlalchemy import delete
+        await db.execute(
+            delete(MessageModel).where(MessageModel.session_db_id == session.id)
+        )
+        
+        # Add all new messages
+        for message in new_messages:
+            db.add(message)
+        
+        await db.commit()
     
-    def load_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+    async def load_session(self, db: AsyncSession, session_id: str) -> Optional[Dict[str, Any]]:
         """
         Load session state from database.
         
         Args:
+            db: Database session
             session_id: Session identifier
             
         Returns:
             Session data dict with messages or None if not found
         """
-        with self.session_scope() as db:
-            session = db.query(SessionModel).filter(
+        from sqlalchemy import select
+        
+        result = await db.execute(
+            select(SessionModel).where(
                 SessionModel.id == session_id,
                 SessionModel.deleted_at.is_(None)
-            ).first()
-            
-            if not session:
-                return None
-            
-            # Load messages
-            messages = db.query(MessageModel).filter(
-                MessageModel.session_db_id == session.id
-            ).order_by(MessageModel.timestamp.asc()).all()
-            
-            return {
-                "session_id": session.id,  # Use id directly
-                "messages": [msg.to_dict() for msg in messages],
-                "last_activity": session.last_activity,
-                "created_at": session.created_at
-            }
+            )
+        )
+        session = result.scalar_one_or_none()
+        
+        if not session:
+            return None
+        
+        # Load messages
+        result = await db.execute(
+            select(MessageModel)
+            .where(MessageModel.session_db_id == session.id)
+            .order_by(MessageModel.timestamp.asc())
+        )
+        messages = result.scalars().all()
+        
+        return {
+            "session_id": session.id,
+            "messages": [msg.to_dict() for msg in messages],
+            "last_activity": session.last_activity,
+            "created_at": session.created_at
+        }
     
-    def delete_session(self, session_id: str, soft: bool = True) -> bool:
+    async def delete_session(self, db: AsyncSession, session_id: str, soft: bool = True) -> bool:
         """
         Delete session from database.
         
         Args:
+            db: Database session
             session_id: Session identifier
             soft: If True, perform soft delete; if False, hard delete
             
         Returns:
             True if deleted, False if not found
         """
-        with self.session_scope() as db:
-            session = db.query(SessionModel).filter(
-                SessionModel.id == session_id
-            ).first()
-            
-            if not session:
-                return False
-            
-            if soft:
-                # Soft delete
-                session.deleted_at = datetime.now(timezone.utc)
-                session.is_active = False
-                logger.info(f"Soft deleted session {session_id} from database")
-            else:
-                # Hard delete (cascade will delete messages and context)
-                db.delete(session)
-                logger.info(f"Hard deleted session {session_id} from database")
-            
-            return True
+        from sqlalchemy import select
+        
+        result = await db.execute(
+            select(SessionModel).where(SessionModel.id == session_id)
+        )
+        session = result.scalar_one_or_none()
+        
+        if not session:
+            return False
+        
+        if soft:
+            # Soft delete
+            session.deleted_at = datetime.now(timezone.utc)
+            session.is_active = False
+            logger.info(f"Soft deleted session {session_id} from database")
+        else:
+            # Hard delete (cascade will delete messages and context)
+            await db.delete(session)
+            logger.info(f"Hard deleted session {session_id} from database")
+        
+        await db.commit()
+        return True
     
-    def list_all_sessions(self, include_deleted: bool = False) -> List[str]:
+    async def list_all_sessions(self, db: AsyncSession, include_deleted: bool = False) -> List[str]:
         """
         Get list of all session IDs.
         
         Args:
+            db: Database session
             include_deleted: Include soft-deleted sessions
             
         Returns:
             List of session IDs
         """
-        with self.session_scope() as db:
-            query = db.query(SessionModel.id)
-            
-            if not include_deleted:
-                query = query.filter(SessionModel.deleted_at.is_(None))
-            
-            sessions = query.all()
-            return [s[0] for s in sessions]
-    
-    def get_messages_paginated(
-        self,
-        session_id: str,
-        page: int = 1,
-        page_size: int = 50
-    ) -> List[Dict[str, Any]]:
-        """
-        Get paginated messages for a session.
+        from sqlalchemy import select
         
-        Args:
-            session_id: Session identifier
-            page: Page number (1-indexed)
-            page_size: Number of messages per page
-            
-        Returns:
-            List of message dictionaries
-        """
-        with self.session_scope() as db:
-            session = db.query(SessionModel).filter(
-                SessionModel.id == session_id,
-                SessionModel.deleted_at.is_(None)
-            ).first()
-            
-            if not session:
-                return []
-            
-            offset = (page - 1) * page_size
-            messages = db.query(MessageModel).filter(
-                MessageModel.session_db_id == session.id
-            ).order_by(
-                MessageModel.timestamp.asc()
-            ).limit(page_size).offset(offset).all()
-            
-            return [msg.to_dict() for msg in messages]
-    
-    def get_session_stats(self, session_id: str) -> Optional[Dict[str, Any]]:
-        """
-        Get statistics for a session.
+        query = select(SessionModel.id)
         
-        Args:
-            session_id: Session identifier
-            
-        Returns:
-            Dictionary with stats or None if session not found
-        """
-        with self.session_scope() as db:
-            session = db.query(SessionModel).filter(
-                SessionModel.id == session_id,
-                SessionModel.deleted_at.is_(None)
-            ).first()
-            
-            if not session:
-                return None
-            
-            stats = db.query(
-                func.count(MessageModel.id).label('message_count'),
-                func.sum(MessageModel.token_count).label('total_tokens'),
-                func.max(MessageModel.timestamp).label('last_message_at')
-            ).filter(
-                MessageModel.session_db_id == session.id
-            ).first()
-            
-            return {
-                "session_id": session_id,
-                "message_count": stats.message_count or 0,
-                "total_tokens": stats.total_tokens or 0,
-                "last_message_at": stats.last_message_at,
-                "created_at": session.created_at,
-                "last_activity": session.last_activity
-            }
+        if not include_deleted:
+            query = query.where(SessionModel.deleted_at.is_(None))
+        
+        result = await db.execute(query)
+        sessions = result.scalars().all()
+        return list(sessions)
     
     # ==================== Agent Context Operations ====================
     
-    def save_agent_context(
+    async def save_agent_context(
         self,
+        db: AsyncSession,
         session_id: str,
         current_agent: str,
         agent_history: List[Dict[str, Any]],
@@ -611,258 +608,144 @@ class Database:
         Save or update agent context.
         
         Args:
+            db: Database session
             session_id: Session identifier
             current_agent: Current active agent type
-            agent_history: History of agent switches (for backward compatibility)
+            agent_history: History of agent switches
             metadata: Additional metadata
             created_at: Context creation timestamp
             last_switch_at: Last switch timestamp
             switch_count: Number of switches
         """
-        with self.session_scope() as db:
-            # Get session
-            session = db.query(SessionModel).filter(
+        from sqlalchemy import select, delete
+        
+        # Get session
+        result = await db.execute(
+            select(SessionModel).where(
                 SessionModel.id == session_id,
                 SessionModel.deleted_at.is_(None)
-            ).first()
-            
-            if not session:
-                logger.error(f"Cannot save agent context: session {session_id} not found")
-                return
-            
-            # Get or create context
-            context = db.query(AgentContextModel).filter(
-                AgentContextModel.session_db_id == session.id
-            ).first()
-            
-            metadata_json = json.dumps(metadata) if metadata else None
-            
-            if not context:
-                # Create new context
-                context = AgentContextModel(
-                    session_db_id=session.id,
-                    current_agent=current_agent,
-                    created_at=created_at,
-                    updated_at=datetime.now(timezone.utc),
-                    switch_count=switch_count,
-                    metadata_json=metadata_json
-                )
-                db.add(context)
-                db.flush()  # Get ID
-                logger.info(f"Created new agent context for {session_id} in database")
-            else:
-                # Update existing context
-                context.current_agent = current_agent
-                context.updated_at = datetime.now(timezone.utc)
-                context.switch_count = switch_count
-                context.metadata_json = metadata_json
-                logger.debug(f"Updated agent context for {session_id} in database")
-            
-            # Sync agent_history to switches table (for backward compatibility)
-            # Clear existing switches and recreate from history
-            db.query(AgentSwitchModel).filter(
-                AgentSwitchModel.context_db_id == context.id
-            ).delete()
-            
-            for history_entry in agent_history:
-                switch = AgentSwitchModel(
-                    context_db_id=context.id,
-                    from_agent=history_entry.get("from"),
-                    to_agent=history_entry.get("to", current_agent),
-                    switched_at=datetime.fromisoformat(history_entry["timestamp"])
-                               if "timestamp" in history_entry else datetime.now(timezone.utc),
-                    reason=history_entry.get("reason"),
-                    metadata_json=json.dumps(history_entry.get("metadata", {}))
-                                 if history_entry.get("metadata") else None
-                )
-                db.add(switch)
+            )
+        )
+        session = result.scalar_one_or_none()
+        
+        if not session:
+            logger.error(f"Cannot save agent context: session {session_id} not found")
+            return
+        
+        # Get or create context
+        result = await db.execute(
+            select(AgentContextModel).where(AgentContextModel.session_db_id == session.id)
+        )
+        context = result.scalar_one_or_none()
+        
+        metadata_json = json.dumps(metadata) if metadata else None
+        
+        if not context:
+            # Create new context
+            context = AgentContextModel(
+                session_db_id=session.id,
+                current_agent=current_agent,
+                created_at=created_at,
+                updated_at=datetime.now(timezone.utc),
+                switch_count=switch_count,
+                metadata_json=metadata_json
+            )
+            db.add(context)
+            await db.flush()
+            logger.info(f"Created new agent context for {session_id} in database")
+        else:
+            # Update existing context
+            context.current_agent = current_agent
+            context.updated_at = datetime.now(timezone.utc)
+            context.switch_count = switch_count
+            context.metadata_json = metadata_json
+            logger.debug(f"Updated agent context for {session_id} in database")
+        
+        # Sync agent_history to switches table
+        await db.execute(
+            delete(AgentSwitchModel).where(AgentSwitchModel.context_db_id == context.id)
+        )
+        
+        for history_entry in agent_history:
+            switch = AgentSwitchModel(
+                context_db_id=context.id,
+                from_agent=history_entry.get("from"),
+                to_agent=history_entry.get("to", current_agent),
+                switched_at=datetime.fromisoformat(history_entry["timestamp"])
+                           if "timestamp" in history_entry else datetime.now(timezone.utc),
+                reason=history_entry.get("reason"),
+                metadata_json=json.dumps(history_entry.get("metadata", {}))
+                             if history_entry.get("metadata") else None
+            )
+            db.add(switch)
+        
+        await db.commit()
     
-    def load_agent_context(self, session_id: str) -> Optional[Dict[str, Any]]:
+    async def load_agent_context(self, db: AsyncSession, session_id: str) -> Optional[Dict[str, Any]]:
         """
         Load agent context from database.
         
         Args:
+            db: Database session
             session_id: Session identifier
             
         Returns:
             Agent context data dict or None if not found
         """
-        with self.session_scope() as db:
-            session = db.query(SessionModel).filter(
+        from sqlalchemy import select
+        
+        result = await db.execute(
+            select(SessionModel).where(
                 SessionModel.id == session_id,
                 SessionModel.deleted_at.is_(None)
-            ).first()
-            
-            if not session:
-                return None
-            
-            context = db.query(AgentContextModel).filter(
-                AgentContextModel.session_db_id == session.id
-            ).first()
-            
-            if not context:
-                return None
-            
-            # Load switch history
-            switches = db.query(AgentSwitchModel).filter(
-                AgentSwitchModel.context_db_id == context.id
-            ).order_by(AgentSwitchModel.switched_at.asc()).all()
-            
-            # Convert switches to agent_history format for backward compatibility
-            agent_history = []
-            for switch in switches:
-                agent_history.append({
-                    "from": switch.from_agent,
-                    "to": switch.to_agent,
-                    "reason": switch.reason,
-                    "timestamp": switch.switched_at.isoformat()
-                })
-            
-            return {
-                "session_id": session_id,
-                "current_agent": context.current_agent,
-                "agent_history": agent_history,
-                "metadata": json.loads(context.metadata_json) if context.metadata_json else {},
-                "created_at": context.created_at,
-                "last_switch_at": switches[-1].switched_at if switches else None,
-                "switch_count": context.switch_count
-            }
-    
-    def delete_agent_context(self, session_id: str) -> bool:
-        """
-        Delete agent context from database.
+            )
+        )
+        session = result.scalar_one_or_none()
         
-        Args:
-            session_id: Session identifier
-            
-        Returns:
-            True if deleted, False if not found
-        """
-        with self.session_scope() as db:
-            session = db.query(SessionModel).filter(
-                SessionModel.id == session_id
-            ).first()
-            
-            if not session:
-                return False
-            
-            context = db.query(AgentContextModel).filter(
-                AgentContextModel.session_db_id == session.id
-            ).first()
-            
-            if not context:
-                return False
-            
-            # Cascade will delete switches
-            db.delete(context)
-            logger.info(f"Deleted agent context for {session_id} from database")
-            return True
-    
-    def list_all_contexts(self) -> List[str]:
-        """
-        Get list of all session IDs with agent contexts.
+        if not session:
+            return None
         
-        Returns:
-            List of session IDs
-        """
-        with self.session_scope() as db:
-            results = db.query(SessionModel.id).join(
-                AgentContextModel,
-                SessionModel.id == AgentContextModel.session_db_id
-            ).filter(
-                SessionModel.deleted_at.is_(None)
-            ).all()
-            
-            return [r[0] for r in results]
-    
-    def get_agent_switch_history(
-        self,
-        session_id: str,
-        limit: int = 100
-    ) -> List[Dict[str, Any]]:
-        """
-        Get agent switch history for a session.
+        result = await db.execute(
+            select(AgentContextModel).where(AgentContextModel.session_db_id == session.id)
+        )
+        context = result.scalar_one_or_none()
         
-        Args:
-            session_id: Session identifier
-            limit: Maximum number of switches to return
-            
-        Returns:
-            List of switch records
-        """
-        with self.session_scope() as db:
-            session = db.query(SessionModel).filter(
-                SessionModel.id == session_id,
-                SessionModel.deleted_at.is_(None)
-            ).first()
-            
-            if not session or not session.agent_context:
-                return []
-            
-            switches = db.query(AgentSwitchModel).filter(
-                AgentSwitchModel.context_db_id == session.agent_context.id
-            ).order_by(
-                AgentSwitchModel.switched_at.desc()
-            ).limit(limit).all()
-            
-            return [switch.to_dict() for switch in switches]
-    
-    # ==================== Cleanup Operations ====================
-    
-    def cleanup_old_sessions(self, max_age_hours: int = 24) -> int:
-        """
-        Clean up old inactive sessions (soft delete).
+        if not context:
+            return None
         
-        Args:
-            max_age_hours: Maximum age in hours before cleanup
-            
-        Returns:
-            Number of sessions cleaned up
-        """
-        with self.session_scope() as db:
-            cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
-            
-            # Soft delete old sessions
-            sessions_updated = db.query(SessionModel).filter(
-                SessionModel.last_activity < cutoff,
-                SessionModel.deleted_at.is_(None)
-            ).update({
-                "deleted_at": datetime.now(timezone.utc),
-                "is_active": False
-            }, synchronize_session=False)
-            
-            if sessions_updated > 0:
-                logger.info(f"Soft deleted {sessions_updated} old sessions")
-            
-            return sessions_updated
-    
-    def hard_delete_old_sessions(self, days_old: int = 30) -> int:
-        """
-        Permanently delete sessions that were soft-deleted long ago.
+        # Load switch history
+        result = await db.execute(
+            select(AgentSwitchModel)
+            .where(AgentSwitchModel.context_db_id == context.id)
+            .order_by(AgentSwitchModel.switched_at.asc())
+        )
+        switches = result.scalars().all()
         
-        Args:
-            days_old: Delete sessions soft-deleted more than this many days ago
-            
-        Returns:
-            Number of sessions permanently deleted
-        """
-        with self.session_scope() as db:
-            cutoff = datetime.now(timezone.utc) - timedelta(days=days_old)
-            
-            # Hard delete old soft-deleted sessions
-            sessions_deleted = db.query(SessionModel).filter(
-                SessionModel.deleted_at < cutoff
-            ).delete(synchronize_session=False)
-            
-            if sessions_deleted > 0:
-                logger.info(f"Permanently deleted {sessions_deleted} old sessions")
-            
-            return sessions_deleted
+        # Convert switches to agent_history format
+        agent_history = []
+        for switch in switches:
+            agent_history.append({
+                "from": switch.from_agent,
+                "to": switch.to_agent,
+                "reason": switch.reason,
+                "timestamp": switch.switched_at.isoformat()
+            })
+        
+        return {
+            "session_id": session_id,
+            "current_agent": context.current_agent,
+            "agent_history": agent_history,
+            "metadata": json.loads(context.metadata_json) if context.metadata_json else {},
+            "created_at": context.created_at,
+            "last_switch_at": switches[-1].switched_at if switches else None,
+            "switch_count": context.switch_count
+        }
     
     # ==================== Pending Approval Operations ====================
     
-    def save_pending_approval(
+    async def save_pending_approval(
         self,
+        db: AsyncSession,
         session_id: str,
         call_id: str,
         tool_name: str,
@@ -873,184 +756,335 @@ class Database:
         Save pending approval request to database.
         
         Args:
+            db: Database session
             session_id: Session identifier
             call_id: Tool call identifier (unique)
             tool_name: Name of the tool requiring approval
             arguments: Tool arguments
             reason: Reason why approval is required
         """
-        with self.session_scope() as db:
-            # Check if approval already exists
-            existing = db.query(PendingApproval).filter(
-                PendingApproval.call_id == call_id
-            ).first()
-            
-            if existing:
-                logger.warning(f"Pending approval already exists for call_id={call_id}")
-                return
-            
-            # Create new pending approval (no redundant approval_id field)
-            approval = PendingApproval(
-                session_id=session_id,
-                call_id=call_id,
-                tool_name=tool_name,
-                arguments=arguments,  # SQLAlchemy handles JSONB serialization
-                reason=reason,
-                status='pending'
-            )
-            
-            db.add(approval)
-            logger.info(f"Saved pending approval: session={session_id}, call_id={call_id}, tool={tool_name}")
+        from sqlalchemy import select
+        
+        # Check if approval already exists
+        result = await db.execute(
+            select(PendingApproval).where(PendingApproval.call_id == call_id)
+        )
+        existing = result.scalar_one_or_none()
+        
+        if existing:
+            logger.warning(f"Pending approval already exists for call_id={call_id}")
+            return
+        
+        # Create new pending approval
+        approval = PendingApproval(
+            session_id=session_id,
+            call_id=call_id,
+            tool_name=tool_name,
+            arguments=arguments,
+            reason=reason,
+            status='pending'
+        )
+        
+        db.add(approval)
+        await db.commit()
+        logger.info(f"Saved pending approval: session={session_id}, call_id={call_id}, tool={tool_name}")
     
-    def get_pending_approvals(self, session_id: str) -> List[Dict[str, Any]]:
+    async def get_pending_approvals(self, db: AsyncSession, session_id: str) -> List[Dict[str, Any]]:
         """
         Get all pending approval requests for a session.
         
         Args:
+            db: Database session
             session_id: Session identifier
             
         Returns:
             List of pending approval dictionaries
         """
-        with self.session_scope() as db:
-            approvals = db.query(PendingApproval).filter(
+        from sqlalchemy import select
+        
+        result = await db.execute(
+            select(PendingApproval)
+            .where(
                 PendingApproval.session_id == session_id,
                 PendingApproval.status == 'pending'
-            ).order_by(PendingApproval.created_at.asc()).all()
-            
-            return [
-                {
-                    'call_id': approval.call_id,
-                    'tool_name': approval.tool_name,
-                    'arguments': approval.arguments,  # JSONB auto-deserialized
-                    'reason': approval.reason,
-                    'created_at': approval.created_at
-                }
-                for approval in approvals
-            ]
+            )
+            .order_by(PendingApproval.created_at.asc())
+        )
+        approvals = result.scalars().all()
+        
+        return [
+            {
+                'call_id': approval.call_id,
+                'tool_name': approval.tool_name,
+                'arguments': approval.arguments,
+                'reason': approval.reason,
+                'created_at': approval.created_at
+            }
+            for approval in approvals
+        ]
     
-    def delete_pending_approval(self, call_id: str) -> bool:
+    async def delete_pending_approval(self, db: AsyncSession, call_id: str) -> bool:
         """
         Delete pending approval request from database.
         
         Args:
+            db: Database session
             call_id: Tool call identifier
             
         Returns:
             True if deleted, False if not found
         """
-        with self.session_scope() as db:
-            approval = db.query(PendingApproval).filter(
-                PendingApproval.call_id == call_id
-            ).first()
-            
-            if not approval:
-                logger.warning(f"Pending approval not found for call_id={call_id}")
-                return False
-            
-            db.delete(approval)
-            logger.info(f"Deleted pending approval: call_id={call_id}")
-            return True
-    
-    def update_approval_status(
-        self,
-        call_id: str,
-        status: str
-    ) -> bool:
-        """
-        Update status of pending approval.
+        from sqlalchemy import select
         
-        Args:
-            call_id: Tool call identifier
-            status: New status (approved, rejected, cancelled)
-            
-        Returns:
-            True if updated, False if not found
-        """
-        with self.session_scope() as db:
-            approval = db.query(PendingApproval).filter(
-                PendingApproval.call_id == call_id
-            ).first()
-            
-            if not approval:
-                logger.warning(f"Pending approval not found for call_id={call_id}")
-                return False
-            
-            approval.status = status
-            logger.info(f"Updated approval status: call_id={call_id}, status={status}")
-            return True
-
-
-    def update_session_title(self, session_id: str, title: str) -> bool:
-        """
-        Update session title.
+        result = await db.execute(
+            select(PendingApproval).where(PendingApproval.call_id == call_id)
+        )
+        approval = result.scalar_one_or_none()
         
-        Args:
-            session_id: Session identifier
-            title: New title (will be truncated to 500 chars)
-            
-        Returns:
-            True if updated, False if session not found
-        """
-        with self.session_scope() as db:
-            session = db.query(SessionModel).filter(
-                SessionModel.id == session_id,
-                SessionModel.deleted_at.is_(None)
-            ).first()
-            
-            if not session:
-                logger.warning(f"Session not found for title update: {session_id}")
-                return False
-            
-            session.title = title[:500] if len(title) > 500 else title
-            logger.info(f"Updated title for session {session_id}")
-            return True
-    
-    def update_session_description(self, session_id: str, description: str) -> bool:
-        """
-        Update session description (typically from LLM summarization).
+        if not approval:
+            logger.warning(f"Pending approval not found for call_id={call_id}")
+            return False
         
-        Args:
-            session_id: Session identifier
-            description: New description from LLM
-            
-        Returns:
-            True if updated, False if session not found
-        """
-        with self.session_scope() as db:
-            session = db.query(SessionModel).filter(
-                SessionModel.id == session_id,
-                SessionModel.deleted_at.is_(None)
-            ).first()
-            
-            if not session:
-                logger.warning(f"Session not found for description update: {session_id}")
-                return False
-            
-            session.description = description
-            logger.info(f"Updated description for session {session_id}")
-            return True
+        await db.delete(approval)
+        await db.commit()
+        logger.info(f"Deleted pending approval: call_id={call_id}")
+        return True
 
 
 # ==================== Dependency Injection ====================
 
-_database_instance: Optional[Database] = None
+_database_service: Optional[DatabaseService] = None
 
 
-def get_database() -> Database:
+def get_database_service() -> DatabaseService:
     """
-    Get database instance for dependency injection.
+    Get database service instance for dependency injection.
     
     Returns:
-        Database instance
+        DatabaseService instance
     """
-    global _database_instance
-    if _database_instance is None:
-        from app.core.config import AppConfig
-        _database_instance = Database(db_url=AppConfig.DB_URL)
-    return _database_instance
+    global _database_service
+    if _database_service is None:
+        _database_service = DatabaseService()
+    return _database_service
 
 
-def get_db() -> Database:
-    """Get database instance (convenience wrapper)"""
-    return get_database()
+# ==================== Backward Compatibility ====================
+
+class Database:
+    """
+    Backward compatibility wrapper for old synchronous code.
+    
+    This class provides a synchronous interface to the async database
+    for legacy code that hasn't been migrated yet.
+    
+    ⚠️ DEPRECATED: Use DatabaseService with async/await instead.
+    """
+    
+    def __init__(self, db_url: str = None):
+        """Initialize database wrapper"""
+        if db_url:
+            logger.warning(
+                "Database class is deprecated. "
+                "Use DatabaseService with async/await instead."
+            )
+        self._db_service = get_database_service()
+    
+    def _run_async(self, coro):
+        """Run async coroutine in sync context"""
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        return loop.run_until_complete(coro)
+    
+    async def _get_db_session(self):
+        """Get database session"""
+        async for db in get_db():
+            return db
+    
+    def save_session(
+        self,
+        session_id: str,
+        messages: List[Dict[str, Any]],
+        last_activity: datetime
+    ) -> None:
+        """Sync wrapper for save_session"""
+        async def _save():
+            async for db in get_db():
+                await self._db_service.save_session(
+                    db, session_id, messages, last_activity
+                )
+                break
+        
+        self._run_async(_save())
+    
+    def load_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """Sync wrapper for load_session"""
+        async def _load():
+            async for db in get_db():
+                result = await self._db_service.load_session(db, session_id)
+                return result
+        
+        return self._run_async(_load())
+    
+    def delete_session(self, session_id: str, soft: bool = True) -> bool:
+        """Sync wrapper for delete_session"""
+        async def _delete():
+            async for db in get_db():
+                result = await self._db_service.delete_session(db, session_id, soft)
+                return result
+        
+        return self._run_async(_delete())
+    
+    def list_all_sessions(self, include_deleted: bool = False) -> List[str]:
+        """Sync wrapper for list_all_sessions"""
+        async def _list():
+            async for db in get_db():
+                result = await self._db_service.list_all_sessions(db, include_deleted)
+                return result
+        
+        return self._run_async(_list())
+    
+    def save_agent_context(
+        self,
+        session_id: str,
+        current_agent: str,
+        agent_history: List[Dict[str, Any]],
+        metadata: Dict[str, Any],
+        created_at: datetime,
+        last_switch_at: Optional[datetime],
+        switch_count: int
+    ) -> None:
+        """Sync wrapper for save_agent_context"""
+        async def _save():
+            async for db in get_db():
+                await self._db_service.save_agent_context(
+                    db, session_id, current_agent, agent_history,
+                    metadata, created_at, last_switch_at, switch_count
+                )
+                break
+        
+        self._run_async(_save())
+    
+    def load_agent_context(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """Sync wrapper for load_agent_context"""
+        async def _load():
+            async for db in get_db():
+                result = await self._db_service.load_agent_context(db, session_id)
+                return result
+        
+        return self._run_async(_load())
+    
+    def delete_agent_context(self, session_id: str) -> bool:
+        """Sync wrapper for delete_agent_context"""
+        async def _delete():
+            async for db in get_db():
+                # Используем delete_session для удаления контекста
+                from sqlalchemy import select, delete as sql_delete
+                result = await db.execute(
+                    select(SessionModel).where(SessionModel.id == session_id)
+                )
+                session = result.scalar_one_or_none()
+                
+                if not session:
+                    return False
+                
+                result = await db.execute(
+                    select(AgentContextModel).where(
+                        AgentContextModel.session_db_id == session.id
+                    )
+                )
+                context = result.scalar_one_or_none()
+                
+                if not context:
+                    return False
+                
+                await db.delete(context)
+                await db.commit()
+                return True
+        
+        return self._run_async(_delete())
+    
+    def list_all_contexts(self) -> List[str]:
+        """Sync wrapper for list_all_contexts"""
+        async def _list():
+            async for db in get_db():
+                from sqlalchemy import select
+                result = await db.execute(
+                    select(SessionModel.id).join(
+                        AgentContextModel,
+                        SessionModel.id == AgentContextModel.session_db_id
+                    ).where(
+                        SessionModel.deleted_at.is_(None)
+                    )
+                )
+                sessions = result.scalars().all()
+                return list(sessions)
+        
+        return self._run_async(_list())
+    
+    def save_pending_approval(
+        self,
+        session_id: str,
+        call_id: str,
+        tool_name: str,
+        arguments: Dict[str, Any],
+        reason: Optional[str] = None
+    ) -> None:
+        """Sync wrapper for save_pending_approval"""
+        async def _save():
+            async for db in get_db():
+                await self._db_service.save_pending_approval(
+                    db, session_id, call_id, tool_name, arguments, reason
+                )
+                break
+        
+        self._run_async(_save())
+    
+    def get_pending_approvals(self, session_id: str) -> List[Dict[str, Any]]:
+        """Sync wrapper for get_pending_approvals"""
+        async def _get():
+            async for db in get_db():
+                result = await self._db_service.get_pending_approvals(db, session_id)
+                return result
+        
+        return self._run_async(_get())
+    
+    def delete_pending_approval(self, call_id: str) -> bool:
+        """Sync wrapper for delete_pending_approval"""
+        async def _delete():
+            async for db in get_db():
+                result = await self._db_service.delete_pending_approval(db, call_id)
+                return result
+        
+        return self._run_async(_delete())
+    
+    @contextmanager
+    def session_scope(self):
+        """
+        Deprecated context manager for backward compatibility.
+        
+        ⚠️ This is a no-op for compatibility. Operations are executed immediately.
+        """
+        logger.warning(
+            "session_scope() is deprecated and does nothing. "
+            "Operations are executed immediately."
+        )
+        yield self
+
+
+def get_db_legacy() -> Database:
+    """
+    Get Database instance for legacy code.
+    
+    ⚠️ DEPRECATED: Use get_database_service() instead.
+    """
+    return Database()
+
+
+# Alias for backward compatibility
+get_database = get_db_legacy

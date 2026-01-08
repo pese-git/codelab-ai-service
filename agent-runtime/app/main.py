@@ -4,12 +4,69 @@ Agent Runtime Service - Main application entry point.
 FastAPI application for AI agent runtime with LLM integration and tool execution.
 Multi-agent system with specialized agents for different tasks.
 """
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 
 from app.api.v1.endpoints import router as v1_router
 from app.middleware.internal_auth import InternalAuthMiddleware
-from app.core.config import AppConfig
+from app.core.config import AppConfig, logger
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan events"""
+    logger.info("Starting Agent Runtime Service...")
+    logger.info(f"Version: {AppConfig.VERSION}")
+    
+    # Startup logic
+    try:
+        # Initialize database
+        from app.services.database import init_database, init_db
+        init_database(AppConfig.DB_URL)
+        await init_db()
+        logger.info("✓ Database initialized")
+        
+        # Initialize async session manager
+        from app.services.session_manager_async import init_session_manager
+        await init_session_manager()
+        logger.info("✓ Session manager initialized")
+        
+        # Initialize async agent context manager
+        from app.services.agent_context_async import init_agent_context_manager
+        await init_agent_context_manager()
+        logger.info("✓ Agent context manager initialized")
+        
+    except Exception as e:
+        logger.error(f"Failed to initialize: {e}")
+        raise
+    
+    yield
+    
+    # Shutdown logic
+    logger.info("Shutting down Agent Runtime Service...")
+    
+    # Shutdown managers (flush pending writes)
+    try:
+        from app.services.session_manager_async import session_manager
+        from app.services.agent_context_async import agent_context_manager
+        
+        if session_manager:
+            await session_manager.shutdown()
+            logger.info("✓ Session manager shutdown")
+        
+        if agent_context_manager:
+            await agent_context_manager.shutdown()
+            logger.info("✓ Agent context manager shutdown")
+    except Exception as e:
+        logger.error(f"Error during shutdown: {e}")
+    
+    # Close database
+    from app.services.database import close_db
+    await close_db()
+    logger.info("✓ Database closed")
+
 
 # Initialize multi-agent system
 import app.agents  # This will register all agents
@@ -18,7 +75,8 @@ import app.agents  # This will register all agents
 app = FastAPI(
     title="Agent Runtime Service",
     version=AppConfig.VERSION,
-    description="AI Agent Runtime with LLM integration and tool execution support"
+    description="AI Agent Runtime with LLM integration and tool execution support",
+    lifespan=lifespan,
 )
 
 
