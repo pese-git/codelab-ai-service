@@ -163,9 +163,13 @@ async def stream_response(
             )
             
             # Append assistant message with tool_call to session
+            # Note: We need to add the message directly to preserve tool_calls structure
+            # which is not supported by append_message() method
             session_state = session_mgr.get(session_id)
             if session_state:
                 session_state.messages.append(assistant_msg)
+                # Mark session for persistence
+                await session_mgr._schedule_persist(session_id)
             
             # Send tool_call chunk
             chunk = StreamChunk(
