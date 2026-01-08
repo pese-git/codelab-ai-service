@@ -294,6 +294,39 @@ class AsyncAgentContextManager:
         """
         return self._contexts.get(session_id)
     
+    def get_or_create_sync(
+        self,
+        session_id: str,
+        initial_agent: AgentType = AgentType.ORCHESTRATOR
+    ) -> AgentContext:
+        """
+        Get existing context or create a new one (sync version).
+        
+        Creates context in memory only. Persistence happens in background.
+        Use this for sync code that needs immediate context access.
+        
+        Args:
+            session_id: Session identifier
+            initial_agent: Initial agent type for new contexts
+            
+        Returns:
+            Agent context for the session
+        """
+        if session_id not in self._contexts:
+            context = AgentContext(
+                session_id=session_id,
+                current_agent=initial_agent
+            )
+            self._contexts[session_id] = context
+            context._needs_persist = True
+            
+            logger.info(
+                f"Created new agent context (sync) for session {session_id} "
+                f"with initial agent {initial_agent.value}"
+            )
+        
+        return self._contexts[session_id]
+    
     def exists(self, session_id: str) -> bool:
         """
         Check if context exists for session.

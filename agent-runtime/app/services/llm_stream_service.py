@@ -135,7 +135,7 @@ async def stream_response(
             
             # If approval required, save pending state
             if requires_approval:
-                hitl_manager.add_pending(
+                await hitl_manager.add_pending(
                     session_id=session_id,
                     call_id=tool_call.id,
                     tool_name=tool_call.tool_name,

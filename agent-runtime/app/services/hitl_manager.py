@@ -20,7 +20,7 @@ from app.services.database import get_db, get_database_service
 
 # Lazy import to avoid circular dependency
 if TYPE_CHECKING:
-    from app.services.agent_context import AgentContextManager
+    from app.services.agent_context_async import AsyncAgentContextManager
 
 logger = logging.getLogger("agent-runtime.hitl_manager")
 
@@ -31,7 +31,7 @@ HITL_AUDIT_KEY = "hitl_audit_logs"
 
 def _get_agent_context_manager():
     """Lazy import to avoid circular dependency"""
-    from app.services.agent_context import agent_context_manager
+    from app.services.agent_context_async import agent_context_manager
     return agent_context_manager
 
 
@@ -49,7 +49,7 @@ class HITLManager:
         """Initialize HITL Manager with async database service"""
         self.db_service = get_database_service()
     
-    def add_pending(
+    async def add_pending(
         self,
         session_id: str,
         call_id: str,
@@ -73,7 +73,8 @@ class HITLManager:
         Returns:
             Created HITLPendingState
         """
-        context = _get_agent_context_manager().get_or_create(session_id)
+        # Get or create context (async)
+        context = await _get_agent_context_manager().get_or_create(session_id)
         
         # Initialize pending calls dict if not exists
         if HITL_PENDING_KEY not in context.metadata:
@@ -89,15 +90,9 @@ class HITLManager:
         )
         
         # Store in database (source of truth for persistence)
-        # Use asyncio.create_task for non-blocking persistence
-        try:
-            import asyncio
-            asyncio.create_task(self._save_pending_async(
-                session_id, call_id, tool_name, arguments, reason
-            ))
-        except Exception as e:
-            logger.error(f"Failed to schedule pending approval save: {e}", exc_info=True)
-            # Continue anyway - we still have in-memory state
+        await self._save_pending_async(
+            session_id, call_id, tool_name, arguments, reason
+        )
         
         # Also store in context metadata for fast access
         context.metadata[HITL_PENDING_KEY][call_id] = pending_state.model_dump()
@@ -153,7 +148,7 @@ class HITLManager:
         pending_calls = context.metadata.get(HITL_PENDING_KEY, {})
         return [HITLPendingState(**data) for data in pending_calls.values()]
     
-    def remove_pending(self, session_id: str, call_id: str) -> bool:
+    async def remove_pending(self, session_id: str, call_id: str) -> bool:
         """
         Remove a pending HITL state.
         Removes from both database and AgentContext.
@@ -165,12 +160,8 @@ class HITLManager:
         Returns:
             True if removed, False if not found
         """
-        # Remove from database (async, non-blocking)
-        try:
-            import asyncio
-            asyncio.create_task(self._delete_pending_async(call_id))
-        except Exception as e:
-            logger.error(f"Failed to schedule pending approval deletion: {e}", exc_info=True)
+        # Remove from database
+        await self._delete_pending_async(call_id)
         
         # Remove from context metadata
         context = _get_agent_context_manager().get(session_id)
@@ -216,7 +207,7 @@ class HITLManager:
         
         return len(expired_ids)
     
-    def log_decision(
+    async def log_decision(
         self,
         session_id: str,
         call_id: str,
@@ -241,7 +232,8 @@ class HITLManager:
         Returns:
             Created HITLAuditLog
         """
-        context = _get_agent_context_manager().get_or_create(session_id)
+        # Get or create context (async)
+        context = await _get_agent_context_manager().get_or_create(session_id)
         
         # Initialize audit logs list if not exists
         if HITL_AUDIT_KEY not in context.metadata:

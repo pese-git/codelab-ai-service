@@ -119,7 +119,7 @@ async def message_stream_sse(request: AgentStreamRequest):
                     return
                 
                 # Log decision to audit
-                hitl_manager.log_decision(
+                await hitl_manager.log_decision(
                     session_id=request.session_id,
                     call_id=call_id,
                     tool_name=pending_state.tool_name,
@@ -158,7 +158,7 @@ async def message_stream_sse(request: AgentStreamRequest):
                     }
                 
                 # Remove pending state
-                hitl_manager.remove_pending(request.session_id, call_id)
+                await hitl_manager.remove_pending(request.session_id, call_id)
                 
                 # Add tool result to history
                 result_str = json.dumps(result)
@@ -207,7 +207,7 @@ async def message_stream_sse(request: AgentStreamRequest):
                 was_pending = hitl_manager.has_pending(request.session_id, call_id)
                 if was_pending:
                     logger.info(f"Removing pending approval for restored tool: call_id={call_id}")
-                    hitl_manager.remove_pending(request.session_id, call_id)
+                    await hitl_manager.remove_pending(request.session_id, call_id)
                 
                 # Add tool_result to history as tool message
                 result_str = json.dumps(result) if not isinstance(result, str) else result
