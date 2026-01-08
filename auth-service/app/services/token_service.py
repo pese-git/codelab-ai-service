@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 from jose import JWTError, jwt
 
-from app.core.config import settings
+from app.core.config import logger, settings
 from app.core.security import rsa_key_manager
 from app.schemas.token import AccessTokenPayload, RefreshTokenPayload, TokenPair, TokenType
 
@@ -131,6 +131,23 @@ class TokenService:
         Returns:
             TokenPair with both tokens and their payloads
         """
+        logger.info(
+            f"[TRACE] TokenService.create_token_pair started",
+            extra={
+                "trace_point": "token_service_create_pair_start",
+                "user_id": user_id,
+                "client_id": client_id,
+                "scope": scope,
+                "access_lifetime": access_lifetime,
+                "refresh_lifetime": refresh_lifetime,
+            }
+        )
+        
+        logger.debug(
+            f"[TRACE] Creating access token",
+            extra={"trace_point": "create_access_token", "user_id": user_id}
+        )
+        
         access_token, access_payload = self.create_access_token(
             user_id=user_id,
             client_id=client_id,
@@ -138,11 +155,45 @@ class TokenService:
             lifetime=access_lifetime,
         )
 
+        logger.debug(
+            f"[TRACE] Access token created: jti={access_payload.jti}",
+            extra={
+                "trace_point": "access_token_created",
+                "jti": access_payload.jti,
+                "expires_in": access_lifetime or settings.access_token_lifetime,
+            }
+        )
+
+        logger.debug(
+            f"[TRACE] Creating refresh token",
+            extra={"trace_point": "create_refresh_token", "user_id": user_id}
+        )
+
         refresh_token, refresh_payload = self.create_refresh_token(
             user_id=user_id,
             client_id=client_id,
             scope=scope,
             lifetime=refresh_lifetime,
+        )
+
+        logger.debug(
+            f"[TRACE] Refresh token created: jti={refresh_payload.jti}",
+            extra={
+                "trace_point": "refresh_token_created",
+                "jti": refresh_payload.jti,
+                "expires_in": refresh_lifetime or settings.refresh_token_lifetime,
+            }
+        )
+
+        logger.info(
+            f"[TRACE] Token pair created successfully",
+            extra={
+                "trace_point": "token_service_create_pair_success",
+                "user_id": user_id,
+                "client_id": client_id,
+                "access_jti": access_payload.jti,
+                "refresh_jti": refresh_payload.jti,
+            }
         )
 
         return TokenPair(
@@ -166,6 +217,14 @@ class TokenService:
         Raises:
             JWTError: If token is invalid
         """
+        logger.debug(
+            f"[TRACE] Decoding JWT token",
+            extra={
+                "trace_point": "decode_token",
+                "verify": verify,
+            }
+        )
+        
         try:
             payload = jwt.decode(
                 token,
@@ -175,8 +234,26 @@ class TokenService:
                 issuer=settings.jwt_issuer,
                 options={"verify_signature": verify, "verify_exp": verify},
             )
+            
+            logger.debug(
+                f"[TRACE] Token decoded successfully",
+                extra={
+                    "trace_point": "token_decoded",
+                    "token_type": payload.get("type"),
+                    "jti": payload.get("jti"),
+                }
+            )
+            
             return payload
         except JWTError as e:
+            logger.warning(
+                f"[TRACE] Token decode failed: {e}",
+                extra={
+                    "trace_point": "token_decode_failed",
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                }
+            )
             raise JWTError(f"Invalid token: {str(e)}")
 
     def validate_access_token(self, token: str) -> AccessTokenPayload:
@@ -192,10 +269,31 @@ class TokenService:
         Raises:
             JWTError: If token is invalid
         """
+        logger.debug(
+            f"[TRACE] Validating access token",
+            extra={"trace_point": "validate_access_token"}
+        )
+        
         payload = self.decode_token(token)
 
         if payload.get("type") != TokenType.ACCESS:
+            logger.warning(
+                f"[TRACE] Invalid token type for access token",
+                extra={
+                    "trace_point": "invalid_access_token_type",
+                    "expected": TokenType.ACCESS,
+                    "actual": payload.get("type"),
+                }
+            )
             raise JWTError("Invalid token type")
+
+        logger.debug(
+            f"[TRACE] Access token validated",
+            extra={
+                "trace_point": "access_token_validated",
+                "jti": payload.get("jti"),
+            }
+        )
 
         return AccessTokenPayload(**payload)
 
@@ -212,10 +310,31 @@ class TokenService:
         Raises:
             JWTError: If token is invalid
         """
+        logger.debug(
+            f"[TRACE] Validating refresh token",
+            extra={"trace_point": "validate_refresh_token"}
+        )
+        
         payload = self.decode_token(token)
 
         if payload.get("type") != TokenType.REFRESH:
+            logger.warning(
+                f"[TRACE] Invalid token type for refresh token",
+                extra={
+                    "trace_point": "invalid_refresh_token_type",
+                    "expected": TokenType.REFRESH,
+                    "actual": payload.get("type"),
+                }
+            )
             raise JWTError("Invalid token type")
+
+        logger.debug(
+            f"[TRACE] Refresh token validated",
+            extra={
+                "trace_point": "refresh_token_validated",
+                "jti": payload.get("jti"),
+            }
+        )
 
         return RefreshTokenPayload(**payload)
 
