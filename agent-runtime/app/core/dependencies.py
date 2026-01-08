@@ -1,36 +1,39 @@
-"""
-FastAPI dependency injection providers.
+"""FastAPI dependencies for agent runtime service"""
 
-Provides singleton instances and factory functions for services.
-"""
+from typing import Annotated
+
 from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import AppConfig, logger
-from app.services.session_manager import session_manager
-from app.services.llm_proxy_client import LLMProxyClient, llm_proxy_client
-from app.services.tool_registry import LOCAL_TOOLS
+from app.services.database import get_db, get_database_service, DatabaseService
 
+# Database session dependency
+DBSession = Annotated[AsyncSession, Depends(get_db)]
 
-def get_config() -> AppConfig:
-    """Get application configuration"""
-    return AppConfig
-
-
-def get_logger():
-    """Get application logger"""
-    return logger
+# Database service dependency
+DBService = Annotated[DatabaseService, Depends(get_database_service)]
 
 
-def get_session_manager():
-    """Get session manager singleton"""
+# Async manager dependencies
+async def get_session_manager_dep():
+    """Get async session manager dependency"""
+    from app.services.session_manager_async import session_manager
+    if session_manager is None:
+        raise RuntimeError("SessionManager not initialized")
     return session_manager
 
 
-def get_llm_proxy_client() -> LLMProxyClient:
-    """Get LLM proxy client singleton"""
-    return llm_proxy_client
+async def get_agent_context_manager_dep():
+    """Get async agent context manager dependency"""
+    from app.services.agent_context_async import agent_context_manager
+    if agent_context_manager is None:
+        raise RuntimeError("AgentContextManager not initialized")
+    return agent_context_manager
 
 
-def get_tool_registry():
-    """Get local tool registry"""
-    return LOCAL_TOOLS
+# Type annotations for async managers
+from app.services.session_manager_async import AsyncSessionManager
+from app.services.agent_context_async import AsyncAgentContextManager
+
+SessionManagerDep = Annotated[AsyncSessionManager, Depends(get_session_manager_dep)]
+AgentContextManagerDep = Annotated[AsyncAgentContextManager, Depends(get_agent_context_manager_dep)]

@@ -8,8 +8,8 @@ from typing import AsyncGenerator, Optional
 from app.agents.base_agent import AgentType
 from app.models.schemas import StreamChunk
 from app.services.agent_router import agent_router
-from app.services.agent_context import agent_context_manager
-from app.services.session_manager import session_manager
+from app.services.agent_context_async import agent_context_manager
+from app.services.session_manager_async import session_manager
 
 logger = logging.getLogger("agent-runtime.multi_agent_orchestrator")
 
@@ -44,8 +44,14 @@ class MultiAgentOrchestrator:
         """
         logger.info(f"MultiAgentOrchestrator processing message for session {session_id}")
         
-        # Get or create agent context
-        context = agent_context_manager.get_or_create(session_id)
+        # Get or create agent context (async)
+        # Import here to avoid circular dependency and get initialized instance
+        from app.services.agent_context_async import agent_context_manager as async_ctx_mgr
+        
+        if async_ctx_mgr is None:
+            raise RuntimeError("AgentContextManager not initialized")
+        
+        context = await async_ctx_mgr.get_or_create(session_id)
         
         # Handle explicit agent switch request
         if agent_type:
@@ -68,6 +74,12 @@ class MultiAgentOrchestrator:
                     is_final=False
                 )
         
+        # Get session manager for passing to agents
+        from app.services.session_manager_async import session_manager as async_session_mgr
+        
+        if async_session_mgr is None:
+            raise RuntimeError("SessionManager not initialized")
+        
         # If current agent is Orchestrator and we have a message, let it route
         if context.current_agent == AgentType.ORCHESTRATOR and message:
             logger.debug("Current agent is Orchestrator, will route to specialist")
@@ -77,7 +89,8 @@ class MultiAgentOrchestrator:
             async for chunk in orchestrator.process(
                 session_id=session_id,
                 message=message,
-                context=context.model_dump()
+                context=context.model_dump(),
+                session_mgr=async_session_mgr
             ):
                 if chunk.type == "switch_agent":
                     # Extract target agent from metadata
@@ -122,7 +135,8 @@ class MultiAgentOrchestrator:
         async for chunk in current_agent.process(
             session_id=session_id,
             message=message,
-            context=context.model_dump()
+            context=context.model_dump(),
+            session_mgr=async_session_mgr
         ):
             # Check for agent switch requests from the agent itself
             if chunk.type == "switch_agent":
@@ -154,7 +168,8 @@ class MultiAgentOrchestrator:
                 async for new_chunk in new_agent.process(
                     session_id=session_id,
                     message=message,
-                    context=context.model_dump()
+                    context=context.model_dump(),
+                    session_mgr=async_session_mgr
                 ):
                     yield new_chunk
                 
@@ -173,7 +188,9 @@ class MultiAgentOrchestrator:
         Returns:
             Current agent type or None if session doesn't exist
         """
-        context = agent_context_manager.get(session_id)
+        # Import here to get initialized instance
+        from app.services.agent_context_async import agent_context_manager as async_ctx_mgr
+        context = async_ctx_mgr.get(session_id) if async_ctx_mgr else None
         return context.current_agent if context else None
     
     def get_agent_history(self, session_id: str) -> list:
@@ -186,7 +203,9 @@ class MultiAgentOrchestrator:
         Returns:
             List of agent switch records
         """
-        context = agent_context_manager.get(session_id)
+        # Import here to get initialized instance
+        from app.services.agent_context_async import agent_context_manager as async_ctx_mgr
+        context = async_ctx_mgr.get(session_id) if async_ctx_mgr else None
         return context.get_agent_history() if context else []
     
     def reset_session(self, session_id: str) -> None:
@@ -196,7 +215,9 @@ class MultiAgentOrchestrator:
         Args:
             session_id: Session identifier
         """
-        context = agent_context_manager.get(session_id)
+        # Import here to get initialized instance
+        from app.services.agent_context_async import agent_context_manager as async_ctx_mgr
+        context = async_ctx_mgr.get(session_id) if async_ctx_mgr else None
         if context:
             context.switch_agent(AgentType.ORCHESTRATOR, "Session reset")
             logger.info(f"Reset session {session_id} to Orchestrator agent")

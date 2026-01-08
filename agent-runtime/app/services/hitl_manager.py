@@ -4,7 +4,7 @@ HITL Manager for managing pending tool calls and user decisions.
 Integrates with AgentContext to store pending states and provides
 methods for adding, retrieving, and resolving HITL approvals.
 
-Now with database persistence for approval requests.
+Now with async database persistence for approval requests.
 """
 import logging
 from datetime import datetime
@@ -16,11 +16,11 @@ from app.models.hitl_models import (
     HITLDecision,
     HITLAuditLog
 )
-from app.services.database import get_database
+from app.services.database import get_db, get_database_service
 
 # Lazy import to avoid circular dependency
 if TYPE_CHECKING:
-    from app.services.agent_context import AgentContextManager
+    from app.services.agent_context_async import AsyncAgentContextManager
 
 logger = logging.getLogger("agent-runtime.hitl_manager")
 
@@ -31,7 +31,7 @@ HITL_AUDIT_KEY = "hitl_audit_logs"
 
 def _get_agent_context_manager():
     """Lazy import to avoid circular dependency"""
-    from app.services.agent_context import agent_context_manager
+    from app.services.agent_context_async import agent_context_manager
     return agent_context_manager
 
 
@@ -46,10 +46,10 @@ class HITLManager:
     """
     
     def __init__(self):
-        """Initialize HITL Manager with database access"""
-        self.db = get_database()
+        """Initialize HITL Manager with async database service"""
+        self.db_service = get_database_service()
     
-    def add_pending(
+    async def add_pending(
         self,
         session_id: str,
         call_id: str,
@@ -73,7 +73,8 @@ class HITLManager:
         Returns:
             Created HITLPendingState
         """
-        context = _get_agent_context_manager().get_or_create(session_id)
+        # Get or create context (async)
+        context = await _get_agent_context_manager().get_or_create(session_id)
         
         # Initialize pending calls dict if not exists
         if HITL_PENDING_KEY not in context.metadata:
@@ -89,17 +90,9 @@ class HITLManager:
         )
         
         # Store in database (source of truth for persistence)
-        try:
-            self.db.save_pending_approval(
-                session_id=session_id,
-                call_id=call_id,
-                tool_name=tool_name,
-                arguments=arguments,
-                reason=reason
-            )
-        except Exception as e:
-            logger.error(f"Failed to save pending approval to database: {e}", exc_info=True)
-            # Continue anyway - we still have in-memory state
+        await self._save_pending_async(
+            session_id, call_id, tool_name, arguments, reason
+        )
         
         # Also store in context metadata for fast access
         context.metadata[HITL_PENDING_KEY][call_id] = pending_state.model_dump()
@@ -147,32 +140,15 @@ class HITLManager:
         Returns:
             List of HITLPendingState objects
         """
-        try:
-            # Load from database (source of truth)
-            pending_list = self.db.get_pending_approvals(session_id)
-            
-            return [
-                HITLPendingState(
-                    call_id=p['call_id'],
-                    tool_name=p['tool_name'],
-                    arguments=p['arguments'],
-                    reason=p.get('reason'),
-                    created_at=p['created_at']
-                )
-                for p in pending_list
-            ]
-        except Exception as e:
-            logger.error(f"Failed to load pending approvals from database: {e}", exc_info=True)
-            
-            # Fallback to in-memory state
-            context = _get_agent_context_manager().get(session_id)
-            if not context:
-                return []
-            
-            pending_calls = context.metadata.get(HITL_PENDING_KEY, {})
-            return [HITLPendingState(**data) for data in pending_calls.values()]
+        # Fallback to in-memory state (database load is async, not suitable here)
+        context = _get_agent_context_manager().get(session_id)
+        if not context:
+            return []
+        
+        pending_calls = context.metadata.get(HITL_PENDING_KEY, {})
+        return [HITLPendingState(**data) for data in pending_calls.values()]
     
-    def remove_pending(self, session_id: str, call_id: str) -> bool:
+    async def remove_pending(self, session_id: str, call_id: str) -> bool:
         """
         Remove a pending HITL state.
         Removes from both database and AgentContext.
@@ -185,10 +161,7 @@ class HITLManager:
             True if removed, False if not found
         """
         # Remove from database
-        try:
-            self.db.delete_pending_approval(call_id)
-        except Exception as e:
-            logger.error(f"Failed to delete pending approval from database: {e}", exc_info=True)
+        await self._delete_pending_async(call_id)
         
         # Remove from context metadata
         context = _get_agent_context_manager().get(session_id)
@@ -234,7 +207,7 @@ class HITLManager:
         
         return len(expired_ids)
     
-    def log_decision(
+    async def log_decision(
         self,
         session_id: str,
         call_id: str,
@@ -259,7 +232,8 @@ class HITLManager:
         Returns:
             Created HITLAuditLog
         """
-        context = _get_agent_context_manager().get_or_create(session_id)
+        # Get or create context (async)
+        context = await _get_agent_context_manager().get_or_create(session_id)
         
         # Initialize audit logs list if not exists
         if HITL_AUDIT_KEY not in context.metadata:
@@ -315,6 +289,39 @@ class HITLManager:
             True if pending approval exists
         """
         return self.get_pending(session_id, call_id) is not None
+
+
+    async def _save_pending_async(
+        self,
+        session_id: str,
+        call_id: str,
+        tool_name: str,
+        arguments: Dict,
+        reason: Optional[str]
+    ):
+        """Async helper to save pending approval to database"""
+        try:
+            async for db in get_db():
+                await self.db_service.save_pending_approval(
+                    db=db,
+                    session_id=session_id,
+                    call_id=call_id,
+                    tool_name=tool_name,
+                    arguments=arguments,
+                    reason=reason
+                )
+                break
+        except Exception as e:
+            logger.error(f"Failed to save pending approval to database: {e}", exc_info=True)
+    
+    async def _delete_pending_async(self, call_id: str):
+        """Async helper to delete pending approval from database"""
+        try:
+            async for db in get_db():
+                await self.db_service.delete_pending_approval(db, call_id)
+                break
+        except Exception as e:
+            logger.error(f"Failed to delete pending approval from database: {e}", exc_info=True)
 
 
 # Singleton instance for global use
