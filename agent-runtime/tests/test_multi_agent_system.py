@@ -11,7 +11,7 @@ from app.agents.architect_agent import ArchitectAgent
 from app.agents.debug_agent import DebugAgent
 from app.agents.ask_agent import AskAgent
 from app.services.agent_router import AgentRouter
-from app.services.agent_context import AgentContext, AgentContextManager
+from app.services.agent_context_async import AgentContext, AsyncAgentContextManager
 
 
 class TestAgentInitialization:
@@ -167,43 +167,47 @@ class TestAgentContext:
 class TestAgentContextManager:
     """Test agent context manager"""
     
-    def test_get_or_create(self):
+    async def test_get_or_create(self):
         """Test getting or creating context"""
-        manager = AgentContextManager()
+        manager = AsyncAgentContextManager()
+        await manager.initialize()
         
-        context = manager.get_or_create("session_1")
+        context = await manager.get_or_create("session_1")
         
         assert context.session_id == "session_1"
         assert context.current_agent == AgentType.ORCHESTRATOR
     
-    def test_get_existing_context(self):
+    async def test_get_existing_context(self):
         """Test getting existing context"""
-        manager = AgentContextManager()
+        manager = AsyncAgentContextManager()
+        await manager.initialize()
         
-        context1 = manager.get_or_create("session_1")
-        context2 = manager.get_or_create("session_1")
+        context1 = await manager.get_or_create("session_1")
+        context2 = await manager.get_or_create("session_1")
         
         assert context1 is context2
     
-    def test_delete_context(self):
+    async def test_delete_context(self):
         """Test deleting context"""
-        manager = AgentContextManager()
+        manager = AsyncAgentContextManager()
+        await manager.initialize()
         
-        manager.get_or_create("session_1")
+        await manager.get_or_create("session_1")
         assert manager.exists("session_1")
         
-        deleted = manager.delete("session_1")
+        deleted = await manager.delete("session_1")
         
         assert deleted is True
         assert not manager.exists("session_1")
     
-    def test_session_count(self):
+    async def test_session_count(self):
         """Test session count"""
-        manager = AgentContextManager()
+        manager = AsyncAgentContextManager()
+        await manager.initialize()
         
-        manager.get_or_create("session_1")
-        manager.get_or_create("session_2")
-        manager.get_or_create("session_3")
+        await manager.get_or_create("session_1")
+        await manager.get_or_create("session_2")
+        await manager.get_or_create("session_3")
         
         assert manager.get_session_count() == 3
 
