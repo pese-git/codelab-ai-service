@@ -10,7 +10,7 @@ from app.agents.base_agent import BaseAgent, AgentType
 from app.agents.prompts.ask import ASK_PROMPT
 from app.models.schemas import StreamChunk
 from app.services.llm_stream_service import stream_response
-from app.services.session_manager import session_manager
+from app.services.session_manager_async import AsyncSessionManager
 
 logger = logging.getLogger("agent-runtime.ask_agent")
 
@@ -48,10 +48,11 @@ class AskAgent(BaseAgent):
         logger.info("Ask agent initialized (read-only mode)")
     
     async def process(
-        self, 
+        self,
         session_id: str,
         message: str,
-        context: Dict[str, Any]
+        context: Dict[str, Any],
+        session_mgr: AsyncSessionManager
     ) -> AsyncGenerator[StreamChunk, None]:
         """
         Process message through Ask agent.
@@ -60,6 +61,7 @@ class AskAgent(BaseAgent):
             session_id: Session identifier
             message: User message to process
             context: Agent context with history
+            session_mgr: Async session manager for session operations
             
         Yields:
             StreamChunk: Chunks for SSE streaming
@@ -67,7 +69,7 @@ class AskAgent(BaseAgent):
         logger.info(f"Ask agent processing message for session {session_id}")
         
         # Get session history
-        history = session_manager.get_history(session_id)
+        history = session_mgr.get_history(session_id)
         
         # Update system prompt
         if history and history[0].get("role") == "system":
@@ -76,7 +78,7 @@ class AskAgent(BaseAgent):
             history.insert(0, {"role": "system", "content": self.system_prompt})
         
         # Delegate to LLM stream service with allowed tools
-        async for chunk in stream_response(session_id, history, self.allowed_tools):
+        async for chunk in stream_response(session_id, history, self.allowed_tools, session_mgr):
             # Handle switch_mode tool call directly (don't send to IDE)
             if chunk.type == "tool_call" and chunk.tool_name == "switch_mode":
                 target_mode = chunk.arguments.get("mode", "orchestrator")
@@ -87,7 +89,7 @@ class AskAgent(BaseAgent):
                 )
                 
                 # Add tool result to history before switching
-                session_manager.append_tool_result(
+                await session_mgr.append_tool_result(
                     session_id=session_id,
                     call_id=chunk.call_id,
                     tool_name="switch_mode",

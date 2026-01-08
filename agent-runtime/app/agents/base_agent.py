@@ -4,10 +4,13 @@ Base agent class for multi-agent system.
 Defines the interface and common functionality for all specialized agents.
 """
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Optional, AsyncGenerator
+from typing import List, Dict, Any, Optional, AsyncGenerator, TYPE_CHECKING
 from enum import Enum
 import re
 import logging
+
+if TYPE_CHECKING:
+    from app.services.session_manager_async import AsyncSessionManager
 
 logger = logging.getLogger("agent-runtime.base_agent")
 
@@ -61,10 +64,11 @@ class BaseAgent(ABC):
     
     @abstractmethod
     async def process(
-        self, 
+        self,
         session_id: str,
         message: str,
-        context: Dict[str, Any]
+        context: Dict[str, Any],
+        session_mgr: "AsyncSessionManager"
     ) -> AsyncGenerator:
         """
         Process a message through this agent.
@@ -73,6 +77,7 @@ class BaseAgent(ABC):
             session_id: Session identifier
             message: User message to process
             context: Agent context with history and metadata
+            session_mgr: Async session manager for session operations
             
         Yields:
             StreamChunk: Chunks for SSE streaming

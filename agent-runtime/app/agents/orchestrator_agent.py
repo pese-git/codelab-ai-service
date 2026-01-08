@@ -5,12 +5,15 @@ Analyzes user requests using LLM and routes them to appropriate specialized agen
 """
 import json
 import logging
-from typing import AsyncGenerator, Dict, Any
+from typing import AsyncGenerator, Dict, Any, TYPE_CHECKING
 from app.agents.base_agent import BaseAgent, AgentType
 from app.agents.prompts.orchestrator import ORCHESTRATOR_PROMPT
 from app.models.schemas import StreamChunk
 from app.services.llm_proxy_client import llm_proxy_client
 from app.core.config import AppConfig
+
+if TYPE_CHECKING:
+    from app.services.session_manager_async import AsyncSessionManager
 
 logger = logging.getLogger("agent-runtime.orchestrator_agent")
 
@@ -80,10 +83,11 @@ class OrchestratorAgent(BaseAgent):
         logger.info("Orchestrator agent initialized with LLM-based classification")
     
     async def process(
-        self, 
+        self,
         session_id: str,
         message: str,
-        context: Dict[str, Any]
+        context: Dict[str, Any],
+        session_mgr: "AsyncSessionManager"
     ) -> AsyncGenerator[StreamChunk, None]:
         """
         Analyze request using LLM and determine which agent should handle it.
@@ -92,6 +96,7 @@ class OrchestratorAgent(BaseAgent):
             session_id: Session identifier
             message: User message to analyze
             context: Agent context with history
+            session_mgr: Async session manager for session operations (not used by orchestrator)
             
         Yields:
             StreamChunk: Switch agent chunk with routing decision

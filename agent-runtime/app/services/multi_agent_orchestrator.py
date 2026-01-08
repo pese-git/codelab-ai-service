@@ -74,6 +74,12 @@ class MultiAgentOrchestrator:
                     is_final=False
                 )
         
+        # Get session manager for passing to agents
+        from app.services.session_manager_async import session_manager as async_session_mgr
+        
+        if async_session_mgr is None:
+            raise RuntimeError("SessionManager not initialized")
+        
         # If current agent is Orchestrator and we have a message, let it route
         if context.current_agent == AgentType.ORCHESTRATOR and message:
             logger.debug("Current agent is Orchestrator, will route to specialist")
@@ -83,7 +89,8 @@ class MultiAgentOrchestrator:
             async for chunk in orchestrator.process(
                 session_id=session_id,
                 message=message,
-                context=context.model_dump()
+                context=context.model_dump(),
+                session_mgr=async_session_mgr
             ):
                 if chunk.type == "switch_agent":
                     # Extract target agent from metadata
@@ -128,7 +135,8 @@ class MultiAgentOrchestrator:
         async for chunk in current_agent.process(
             session_id=session_id,
             message=message,
-            context=context.model_dump()
+            context=context.model_dump(),
+            session_mgr=async_session_mgr
         ):
             # Check for agent switch requests from the agent itself
             if chunk.type == "switch_agent":
@@ -160,7 +168,8 @@ class MultiAgentOrchestrator:
                 async for new_chunk in new_agent.process(
                     session_id=session_id,
                     message=message,
-                    context=context.model_dump()
+                    context=context.model_dump(),
+                    session_mgr=async_session_mgr
                 ):
                     yield new_chunk
                 
