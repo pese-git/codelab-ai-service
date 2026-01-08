@@ -310,13 +310,36 @@ def init_database(database_url: str):
     else:
         async_db_url = db_url
     
-    # Create async engine
-    engine = create_async_engine(
-        async_db_url,
-        echo=False,
-        future=True,
-        pool_pre_ping=True,
-    )
+    # Create async engine with SQLite-specific configuration
+    if "sqlite" in async_db_url:
+        # Configure SQLite WAL mode via event listener on async engine
+        engine = create_async_engine(
+            async_db_url,
+            echo=False,
+            future=True,
+            pool_pre_ping=True,
+        )
+        
+        @event.listens_for(engine.sync_engine, "connect")
+        def set_sqlite_pragma(dbapi_conn, connection_record):
+            """Set SQLite pragmas for better performance"""
+            cursor = dbapi_conn.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.execute("PRAGMA cache_size=-64000")  # 64MB cache
+            cursor.execute("PRAGMA temp_store=MEMORY")
+            cursor.execute("PRAGMA busy_timeout=30000")  # 30 seconds
+            cursor.close()
+        
+        logger.info("SQLite WAL mode and performance pragmas configured")
+    else:
+        # Create async engine for non-SQLite databases
+        engine = create_async_engine(
+            async_db_url,
+            echo=False,
+            future=True,
+            pool_pre_ping=True,
+        )
     
     # Create async session factory
     async_session_maker = async_sessionmaker(
@@ -326,25 +349,6 @@ def init_database(database_url: str):
     )
     
     logger.info(f"Database initialized with URL: {db_url}")
-
-
-# Enable WAL mode for SQLite (for better concurrency)
-if db_url and "sqlite" in db_url:
-    sync_engine = create_engine(
-        db_url,
-        echo=False,
-    )
-
-    @event.listens_for(sync_engine, "connect")
-    def set_sqlite_pragma(dbapi_conn, connection_record):
-        """Set SQLite pragmas for better performance"""
-        cursor = dbapi_conn.cursor()
-        cursor.execute("PRAGMA journal_mode=WAL")
-        cursor.execute("PRAGMA synchronous=NORMAL")
-        cursor.execute("PRAGMA cache_size=-64000")  # 64MB cache
-        cursor.execute("PRAGMA temp_store=MEMORY")
-        cursor.execute("PRAGMA busy_timeout=30000")  # 30 seconds
-        cursor.close()
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
