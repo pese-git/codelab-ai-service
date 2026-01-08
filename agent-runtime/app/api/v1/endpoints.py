@@ -12,10 +12,10 @@ from sse_starlette.sse import EventSourceResponse
 from sqlalchemy import func
 
 from app.core.config import AppConfig
-from app.core.dependencies import DBSession, DBService
+from app.core.dependencies import DBSession, DBService, SessionManagerDep, AgentContextManagerDep
 from app.models.schemas import AgentStreamRequest, HealthResponse, AgentInfo
 from app.models.hitl_models import HITLUserDecision, HITLDecision
-from app.services.session_manager import session_manager
+from app.services.session_manager import session_manager  # Fallback for non-DI code
 from app.services.llm_stream_service import stream_response
 from app.services.multi_agent_orchestrator import multi_agent_orchestrator
 from app.services.agent_router import agent_router
@@ -387,22 +387,26 @@ async def list_agents():
 
 
 @router.get("/agents/{session_id}/current")
-async def get_current_agent(session_id: str):
+async def get_current_agent(
+    session_id: str,
+    agent_ctx_mgr: AgentContextManagerDep
+):
     """
     Get current active agent for a session.
     
     Args:
         session_id: Session identifier
+        agent_ctx_mgr: Async agent context manager (injected)
         
     Returns:
         Current agent information and switch history
     """
     logger.debug(f"Getting current agent for session {session_id}")
     
-    current_agent = multi_agent_orchestrator.get_current_agent(session_id)
-    agent_history = multi_agent_orchestrator.get_agent_history(session_id)
+    # Get agent context (direct access to async manager)
+    agent_context = agent_ctx_mgr.get(session_id)
     
-    if not current_agent:
+    if not agent_context:
         return JSONResponse(
             content={"error": "Session not found"},
             status_code=404
@@ -410,14 +414,18 @@ async def get_current_agent(session_id: str):
     
     return {
         "session_id": session_id,
-        "current_agent": current_agent.value,
-        "agent_history": agent_history,
-        "switch_count": len(agent_history)
+        "current_agent": agent_context.current_agent.value,
+        "agent_history": agent_context.get_agent_history(),
+        "switch_count": agent_context.switch_count
     }
 
 
 @router.get("/sessions/{session_id}/history")
-async def get_session_history(session_id: str):
+async def get_session_history(
+    session_id: str,
+    session_mgr: SessionManagerDep,
+    agent_ctx_mgr: AgentContextManagerDep
+):
     """
     Get message history for a session.
     
@@ -425,28 +433,31 @@ async def get_session_history(session_id: str):
     
     Args:
         session_id: Session identifier
+        session_mgr: Async session manager (injected)
+        agent_ctx_mgr: Async agent context manager (injected)
         
     Returns:
         Session history with messages and metadata
     """
     logger.debug(f"Getting history for session {session_id}")
     
-    # Check if session exists
-    if not session_manager.exists(session_id):
+    # Check if session exists (direct access to async manager)
+    if not session_mgr.exists(session_id):
         return JSONResponse(
             content={"error": f"Session {session_id} not found"},
             status_code=404
         )
     
-    # Get session state
-    session_state = session_manager.get(session_id)
+    # Get session state (direct access)
+    session_state = session_mgr.get(session_id)
     
-    # Get message history
-    messages = session_manager.get_history(session_id)
+    # Get message history (direct access)
+    messages = session_mgr.get_history(session_id)
     
-    # Get current agent info
-    current_agent = multi_agent_orchestrator.get_current_agent(session_id)
-    agent_history = multi_agent_orchestrator.get_agent_history(session_id)
+    # Get current agent info (direct access)
+    agent_context = agent_ctx_mgr.get(session_id)
+    current_agent = agent_context.current_agent if agent_context else None
+    agent_history = agent_context.get_agent_history() if agent_context else []
     
     return {
         "session_id": session_id,
@@ -459,10 +470,19 @@ async def get_session_history(session_id: str):
 
 
 @router.get("/sessions")
-async def list_sessions(db: DBSession, db_service: DBService):
+async def list_sessions(
+    db: DBSession,
+    db_service: DBService,
+    agent_ctx_mgr: AgentContextManagerDep
+):
     """
     List all active sessions with metadata.
     
+    Args:
+        db: Database session (injected)
+        db_service: Database service (injected)
+        agent_ctx_mgr: Async agent context manager (injected)
+        
     Returns:
         List of sessions with title, description, and basic info
     """
@@ -494,8 +514,9 @@ async def list_sessions(db: DBSession, db_service: DBService):
     for session_model, message_count in sessions_with_counts:
         session_id = session_model.session_id
         
-        # Get current agent (from in-memory cache, not DB)
-        current_agent = multi_agent_orchestrator.get_current_agent(session_id)
+        # Get current agent (direct access to async manager)
+        agent_context = agent_ctx_mgr.get(session_id)
+        current_agent = agent_context.current_agent if agent_context else None
         
         session_info = {
             "session_id": session_id,
@@ -515,13 +536,24 @@ async def list_sessions(db: DBSession, db_service: DBService):
 
 
 @router.post("/sessions")
-async def create_session(db: DBSession, db_service: DBService):
+async def create_session(
+    db: DBSession,
+    db_service: DBService,
+    session_mgr: SessionManagerDep,
+    agent_ctx_mgr: AgentContextManagerDep
+):
     """
     Create a new session explicitly.
     
     This endpoint allows the IDE to create a session before opening WebSocket.
     The session will be created in the database and a unique session_id will be returned.
     
+    Args:
+        db: Database session (injected)
+        db_service: Database service (injected)
+        session_mgr: Async session manager (injected)
+        agent_ctx_mgr: Async agent context manager (injected)
+        
     Returns:
         Session information with session_id
     """
@@ -541,15 +573,17 @@ async def create_session(db: DBSession, db_service: DBService):
         session_id = new_session.id
         await db.commit()
         
-        # Create in-memory session AFTER database commit
-        # This avoids blocking the database transaction with in-memory operations
-        session = session_manager.get_or_create(
+        # Create in-memory session using async manager
+        session = await session_mgr.create(
             session_id,
             system_prompt=""
         )
         
-        # Initialize with orchestrator agent
-        multi_agent_orchestrator.get_current_agent(session_id)
+        # Initialize agent context with orchestrator
+        await agent_ctx_mgr.get_or_create(
+            session_id,
+            initial_agent=AgentType.ORCHESTRATOR
+        )
         
         logger.info(f"Created new session: {session_id}")
         
@@ -561,7 +595,7 @@ async def create_session(db: DBSession, db_service: DBService):
         }
         
     except Exception as e:
-        # If in-memory initialization failed after DB commit, clean up database record
+        # If initialization failed after DB commit, clean up database record
         if session_id:
             logger.error(f"Failed to initialize session {session_id}, cleaning up: {e}")
             try:
@@ -572,7 +606,10 @@ async def create_session(db: DBSession, db_service: DBService):
 
 
 @router.get("/sessions/{session_id}/pending-approvals")
-async def get_pending_approvals(session_id: str):
+async def get_pending_approvals(
+    session_id: str,
+    session_mgr: SessionManagerDep
+):
     """
     Get all pending approval requests for a session.
     
@@ -581,14 +618,15 @@ async def get_pending_approvals(session_id: str):
     
     Args:
         session_id: Session identifier
+        session_mgr: Async session manager (injected)
         
     Returns:
         List of pending approval requests with their details
     """
     logger.debug(f"Getting pending approvals for session {session_id}")
     
-    # Check if session exists
-    if not session_manager.exists(session_id):
+    # Check if session exists (direct access to async manager)
+    if not session_mgr.exists(session_id):
         return JSONResponse(
             content={"error": f"Session {session_id} not found"},
             status_code=404
