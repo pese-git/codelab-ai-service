@@ -117,7 +117,7 @@ curl -X POST http://localhost:8002/v1/chat/completions \
 
 1. Клонируйте репозиторий:
 ```bash
-git clone https://github.com/openidealab/codelab-ai-service.git
+git clone https://github.com/pese-git/codelab-ai-service.git
 cd codelab-ai-service
 ```
 
