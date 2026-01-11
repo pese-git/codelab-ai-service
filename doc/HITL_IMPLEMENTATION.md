@@ -1,8 +1,12 @@
 # HITL (Human-in-the-Loop) Implementation
 
+**Статус**: ✅ **ПОЛНОСТЬЮ РЕАЛИЗОВАНО**
+**Версия**: 1.0
+**Дата обновления**: 11 января 2026
+
 ## Обзор
 
-Реализация механизма Human-in-the-Loop (HITL) для одобрения опасных операций агента перед их выполнением.
+Реализация механизма Human-in-the-Loop (HITL) для одобрения опасных операций агента перед их выполнением. Система включает персистентное хранение в PostgreSQL/SQLite и полную интеграцию с мультиагентной системой.
 
 ## Архитектура
 
@@ -213,14 +217,107 @@ hitl_policy_service.enable()
 
 ## Производительность
 
-- Pending состояния хранятся в памяти (AgentContext)
+- Dual storage: Database (persistence) + AgentContext (fast access)
 - Минимальный overhead для безопасных операций
 - Асинхронная обработка решений
+- Background persistence для batch operations
 
-## Будущие улучшения
+## ✅ Реализованные возможности
 
-- [ ] Персистентное хранение pending состояний (Redis/PostgreSQL)
-- [ ] Поддержка ролевых политик (разные правила для разных пользователей)
-- [ ] UI для управления политиками
-- [ ] Статистика и аналитика HITL решений
-- [ ] Автоматическое обучение на основе решений пользователя
+- ✅ **Персистентное хранение** pending состояний в PostgreSQL/SQLite
+- ✅ **Database persistence** через async SQLAlchemy
+- ✅ **Dual storage** - database (source of truth) + in-memory (fast access)
+- ✅ **Audit logging** всех HITL решений
+- ✅ **Policy engine** с wildcard patterns
+- ✅ **Timeout механизм** для pending approvals
+- ✅ **Интеграция с мультиагентной системой**
+- ✅ **Recovery after restart** - восстановление pending approvals из БД
+
+## 📋 Будущие улучшения
+
+- [ ] **Ролевые политики** - разные правила для разных пользователей/ролей
+- [ ] **UI для управления политиками** - веб-интерфейс для настройки HITL правил
+- [ ] **Статистика и аналитика** - dashboard с метриками HITL решений
+- [ ] **Автоматическое обучение** - ML модель для предсказания решений пользователя
+- [ ] **Batch approvals** - одобрение нескольких операций одновременно
+- [ ] **Approval templates** - шаблоны для часто используемых операций
+- [ ] **Notification system** - уведомления о pending approvals
+
+## 🔧 Техническая реализация
+
+### Database Schema
+
+```sql
+CREATE TABLE pending_approvals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    call_id VARCHAR(255) NOT NULL UNIQUE,
+    tool_name VARCHAR(100) NOT NULL,
+    arguments JSONB NOT NULL,
+    reason TEXT,
+    created_at TIMESTAMP DEFAULT NOW(),
+    expires_at TIMESTAMP,
+    
+    INDEX idx_pending_approvals_session (session_id),
+    INDEX idx_pending_approvals_call_id (call_id)
+);
+```
+
+### Persistence Flow
+
+```mermaid
+sequenceDiagram
+    participant Agent
+    participant HITLManager
+    participant Database
+    participant AgentContext
+    
+    Agent->>HITLManager: add_pending()
+    HITLManager->>Database: save_pending_approval()
+    Database-->>HITLManager: Saved
+    HITLManager->>AgentContext: Store in metadata (cache)
+    HITLManager-->>Agent: HITLPendingState
+    
+    Note over Database,AgentContext: Dual storage for reliability
+    
+    Agent->>HITLManager: remove_pending()
+    HITLManager->>Database: delete_pending_approval()
+    HITLManager->>AgentContext: Remove from metadata
+    HITLManager-->>Agent: Success
+```
+
+### Recovery After Restart
+
+При перезапуске IDE или Agent Runtime:
+1. Pending approvals загружаются из database
+2. Восстанавливается состояние сессии
+3. IDE может продолжить с того же места
+4. Пользователь видит все pending approvals
+
+**Endpoint для восстановления**:
+```http
+GET /sessions/{session_id}/pending-approvals
+```
+
+**Response**:
+```json
+{
+  "pending_approvals": [
+    {
+      "call_id": "call_abc123",
+      "tool_name": "write_file",
+      "arguments": {"path": "src/main.py", "content": "..."},
+      "reason": "File modification requires approval",
+      "created_at": "2024-01-09T10:00:00Z",
+      "expires_at": "2024-01-09T10:05:00Z"
+    }
+  ]
+}
+```
+
+## 📚 Дополнительные ресурсы
+
+- [HITL Implementation Summary](HITL_IMPLEMENTATION_SUMMARY.md) - Краткое резюме
+- [Agent Protocol](/docs/api/agent-protocol) - Протокол агента
+- [WebSocket Protocol](/docs/api/websocket-protocol) - WebSocket протокол
+- [Мультиагентная система](/docs/api/multi-agent-system) - Документация по агентам
