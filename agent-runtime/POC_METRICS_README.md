@@ -25,7 +25,12 @@
 3. **POC Runner** ([`scripts/run_poc_experiment.py`](scripts/run_poc_experiment.py))
    - Автоматический запуск benchmark задач
    - Сбор метрик в процессе выполнения
-   - Генерация отчетов
+   - Вывод базовой статистики
+
+4. **Report Generator** ([`scripts/generate_metrics_report.py`](scripts/generate_metrics_report.py))
+   - Генерация детальных Markdown отчетов
+   - Сравнительный анализ single-agent vs multi-agent
+   - Рекомендации на основе метрик
 
 ## Быстрый старт
 
@@ -84,6 +89,40 @@ python scripts/run_poc_experiment.py \
   --tasks ../poc_benchmark_tasks.yaml \
   --db-url postgresql+asyncpg://user:password@localhost:5432/poc_metrics
 ```
+
+### 4. Генерация отчета
+
+После выполнения экспериментов сгенерируйте детальный Markdown отчет:
+
+#### Использовать последние эксперименты (рекомендуется):
+
+```bash
+python scripts/generate_metrics_report.py --latest --output poc_report.md
+```
+
+Скрипт автоматически найдет последние эксперименты для single-agent и multi-agent режимов и создаст сравнительный отчет.
+
+#### Использовать конкретный эксперимент:
+
+```bash
+python scripts/generate_metrics_report.py --experiment-id <uuid> --output report.md
+```
+
+#### С кастомной базой данных:
+
+```bash
+python scripts/generate_metrics_report.py \
+  --latest \
+  --output poc_report.md \
+  --db-url postgresql+asyncpg://user:password@localhost:5432/poc_metrics
+```
+
+Отчет будет содержать:
+- Executive Summary с ключевыми выводами
+- Детальные метрики для каждого режима
+- Сравнительные таблицы
+- Анализ по категориям и типам задач
+- Рекомендации на основе результатов
 
 ## Использование MetricsCollector в коде
 
