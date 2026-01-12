@@ -28,6 +28,18 @@ async def lifespan(app: FastAPI):
         await init_db()
         logger.info("✓ Database initialized")
         
+        # Initialize metrics tables if metrics collection is enabled
+        if AppConfig.METRICS_ENABLED:
+            from app.models.metrics import Base as MetricsBase
+            from app.services.database import engine
+            
+            async with engine.begin() as conn:
+                await conn.run_sync(MetricsBase.metadata.create_all)
+            
+            logger.info("✓ Metrics tables initialized (METRICS_ENABLED=true)")
+        else:
+            logger.info("⊘ Metrics collection disabled (METRICS_ENABLED=false)")
+        
         # Initialize async session manager
         from app.services.session_manager_async import init_session_manager
         await init_session_manager()

@@ -1,0 +1,233 @@
+# POC Benchmark Tasks - первые 10 задач для тестирования
+# Полный набор из 40 задач описан в MULTI_AGENT_POC_BENCHMARK.md
+
+tasks:
+  # Категория A: Простые задачи (5 задач)
+  
+  - id: task_001
+    category: simple
+    type: coding
+    title: "Создание простого StatelessWidget"
+    description: "Создать новый файл lib/widgets/user_card.dart с StatelessWidget UserCard, который принимает параметры name (String) и avatar (String) и отображает их в Column с CircleAvatar и Text"
+    expected_agent: "Coder"
+    expected_files:
+      - "lib/widgets/user_card.dart"
+    success_criteria:
+      - "Файл создан с правильной структурой"
+      - "Виджет компилируется без ошибок"
+      - "Параметры корректно используются в UI"
+    auto_check:
+      - type: "file_exists"
+        params:
+          path: "lib/widgets/user_card.dart"
+      - type: "syntax_valid"
+        params:
+          path: "lib/widgets/user_card.dart"
+    estimated_time: "1-2 минуты"
+    complexity_score: 2
+
+  - id: task_002
+    category: simple
+    type: coding
+    title: "Добавление метода в класс"
+    description: "В файле lib/models/user.dart добавить метод String getFullName() который возвращает '$firstName $lastName'"
+    expected_agent: "Coder"
+    expected_files:
+      - "lib/models/user.dart"
+    success_criteria:
+      - "Метод добавлен с правильной сигнатурой"
+      - "Реализация корректна"
+      - "Код компилируется"
+    auto_check:
+      - type: "contains_text"
+        params:
+          path: "lib/models/user.dart"
+          text: "String getFullName()"
+      - type: "syntax_valid"
+        params:
+          path: "lib/models/user.dart"
+    estimated_time: "1 минута"
+    complexity_score: 1
+
+  - id: task_003
+    category: simple
+    type: debug
+    title: "Исправление синтаксической ошибки"
+    description: "В файле lib/screens/home_screen.dart исправить отсутствующую точку с запятой в строке 25 после вызова setState()"
+    expected_agent: "Debug"
+    expected_files:
+      - "lib/screens/home_screen.dart"
+    success_criteria:
+      - "Синтаксическая ошибка исправлена"
+      - "Код компилируется без ошибок"
+    auto_check:
+      - type: "syntax_valid"
+        params:
+          path: "lib/screens/home_screen.dart"
+    estimated_time: "30 секунд"
+    complexity_score: 1
+
+  - id: task_004
+    category: simple
+    type: question
+    title: "Поиск определения функции"
+    description: "Найти определение функции buildUserList в проекте и указать в каком файле и на какой строке оно находится"
+    expected_agent: "Ask"
+    expected_files: []
+    success_criteria:
+      - "Правильно указан файл и строка"
+      - "Функция существует в указанном месте"
+    auto_check:
+      - type: "contains_text"
+        params:
+          path: "expected_file"
+          text: "buildUserList"
+    estimated_time: "1 минута"
+    complexity_score: 2
+
+  - id: task_005
+    category: simple
+    type: coding
+    title: "Создание константы"
+    description: "В файле lib/constants/colors.dart добавить константу const Color primaryColor = Color(0xFF6200EE)"
+    expected_agent: "Coder"
+    expected_files:
+      - "lib/constants/colors.dart"
+    success_criteria:
+      - "Константа добавлена с правильным значением"
+      - "Файл компилируется"
+    auto_check:
+      - type: "contains_text"
+        params:
+          path: "lib/constants/colors.dart"
+          text: "primaryColor"
+      - type: "syntax_valid"
+        params:
+          path: "lib/constants/colors.dart"
+    estimated_time: "1 минута"
+    complexity_score: 1
+
+  # Категория B: Средние задачи (3 задачи)
+
+  - id: task_011
+    category: medium
+    type: coding
+    title: "Создание формы с валидацией"
+    description: "Создать StatefulWidget LoginForm с полями email и password, добавить базовую валидацию и кнопку входа"
+    expected_agent: "Coder"
+    expected_files:
+      - "lib/widgets/login_form.dart"
+    success_criteria:
+      - "Форма создана с необходимыми полями"
+      - "Валидация работает"
+      - "Виджет компилируется"
+    auto_check:
+      - type: "file_exists"
+        params:
+          path: "lib/widgets/login_form.dart"
+      - type: "syntax_valid"
+        params:
+          path: "lib/widgets/login_form.dart"
+    estimated_time: "5 минут"
+    complexity_score: 4
+
+  - id: task_012
+    category: medium
+    type: coding
+    title: "Добавление BLoC для управления состоянием"
+    description: "Создать CounterBloc в lib/blocs/counter_bloc.dart с событиями increment/decrement и состояниями для счетчика"
+    expected_agent: "Coder"
+    expected_files:
+      - "lib/blocs/counter_bloc.dart"
+    success_criteria:
+      - "BLoC создан с правильными событиями и состояниями"
+      - "Логика работы корректна"
+      - "Код компилируется"
+    auto_check:
+      - type: "file_exists"
+        params:
+          path: "lib/blocs/counter_bloc.dart"
+      - type: "syntax_valid"
+        params:
+          path: "lib/blocs/counter_bloc.dart"
+    estimated_time: "7 минут"
+    complexity_score: 5
+
+  - id: task_013
+    category: medium
+    type: debug
+    title: "Исправление null pointer exception"
+    description: "В файле lib/screens/product_list_screen.dart исправить ошибку где product может быть null при доступе к product.name"
+    expected_agent: "Debug"
+    expected_files:
+      - "lib/screens/product_list_screen.dart"
+    success_criteria:
+      - "Null check добавлен"
+      - "Ошибка исправлена"
+    auto_check:
+      - type: "syntax_valid"
+        params:
+          path: "lib/screens/product_list_screen.dart"
+    estimated_time: "3 минуты"
+    complexity_score: 3
+
+  # Категория C: Сложные задачи (2 задачи)
+
+  - id: task_026
+    category: complex
+    type: mixed
+    title: "Миграция с Provider на Riverpod"
+    description: "Полная миграция состояния приложения с Provider на Riverpod включая все провайдеры и consumers"
+    expected_agent: "Architect + Coder"
+    expected_files:
+      - "lib/providers/*"
+      - "lib/riverpod/*"
+    success_criteria:
+      - "Все провайдеры мигрированы"
+      - "Приложение работает корректно"
+      - "Тесты проходят"
+    auto_check:
+      - type: "test_passes"
+        params:
+          pattern: "*"
+    estimated_time: "45 минут"
+    complexity_score: 9
+
+  - id: task_027
+    category: complex
+    type: architecture
+    title: "Проектирование offline-first архитектуры"
+    description: "Спроектировать полную offline-first архитектуру с синхронизацией, conflict resolution и cache management"
+    expected_agent: "Architect"
+    expected_files:
+      - "docs/architecture/offline_design.md"
+    success_criteria:
+      - "Архитектура спроектирована"
+      - "Все аспекты учтены"
+    auto_check:
+      - type: "file_exists"
+        params:
+          path: "docs/architecture/offline_design.md"
+    estimated_time: "30 минут"
+    complexity_score: 8
+
+# Метаданные
+metadata:
+  version: "1.0"
+  created_at: "2026-01-12"
+  total_tasks: 10
+  categories:
+    simple: 5
+    medium: 3
+    complex: 2
+  types:
+    coding: 6
+    debug: 2
+    question: 1
+    architecture: 1
+  description: "Первые 10 задач из benchmark для тестирования POC инфраструктуры"
+  notes: |
+    Этот файл содержит подмножество задач из полного benchmark (MULTI_AGENT_POC_BENCHMARK.md).
+    Используется для первоначального тестирования системы сбора метрик.
+    
+    Для полного эксперимента используйте все 40 задач из основного benchmark файла.

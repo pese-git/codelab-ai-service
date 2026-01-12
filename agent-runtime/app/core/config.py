@@ -59,6 +59,12 @@ class AppConfig:
         "true"
     ).lower() in ("true", "1", "yes")
     
+    # Metrics collection for POC experiments
+    METRICS_ENABLED: bool = os.getenv(
+        "AGENT_RUNTIME__METRICS_ENABLED",
+        "false"
+    ).lower() in ("true", "1", "yes")
+    
     # Service metadata
     VERSION: str = os.getenv(
         "AGENT_RUNTIME__VERSION",
