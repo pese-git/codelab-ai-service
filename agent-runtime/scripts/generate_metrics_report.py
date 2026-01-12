@@ -120,7 +120,7 @@ class MetricsReportGenerator:
         result = await self.db.execute(
             select(LLMCall)
             .where(LLMCall.task_execution_id == task_execution_id)
-            .order_by(LLMCall.timestamp)
+            .order_by(LLMCall.started_at)
         )
         return list(result.scalars().all())
     
@@ -137,7 +137,7 @@ class MetricsReportGenerator:
         result = await self.db.execute(
             select(ToolCall)
             .where(ToolCall.task_execution_id == task_execution_id)
-            .order_by(ToolCall.timestamp)
+            .order_by(ToolCall.started_at)
         )
         return list(result.scalars().all())
     
@@ -171,7 +171,7 @@ class MetricsReportGenerator:
         result = await self.db.execute(
             select(QualityEvaluation)
             .where(QualityEvaluation.task_execution_id == task_execution_id)
-            .order_by(QualityEvaluation.timestamp)
+            .order_by(QualityEvaluation.evaluated_at)
         )
         return list(result.scalars().all())
     
@@ -188,7 +188,7 @@ class MetricsReportGenerator:
         result = await self.db.execute(
             select(Hallucination)
             .where(Hallucination.task_execution_id == task_execution_id)
-            .order_by(Hallucination.timestamp)
+            .order_by(Hallucination.detected_at)
         )
         return list(result.scalars().all())
     
@@ -204,6 +204,12 @@ class MetricsReportGenerator:
         """
         tasks = await self.get_task_executions(experiment.id)
         
+        # Helper function to get duration from metrics JSON
+        def get_duration(task: TaskExecution) -> float:
+            if task.metrics and isinstance(task.metrics, dict):
+                return task.metrics.get('duration_seconds', 0) or 0
+            return 0
+        
         stats = {
             "experiment_id": str(experiment.id),
             "mode": experiment.mode,
@@ -213,8 +219,8 @@ class MetricsReportGenerator:
             "successful_tasks": sum(1 for t in tasks if t.success),
             "failed_tasks": sum(1 for t in tasks if not t.success),
             "success_rate": sum(1 for t in tasks if t.success) / len(tasks) if tasks else 0,
-            "total_duration": sum(t.duration_seconds or 0 for t in tasks),
-            "avg_task_duration": sum(t.duration_seconds or 0 for t in tasks) / len(tasks) if tasks else 0,
+            "total_duration": sum(get_duration(t) for t in tasks),
+            "avg_task_duration": sum(get_duration(t) for t in tasks) / len(tasks) if tasks else 0,
             "total_llm_calls": 0,
             "total_tool_calls": 0,
             "total_agent_switches": 0,
@@ -701,27 +707,33 @@ async def main():
     await init_db()
     logger.info("Database initialized")
     
-    # Generate report
-    async for db in get_db():
-        generator = MetricsReportGenerator(db)
-        
-        try:
-            experiment_id = UUID(args.experiment_id) if args.experiment_id else None
-            report = await generator.generate_report(
-                experiment_id=experiment_id,
-                latest=args.latest
-            )
+    try:
+        # Generate report
+        async for db in get_db():
+            generator = MetricsReportGenerator(db)
             
-            # Write to file
-            args.output.write_text(report, encoding='utf-8')
-            logger.info(f"Report generated: {args.output}")
-            
-            # Also print to console
-            print("\n" + report)
-            
-        except Exception as e:
-            logger.error(f"Failed to generate report: {e}", exc_info=True)
-            sys.exit(1)
+            try:
+                experiment_id = UUID(args.experiment_id) if args.experiment_id else None
+                report = await generator.generate_report(
+                    experiment_id=experiment_id,
+                    latest=args.latest
+                )
+                
+                # Write to file
+                args.output.write_text(report, encoding='utf-8')
+                logger.info(f"Report generated: {args.output}")
+                
+                # Also print to console
+                print("\n" + report)
+                
+            except Exception as e:
+                logger.error(f"Failed to generate report: {e}", exc_info=True)
+                sys.exit(1)
+    finally:
+        # Close database connections
+        from app.services.database import close_db
+        await close_db()
+        logger.info("Database connections closed")
 
 
 if __name__ == "__main__":
