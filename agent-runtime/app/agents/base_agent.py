@@ -22,6 +22,7 @@ class AgentType(str, Enum):
     ARCHITECT = "architect"
     DEBUG = "debug"
     ASK = "ask"
+    UNIVERSAL = "universal"
 
 
 class BaseAgent(ABC):

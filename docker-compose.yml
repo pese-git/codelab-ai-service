@@ -24,8 +24,8 @@ services:
       context: ./auth-service
       dockerfile: Dockerfile
     # Убираем внешний порт - доступ только через nginx
-    expose:
-      - "8003"
+    ports:
+      - "8003:8003"
     volumes:
       - ./auth-service/data:/app/data
       - ./auth-service/keys:/app/keys
@@ -132,8 +132,8 @@ services:
       context: ./agent-runtime
       dockerfile: Dockerfile
     # Внутренний сервис - доступ только внутри Docker сети
-    expose:
-      - "${AGENT_RUNTIME_PORT}"
+    ports:
+      - "${AGENT_RUNTIME_PORT}:${AGENT_RUNTIME_PORT}"
     volumes:
       # Монтируем директорию data для персистентности SQLite базы данных
       - ./agent-runtime/data:/app/data
@@ -147,6 +147,8 @@ services:
       - AGENT_RUNTIME__MAX_CONCURRENT_REQUESTS=${AGENT_RUNTIME__MAX_CONCURRENT_REQUESTS}
       - AGENT_RUNTIME__REQUEST_TIMEOUT=${AGENT_RUNTIME__REQUEST_TIMEOUT}
       - AGENT_RUNTIME__LLM_MODEL=${AGENT_RUNTIME__LLM_MODEL}
+      # Multi-Agent mode: true for multi-agent (default), false for single-agent (UniversalAgent)
+      - AGENT_RUNTIME__MULTI_AGENT_MODE=${AGENT_RUNTIME__MULTI_AGENT_MODE:-true}
       # Database URL: SQLite по умолчанию, можно переопределить через .env
       - AGENT_RUNTIME__DB_URL=${AGENT_RUNTIME__DB_URL:-sqlite:///data/agent_runtime.db}
     depends_on:

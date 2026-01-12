@@ -50,9 +50,13 @@ Available agents:
    - Teaching or learning
    - General knowledge queries
 
+5. **universal** - universal agent that can handle any task (used in single-agent mode)
+   - All of the above capabilities combined
+   - Used when only one agent is available
+
 Analyze the user's request and respond with ONLY a JSON object in this format:
 {{
-  "agent": "coder|architect|debug|ask",
+  "agent": "coder|architect|debug|ask|universal",
   "confidence": "high|medium|low",
   "reasoning": "brief explanation of why this agent was chosen"
 }}
@@ -104,8 +108,22 @@ class OrchestratorAgent(BaseAgent):
         logger.info(f"Orchestrator analyzing request for session {session_id}")
         logger.debug(f"Message: {message[:100]}...")
         
-        # Classify the task type using LLM
-        target_agent, classification_info = await self.classify_task_with_llm(message)
+        # Check if only Universal agent is available (single-agent mode)
+        from app.services.agent_router import agent_router
+        available_agents = agent_router.list_agents()
+        
+        # If only Orchestrator and Universal are registered, route to Universal
+        if AgentType.UNIVERSAL in available_agents and len(available_agents) == 2:
+            logger.info("Single-agent mode detected, routing to Universal agent")
+            target_agent = AgentType.UNIVERSAL
+            classification_info = {
+                "agent": "universal",
+                "confidence": "high",
+                "reasoning": "Single-agent mode: only Universal agent available"
+            }
+        else:
+            # Multi-agent mode: classify the task type using LLM
+            target_agent, classification_info = await self.classify_task_with_llm(message)
         
         logger.info(
             f"Orchestrator routing to {target_agent.value} agent "
@@ -178,7 +196,8 @@ class OrchestratorAgent(BaseAgent):
                 "coder": AgentType.CODER,
                 "architect": AgentType.ARCHITECT,
                 "debug": AgentType.DEBUG,
-                "ask": AgentType.ASK
+                "ask": AgentType.ASK,
+                "universal": AgentType.UNIVERSAL
             }
             
             target_agent = agent_mapping.get(agent_str, AgentType.CODER)
