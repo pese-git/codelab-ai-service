@@ -86,7 +86,7 @@ class POCExperimentRunner:
         """
         logger.info(f"Starting experiment in {mode} mode")
         
-        # Get database session
+        # Get database session using async context manager
         async for db in get_db():
             collector = MetricsCollector(db)
             
@@ -342,8 +342,8 @@ class POCExperimentRunner:
         
         logger.info(
             f"{'Success Rate':<30} "
-            f"{single.get('success_rate', 0):.2%:<20} "
-            f"{multi.get('success_rate', 0):.2%:<20}"
+            f"{single.get('success_rate', 0)*100:.1f}%{'':<18} "
+            f"{multi.get('success_rate', 0)*100:.1f}%"
         )
         
         logger.info(
@@ -354,8 +354,8 @@ class POCExperimentRunner:
         
         logger.info(
             f"{'Estimated Cost (USD)':<30} "
-            f"${single.get('estimated_cost_usd', 0):.4f:<19} "
-            f"${multi.get('estimated_cost_usd', 0):.4f:<19}"
+            f"${single.get('estimated_cost_usd', 0):.4f}{'':<15} "
+            f"${multi.get('estimated_cost_usd', 0):.4f}"
         )
         
         logger.info(f"{'='*60}\n")
@@ -403,6 +403,11 @@ async def main():
     except Exception as e:
         logger.error(f"POC experiment failed: {e}", exc_info=True)
         sys.exit(1)
+    finally:
+        # Close database connections
+        from app.services.database import close_db
+        await close_db()
+        logger.info("Database connections closed")
 
 
 if __name__ == "__main__":
