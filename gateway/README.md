@@ -1,6 +1,10 @@
 # Gateway Service
 
-Gateway Service — современный асинхронный FastAPI-микросервис для защищённой коммуникации между пользователем и LLM-агентом по WebSocket и REST API.
+Gateway Service — современный асинхронный FastAPI-микросервис для защищённой коммуникации между IDE и Agent Runtime через WebSocket и REST API с поддержкой JWT аутентификации.
+
+**Версия**: 1.0 (MVP)
+**Дата обновления**: 11 января 2026
+**Статус**: ✅ Production Ready
 
 ---
 
@@ -49,28 +53,57 @@ uvicorn app.main:app --reload
 
 ## Примеры API
 
-### WebSocket
+### WebSocket (требует JWT)
 
-- `WS /ws/{session_id}` — основной endpoint. Отправьте JSON:
-  ```json
-  {
-    "type": "user_message",
-    "content": "Привет агент!",
-    "role": "user"
+- `WS /api/v1/ws/{session_id}` — основной endpoint для IDE
+
+**Подключение:**
+```javascript
+const ws = new WebSocket('ws://localhost/api/v1/ws/session_123', {
+  headers: {
+    'Authorization': 'Bearer YOUR_JWT_TOKEN'
   }
-  ```
-  Ответы приходят по частям (streaming):
-  ```json
-  {"type": "assistant_message", "token": "Прив", "is_final": false}
-  {"type": "assistant_message", "token": "ет!", "is_final": true}
-  ```
+});
+```
 
-### REST
+**Отправка сообщения:**
+```json
+{
+  "type": "user_message",
+  "content": "Создай новый виджет",
+  "role": "user"
+}
+```
+
+**Получение ответов (streaming):**
+```json
+{"type": "assistant_message", "token": "Созд", "is_final": false}
+{"type": "assistant_message", "token": "аю ", "is_final": false}
+{"type": "assistant_message", "token": "виджет...", "is_final": true}
+```
+
+**Agent switching:**
+```json
+{"type": "agent_switched", "from_agent": "orchestrator", "to_agent": "coder", "reason": "Code implementation needed"}
+```
+
+**Tool calls:**
+```json
+{"type": "tool_call", "tool_name": "write_file", "call_id": "call_123", "arguments": {...}, "requires_approval": true}
+```
+
+### REST (Proxy endpoints)
 
 - `GET /health` — статус сервиса
+- `GET /api/v1/health` — API health check
+- `GET /api/v1/agents` — список агентов (proxy к Agent Runtime)
+- `GET /api/v1/agents/{session_id}/current` — текущий агент (proxy)
+- `GET /api/v1/sessions/{session_id}/history` — история сессии (proxy)
+- `GET /api/v1/sessions` — список сессий (proxy)
+- `POST /api/v1/sessions` — создать сессию (proxy)
+- `GET /api/v1/sessions/{session_id}/pending-approvals` — pending HITL approvals (proxy)
 
-- `POST /tool/execute/{session_id}`  
-  (service-to-service, только для доверенных сервисов: обязателен заголовок `X-Internal-Auth`!)
+**Все proxy endpoints требуют JWT токен в заголовке Authorization.**
 
 ---
 

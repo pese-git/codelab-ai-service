@@ -1,17 +1,22 @@
 # LLM Proxy Service
 
-LLM Proxy — микросервис для унификации доступа к различным языковым моделям (LLM), реализующий защищённое API для сервисов экосистемы. Является частью мультисервисной архитектуры Codelab.
+LLM Proxy — микросервис для унификации доступа к различным языковым моделям (LLM) через LiteLLM, реализующий защищённое API для сервисов экосистемы CodeLab.
+
+**Версия**: 1.0 (MVP)
+**Дата обновления**: 11 января 2026
+**Статус**: ✅ Production Ready
 
 ## Основные возможности
 
-- Единое REST API для обращения к языковым моделям
-- SSE (Server-Sent Events) для стриминговых ответов token-by-token
-- Защита эндпоинтов через внутренний API-ключ (middleware)
-- Лёгкое масштабирование и расширяемость архитектуры за счёт слоёв (api, services, models, middleware)
-- **Интеграция с LiteLLM proxy** для поддержки 100+ LLM провайдеров
-- Встроенные retry, fallback и rate limiting через LiteLLM
-- Унифицированный формат ответов (OpenAI-compatible)
-- Поддержка tool calling и function calling
+- ✅ **Единое REST API** для обращения к языковым моделям
+- ✅ **SSE (Server-Sent Events)** для стриминговых ответов token-by-token
+- ✅ **Защита эндпоинтов** через внутренний API-ключ (X-Internal-Auth)
+- ✅ **Интеграция с LiteLLM proxy** для поддержки 100+ LLM провайдеров
+- ✅ **Поддержка провайдеров**: OpenAI, Anthropic, Ollama, OpenRouter, DeepSeek, Qwen
+- ✅ **Встроенные retry, fallback и rate limiting** через LiteLLM
+- ✅ **Унифицированный формат** ответов (OpenAI-compatible)
+- ✅ **Tool calling и function calling** для всех провайдеров
+- ✅ **Локальные модели** через Ollama (приватность и экономия)
 
 ---
 

@@ -1,17 +1,29 @@
 # Agent Runtime Service
 
-Agent Runtime — отдельный микросервис (FastAPI), отвечающий за управление сессиями агента, стриминг сообщений между пользователем и LLM-прокси, хранение user/assistant истории. Используется внутри Codelab для посредничества между фронтом и языковыми моделями.
+Agent Runtime — микросервис (FastAPI) с мультиагентной системой, отвечающий за управление сессиями, стриминг сообщений между IDE и LLM, хранение истории и выполнение инструментов. Ядро AI логики CodeLab.
+
+**Версия**: 1.0 (MVP)
+**Дата обновления**: 11 января 2026
+**Статус**: ✅ Production Ready
 
 ---
 
 ## Особенности и архитектура
 
+**Мультиагентная система:**
+- ✅ **5 специализированных агентов** (Orchestrator, Coder, Architect, Debug, Ask)
+- ✅ **LLM-based routing** через Orchestrator с fallback на ключевые слова
+- ✅ **Agent switching** с сохранением контекста
+- ✅ **File restrictions** для агентов (Architect только .md, Debug read-only)
+
+**Архитектура:**
 - Строгая многоуровневая архитектура (API, сервисы, модели, middleware, core)
 - Вся бизнес-логика инкапсулирована в сервисах (app/services)
-- Типизированные Pydantic-модели истории, инструментов и протоколов (app/models)
-- Внедрение зависимостей через единый провайдер (app/core/dependencies.py)
-- In-memory session store с возможностью расширения до persistent
-- Все external dependencies (LLM-прокси, инструменты и т.д.) строятся через DI (Dependency Injection)
+- Типизированные Pydantic-модели (app/models)
+- Dependency Injection через app/core/dependencies.py
+- **Async database** (PostgreSQL/SQLite) для session persistence
+- **HITL (Human-in-the-Loop)** с database persistence
+- **Tool registry** с 9 реализованными инструментами
 
 ---
 
@@ -42,8 +54,21 @@ uv run pytest --maxfail=3 --disable-warnings -v tests
 
 ## API
 
+**Public endpoints:**
 - `GET /health` — Проверка статуса сервиса
-- `POST /agent/message/stream` — Стриминговая обработка сообщения (SSE).
+- `POST /agent/message/stream` — Стриминговая обработка сообщения (SSE)
+
+**Agent endpoints:**
+- `GET /agents` — Список зарегистрированных агентов
+- `GET /agents/{session_id}/current` — Текущий активный агент сессии
+
+**Session endpoints:**
+- `GET /sessions/{session_id}/history` — История сообщений сессии
+- `GET /sessions` — Список всех сессий
+- `POST /sessions` — Создать новую сессию
+- `GET /sessions/{session_id}/pending-approvals` — Pending HITL approvals
+
+**Все endpoints требуют X-Internal-Auth заголовок.**
 
   Требуется заголовок авторизации:
   ```
