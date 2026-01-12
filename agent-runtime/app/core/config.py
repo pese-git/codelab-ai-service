@@ -53,6 +53,12 @@ class AppConfig:
         "INFO"
     )
     
+    # Multi-Agent configuration
+    MULTI_AGENT_MODE: bool = os.getenv(
+        "AGENT_RUNTIME__MULTI_AGENT_MODE",
+        "true"
+    ).lower() in ("true", "1", "yes")
+    
     # Service metadata
     VERSION: str = os.getenv(
         "AGENT_RUNTIME__VERSION",

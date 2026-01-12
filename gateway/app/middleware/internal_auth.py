@@ -10,6 +10,7 @@ class InternalAuthMiddleware(BaseHTTPMiddleware):
         # Публичные endpoints без аутентификации
         public_paths = (
             "/health",
+            "/api/v1/health",
             "/docs",
             "/openapi.json",
             "/redoc",

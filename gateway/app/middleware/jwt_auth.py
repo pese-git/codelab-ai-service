@@ -45,7 +45,7 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         # Public endpoints
-        public_paths = ("/health", "/docs", "/openapi.json", "/redoc")
+        public_paths = ("/health", "/api/v1/health", "/docs", "/openapi.json", "/redoc")
 
         if request.url.path in public_paths or request.url.path.startswith("/ws/"):
             return await call_next(request)
@@ -122,7 +122,7 @@ class HybridAuthMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         # Public endpoints
-        public_paths = ("/health", "/docs", "/openapi.json", "/redoc")
+        public_paths = ("/health", "/api/v1/health", "/docs", "/openapi.json", "/redoc")
 
         if request.url.path in public_paths or request.url.path.startswith("/ws/"):
             return await call_next(request)
