@@ -1,0 +1,800 @@
+# POC Benchmark Tasks - полный набор из 40 задач
+# Спецификация в MULTI_AGENT_POC_BENCHMARK.md
+
+tasks:
+  # Категория A: Простые задачи (10 задач)
+  
+  - id: task_001
+    category: simple
+    type: coding
+    title: "Создание простого StatelessWidget"
+    description: "Создать новый файл lib/widgets/user_card.dart с StatelessWidget UserCard, который принимает параметры name (String) и avatar (String) и отображает их в Column с CircleAvatar и Text"
+    expected_agent: "Coder"
+    expected_files:
+      - "lib/widgets/user_card.dart"
+    success_criteria:
+      - "Файл создан с правильной структурой"
+      - "Виджет компилируется без ошибок"
+      - "Параметры корректно используются в UI"
+    auto_check:
+      - type: "file_exists"
+        params:
+          path: "lib/widgets/user_card.dart"
+      - type: "syntax_valid"
+        params:
+          path: "lib/widgets/user_card.dart"
+    estimated_time: "1-2 минуты"
+    complexity_score: 2
+
+  - id: task_002
+    category: simple
+    type: coding
+    title: "Добавление метода в класс"
+    description: "В файле lib/models/user.dart добавить метод String getFullName() который возвращает '$firstName $lastName'"
+    expected_agent: "Coder"
+    expected_files:
+      - "lib/models/user.dart"
+    success_criteria:
+      - "Метод добавлен с правильной сигнатурой"
+      - "Реализация корректна"
+      - "Код компилируется"
+    auto_check:
+      - type: "contains_text"
+        params:
+          path: "lib/models/user.dart"
+          text: "String getFullName()"
+      - type: "syntax_valid"
+        params:
+          path: "lib/models/user.dart"
+    estimated_time: "1 минута"
+    complexity_score: 1
+
+  - id: task_003
+    category: simple
+    type: debug
+    title: "Исправление синтаксической ошибки"
+    description: "В файле lib/screens/home_screen.dart исправить отсутствующую точку с запятой в строке 25 после вызова setState()"
+    expected_agent: "Debug"
+    expected_files:
+      - "lib/screens/home_screen.dart"
+    success_criteria:
+      - "Синтаксическая ошибка исправлена"
+      - "Код компилируется без ошибок"
+    auto_check:
+      - type: "syntax_valid"
+        params:
+          path: "lib/screens/home_screen.dart"
+    estimated_time: "30 секунд"
+    complexity_score: 1
+
+  - id: task_004
+    category: simple
+    type: question
+    title: "Поиск определения функции"
+    description: "Найти определение функции buildUserList в проекте и указать в каком файле и на какой строке оно находится"
+    expected_agent: "Ask"
+    expected_files: []
+    success_criteria:
+      - "Правильно указан файл и строка"
+      - "Функция существует в указанном месте"
+    auto_check:
+      - type: "contains_text"
+        params:
+          path: "expected_file"
+          text: "buildUserList"
+    estimated_time: "1 минута"
+    complexity_score: 2
+
+  - id: task_005
+    category: simple
+    type: coding
+    title: "Создание константы"
+    description: "В файле lib/constants/colors.dart добавить константу const Color primaryColor = Color(0xFF6200EE)"
+    expected_agent: "Coder"
+    expected_files:
+      - "lib/constants/colors.dart"
+    success_criteria:
+      - "Константа добавлена с правильным значением"
+      - "Файл компилируется"
+    auto_check:
+      - type: "contains_text"
+        params:
+          path: "lib/constants/colors.dart"
+          text: "primaryColor"
+      - type: "syntax_valid"
+        params:
+          path: "lib/constants/colors.dart"
+    estimated_time: "1 минута"
+    complexity_score: 1
+
+  # Категория B: Средние задачи (15 задач)
+
+  - id: task_006
+    category: simple
+    type: coding
+    title: "Создание формы с валидацией"
+    description: "Создать StatefulWidget LoginForm с полями email и password, добавить базовую валидацию и кнопку входа"
+    expected_agent: "Coder"
+    expected_files:
+      - "lib/widgets/login_form.dart"
+    success_criteria:
+      - "Форма создана с необходимыми полями"
+      - "Валидация работает"
+      - "Виджет компилируется"
+    auto_check:
+      - type: "file_exists"
+        params:
+          path: "lib/widgets/login_form.dart"
+      - type: "syntax_valid"
+        params:
+          path: "lib/widgets/login_form.dart"
+    estimated_time: "5 минут"
+    complexity_score: 4
+
+  - id: task_007
+    category: simple
+    type: coding
+    title: "Добавление BLoC для управления состоянием"
+    description: "Создать CounterBloc в lib/blocs/counter_bloc.dart с событиями increment/decrement и состояниями для счетчика"
+    expected_agent: "Coder"
+    expected_files:
+      - "lib/blocs/counter_bloc.dart"
+    success_criteria:
+      - "BLoC создан с правильными событиями и состояниями"
+      - "Логика работы корректна"
+      - "Код компилируется"
+    auto_check:
+      - type: "file_exists"
+        params:
+          path: "lib/blocs/counter_bloc.dart"
+      - type: "syntax_valid"
+        params:
+          path: "lib/blocs/counter_bloc.dart"
+    estimated_time: "7 минут"
+    complexity_score: 5
+
+  - id: task_008
+    category: simple
+    type: debug
+    title: "Исправление null pointer exception"
+    description: "В файле lib/screens/product_list_screen.dart исправить ошибку где product может быть null при доступе к product.name"
+    expected_agent: "Debug"
+    expected_files:
+      - "lib/screens/product_list_screen.dart"
+    success_criteria:
+      - "Null check добавлен"
+      - "Ошибка исправлена"
+    auto_check:
+      - type: "syntax_valid"
+        params:
+          path: "lib/screens/product_list_screen.dart"
+    estimated_time: "3 минуты"
+    complexity_score: 3
+
+  # Категория C: Сложные задачи (10 задач)
+
+  - id: task_009
+    category: simple
+    type: mixed
+    title: "Миграция с Provider на Riverpod"
+    description: "Полная миграция состояния приложения с Provider на Riverpod включая все провайдеры и consumers"
+    expected_agent: "Architect + Coder"
+    expected_files:
+      - "lib/providers/*"
+      - "lib/riverpod/*"
+    success_criteria:
+      - "Все провайдеры мигрированы"
+      - "Приложение работает корректно"
+      - "Тесты проходят"
+    auto_check:
+      - type: "test_passes"
+        params:
+          pattern: "*"
+    estimated_time: "45 минут"
+    complexity_score: 9
+
+  - id: task_010
+    category: simple
+    type: architecture
+    title: "Проектирование offline-first архитектуры"
+    description: "Спроектировать полную offline-first архитектуру с синхронизацией, conflict resolution и cache management"
+    expected_agent: "Architect"
+    expected_files:
+      - "docs/architecture/offline_design.md"
+    success_criteria:
+      - "Архитектура спроектирована"
+      - "Все аспекты учтены"
+    auto_check:
+      - type: "file_exists"
+        params:
+          path: "docs/architecture/offline_design.md"
+    estimated_time: "30 минут"
+    complexity_score: 8
+
+  # Категория B: Средние задачи (15 задач)
+
+  - id: task_011
+    category: medium
+    type: coding
+    title: "Добавление анимации к виджету"
+    description: "Добавить анимацию появления/исчезновения к существующему виджету с использованием AnimatedOpacity"
+    expected_agent: "Coder"
+    expected_files:
+      - "lib/widgets/animated_widget.dart"
+    success_criteria:
+      - "Анимация корректно работает"
+      - "Виджет компилируется"
+    auto_check:
+      - type: "file_exists"
+        params:
+          path: "lib/widgets/animated_widget.dart"
+      - type: "syntax_valid"
+        params:
+          path: "lib/widgets/animated_widget.dart"
+    estimated_time: "5 минут"
+    complexity_score: 4
+
+  - id: task_012
+    category: medium
+    type: debug
+    title: "Исправление баг с async/await"
+    description: "В файле lib/services/api_service.dart исправить неправильное использование async/await в цикле"
+    expected_agent: "Debug"
+    expected_files:
+      - "lib/services/api_service.dart"
+    success_criteria:
+      - "Async код исправлен"
+      - "Приложение работает без ошибок"
+    auto_check:
+      - type: "syntax_valid"
+        params:
+          path: "lib/services/api_service.dart"
+    estimated_time: "4 минуты"
+    complexity_score: 4
+
+  - id: task_013
+    category: medium
+    type: coding
+    title: "Создание custom painter"
+    description: "Создать CustomPainter для рисования круговой диаграммы с данными из модели"
+    expected_agent: "Coder"
+    expected_files:
+      - "lib/widgets/chart_painter.dart"
+    success_criteria:
+      - "Painter корректно рисует диаграмму"
+      - "Использует данные из модели"
+    auto_check:
+      - type: "file_exists"
+        params:
+          path: "lib/widgets/chart_painter.dart"
+      - type: "syntax_valid"
+        params:
+          path: "lib/widgets/chart_painter.dart"
+    estimated_time: "8 минут"
+    complexity_score: 5
+
+  - id: task_014
+    category: medium
+    type: architecture
+    title: "Проектирование repository pattern"
+    description: "Спроектировать и реализовать repository pattern для управления данными пользователей"
+    expected_agent: "Architect"
+    expected_files:
+      - "lib/repositories/user_repository.dart"
+      - "docs/architecture/repository_design.md"
+    success_criteria:
+      - "Repository pattern реализован"
+      - "Документация написана"
+    auto_check:
+      - type: "file_exists"
+        params:
+          path: "lib/repositories/user_repository.dart"
+      - type: "file_exists"
+        params:
+          path: "docs/architecture/repository_design.md"
+    estimated_time: "10 минут"
+    complexity_score: 5
+
+  - id: task_015
+    category: medium
+    type: coding
+    title: "Добавление unit тестов"
+    description: "Написать unit тесты для класса Calculator в lib/utils/calculator.dart"
+    expected_agent: "Coder"
+    expected_files:
+      - "test/calculator_test.dart"
+    success_criteria:
+      - "Тесты написаны"
+      - "Все тесты проходят"
+    auto_check:
+      - type: "test_passes"
+        params:
+          pattern: "calculator_test.dart"
+    estimated_time: "6 минут"
+    complexity_score: 4
+
+  - id: task_016
+    category: medium
+    type: debug
+    title: "Исправление memory leak"
+    description: "Найти и исправить memory leak в компоненте списка с большим количеством элементов"
+    expected_agent: "Debug"
+    expected_files:
+      - "lib/widgets/large_list.dart"
+    success_criteria:
+      - "Memory leak исправлен"
+      - "Производительность улучшена"
+    auto_check:
+      - type: "syntax_valid"
+        params:
+          path: "lib/widgets/large_list.dart"
+    estimated_time: "7 минут"
+    complexity_score: 5
+
+  - id: task_017
+    category: medium
+    type: coding
+    title: "Создание custom hook"
+    description: "Создать custom hook для управления формой с валидацией"
+    expected_agent: "Coder"
+    expected_files:
+      - "lib/hooks/use_form.dart"
+    success_criteria:
+      - "Hook работает корректно"
+      - "Валидация интегрирована"
+    auto_check:
+      - type: "file_exists"
+        params:
+          path: "lib/hooks/use_form.dart"
+      - type: "syntax_valid"
+        params:
+          path: "lib/hooks/use_form.dart"
+    estimated_time: "6 минут"
+    complexity_score: 4
+
+  - id: task_018
+    category: medium
+    type: coding
+    title: "Реализовать state management"
+    description: "Реализовать эффективное state management с использованием BLoC"
+    expected_agent: "Coder"
+    expected_files:
+      - "lib/blocs/state_management.dart"
+    success_criteria:
+      - "State management реализован"
+      - "Работает корректно"
+    auto_check:
+      - type: "file_exists"
+        params:
+          path: "lib/blocs/state_management.dart"
+    estimated_time: "5 минут"
+    complexity_score: 3
+
+  - id: task_019
+    category: medium
+    type: coding
+    title: "Реализация search functionality"
+    description: "Добавить функционал поиска в список элементов с фильтрацией и debounce"
+    expected_agent: "Coder"
+    expected_files:
+      - "lib/widgets/searchable_list.dart"
+    success_criteria:
+      - "Поиск работает"
+      - "Debounce реализован"
+    auto_check:
+      - type: "file_exists"
+        params:
+          path: "lib/widgets/searchable_list.dart"
+      - type: "syntax_valid"
+        params:
+          path: "lib/widgets/searchable_list.dart"
+    estimated_time: "7 минут"
+    complexity_score: 5
+
+  - id: task_020
+    category: medium
+    type: debug
+    title: "Исправление layout issue"
+    description: "Исправить проблемы с layout в responsive design при разных размерах экрана"
+    expected_agent: "Debug"
+    expected_files:
+      - "lib/screens/responsive_screen.dart"
+    success_criteria:
+      - "Layout корректен на всех размерах"
+      - "Элементы не перекрываются"
+    auto_check:
+      - type: "syntax_valid"
+        params:
+          path: "lib/screens/responsive_screen.dart"
+    estimated_time: "5 минут"
+    complexity_score: 4
+
+  - id: task_021
+    category: medium
+    type: architecture
+    title: "Проектирование navigation flow"
+    description: "Спроектировать навигацию приложения с глубокими ссылками и back stack management"
+    expected_agent: "Architect"
+    expected_files:
+      - "docs/architecture/navigation_design.md"
+    success_criteria:
+      - "Навигация спроектирована"
+      - "Deep linking учтен"
+    auto_check:
+      - type: "file_exists"
+        params:
+          path: "docs/architecture/navigation_design.md"
+    estimated_time: "8 минут"
+    complexity_score: 5
+
+  - id: task_022
+    category: medium
+    type: mixed
+    title: "Рефакторинг с добавлением тестов"
+    description: "Рефакторить класс utils и добавить соответствующие тесты"
+    expected_agent: "Coder + Debug"
+    expected_files:
+      - "lib/utils/refactored_utils.dart"
+      - "test/utils_test.dart"
+    success_criteria:
+      - "Код рефакторен"
+      - "Тесты написаны и проходят"
+    auto_check:
+      - type: "test_passes"
+        params:
+          pattern: "utils_test.dart"
+    estimated_time: "10 минут"
+    complexity_score: 6
+
+  - id: task_023
+    category: medium
+    type: coding
+    title: "Создание responsive layout"
+    description: "Создать responsive layout с использованием LayoutBuilder и MediaQuery"
+    expected_agent: "Coder"
+    expected_files:
+      - "lib/widgets/responsive_layout.dart"
+    success_criteria:
+      - "Layout адаптируется к размерам"
+      - "Использует правильные виджеты"
+    auto_check:
+      - type: "file_exists"
+        params:
+          path: "lib/widgets/responsive_layout.dart"
+      - type: "syntax_valid"
+        params:
+          path: "lib/widgets/responsive_layout.dart"
+    estimated_time: "6 минут"
+    complexity_score: 4
+
+  - id: task_024
+    category: medium
+    type: debug
+    title: "Исправление infinite loop"
+    description: "Найти и исправить бесконечный цикл в state management коде"
+    expected_agent: "Debug"
+    expected_files:
+      - "lib/blocs/infinite_loop_bloc.dart"
+    success_criteria:
+      - "Бесконечный цикл устранен"
+      - "State обновляется корректно"
+    auto_check:
+      - type: "syntax_valid"
+        params:
+          path: "lib/blocs/infinite_loop_bloc.dart"
+    estimated_time: "6 минут"
+    complexity_score: 5
+
+  - id: task_025
+    category: medium
+    type: coding
+    title: "Добавление localization"
+    description: "Добавить поддержку локализации с использованием intl package"
+    expected_agent: "Coder"
+    expected_files:
+      - "lib/l10n/app_localizations.dart"
+      - "lib/l10n/app_en.arb"
+    success_criteria:
+      - "Локализация работает"
+      - "Переводы добавлены"
+    auto_check:
+      - type: "file_exists"
+        params:
+          path: "lib/l10n/app_localizations.dart"
+    estimated_time: "8 минут"
+    complexity_score: 5
+
+  # Категория C: Сложные задачи (10 задач)
+
+  - id: task_026
+    category: complex
+    type: architecture
+    title: "Проектирование microservices architecture"
+    description: "Спроектировать архитектуру микросервисов для масштабируемого приложения"
+    expected_agent: "Architect"
+    expected_files:
+      - "docs/architecture/microservices_design.md"
+    success_criteria:
+      - "Архитектура спроектирована"
+      - "Масштабируемость учтена"
+    auto_check:
+      - type: "file_exists"
+        params:
+          path: "docs/architecture/microservices_design.md"
+    estimated_time: "25 минут"
+    complexity_score: 8
+
+  - id: task_027
+    category: complex
+    type: coding
+    title: "Полная рефакторинг модуля"
+    description: "Полностью рефакторить большой модуль с улучшением архитектуры и добавлением тестов"
+    expected_agent: "Architect + Coder"
+    expected_files:
+      - "lib/modules/refactored_module.dart"
+      - "test/module_test.dart"
+    success_criteria:
+      - "Модуль рефакторен"
+      - "Архитектура улучшена"
+      - "Тесты написаны"
+    auto_check:
+      - type: "test_passes"
+        params:
+          pattern: "module_test.dart"
+    estimated_time: "35 минут"
+    complexity_score: 9
+
+  - id: task_028
+    category: complex
+    type: debug
+    title: "Комплексная отладка производительности"
+    description: "Проанализировать и оптимизировать производительность приложения с использованием DevTools"
+    expected_agent: "Debug"
+    expected_files:
+      - "docs/performance_analysis.md"
+    success_criteria:
+      - "Производительность улучшена"
+      - "Анализ документирован"
+    auto_check:
+      - type: "file_exists"
+        params:
+          path: "docs/performance_analysis.md"
+    estimated_time: "30 минут"
+    complexity_score: 8
+
+  - id: task_029
+    category: complex
+    type: question
+    title: "Объяснить null safety"
+    description: "Объяснить концепции null safety в Dart и Flutter"
+    expected_agent: "Ask"
+    expected_files: []
+    success_criteria:
+      - "Концепции объяснены"
+      - "Примеры приведены"
+    auto_check:
+      - type: "file_exists"
+        params:
+          path: "docs/null_safety_explanation.md"
+    estimated_time: "10 минут"
+    complexity_score: 5
+
+  - id: task_030
+    category: complex
+    type: architecture
+    title: "Проектирование caching strategy"
+    description: "Спроектировать комплексную стратегию кеширования для offline и online режимов"
+    expected_agent: "Architect"
+    expected_files:
+      - "docs/architecture/caching_strategy.md"
+    success_criteria:
+      - "Стратегия спроектирована"
+      - "Offline/online учтены"
+    auto_check:
+      - type: "file_exists"
+        params:
+          path: "docs/architecture/caching_strategy.md"
+    estimated_time: "20 минут"
+    complexity_score: 7
+
+  - id: task_031
+    category: complex
+    type: debug
+    title: "Отладка external API integration"
+    description: "Найти и исправить ошибки в интеграции с external API"
+    expected_agent: "Debug"
+    expected_files:
+      - "lib/services/external_api_service.dart"
+    success_criteria:
+      - "Ошибки исправлены"
+      - "API работает корректно"
+    auto_check:
+      - type: "syntax_valid"
+        params:
+          path: "lib/services/external_api_service.dart"
+    estimated_time: "15 минут"
+    complexity_score: 6
+
+  - id: task_032
+    category: complex
+    type: mixed
+    title: "Исправление race conditions"
+    description: "Найти и исправить race conditions в многопоточном коде"
+    expected_agent: "Debug"
+    expected_files:
+      - "lib/services/concurrent_service.dart"
+    success_criteria:
+      - "Race conditions устранены"
+      - "Код thread-safe"
+    auto_check:
+      - type: "syntax_valid"
+        params:
+          path: "lib/services/concurrent_service.dart"
+    estimated_time: "20 минут"
+    complexity_score: 8
+
+  - id: task_033
+    category: complex
+    type: coding
+    title: "Создание plugin"
+    description: "Создать Flutter plugin для платформенной функциональности"
+    expected_agent: "Coder"
+    expected_files:
+      - "packages/my_plugin/lib/my_plugin.dart"
+    success_criteria:
+      - "Plugin создан"
+      - "Платформенная функциональность работает"
+    auto_check:
+      - type: "file_exists"
+        params:
+          path: "packages/my_plugin/lib/my_plugin.dart"
+    estimated_time: "45 минут"
+    complexity_score: 9
+
+  - id: task_034
+    category: complex
+    type: architecture
+    title: "Проектирование security measures"
+    description: "Спроектировать меры безопасности для приложения включая шифрование и аутентификацию"
+    expected_agent: "Architect"
+    expected_files:
+      - "docs/security/security_design.md"
+    success_criteria:
+      - "Меры безопасности спроектированы"
+      - "Шифрование и аутентификация учтены"
+    auto_check:
+      - type: "file_exists"
+        params:
+          path: "docs/security/security_design.md"
+    estimated_time: "25 минут"
+    complexity_score: 8
+
+  - id: task_035
+    category: complex
+    type: question
+    title: "Объяснить feature implementation process"
+    description: "Объяснить процесс полной реализации новой feature в Flutter"
+    expected_agent: "Ask"
+    expected_files: []
+    success_criteria:
+      - "Процесс описан"
+      - "Шаги объяснены"
+    auto_check:
+      - type: "file_exists"
+        params:
+          path: "docs/feature_implementation_guide.md"
+    estimated_time: "20 минут"
+    complexity_score: 7
+
+  # Категория D: Специализированные задачи (5 задач)
+
+  - id: task_036
+    category: specialized
+    type: architecture
+    title: "Чисто архитектурный дизайн"
+    description: "Спроектировать архитектуру для enterprise-level приложения"
+    expected_agent: "Architect"
+    expected_files:
+      - "docs/architecture/enterprise_design.md"
+    success_criteria:
+      - "Архитектура спроектирована"
+      - "Enterprise требования учтены"
+    auto_check:
+      - type: "file_exists"
+        params:
+          path: "docs/architecture/enterprise_design.md"
+    estimated_time: "30 минут"
+    complexity_score: 9
+
+  - id: task_037
+    category: specialized
+    type: question
+    title: "Объяснить debugging techniques"
+    description: "Объяснить техники отладки в Flutter приложениях"
+    expected_agent: "Ask"
+    expected_files: []
+    success_criteria:
+      - "Техники описаны"
+      - "Примеры приведены"
+    auto_check:
+      - type: "file_exists"
+        params:
+          path: "docs/debugging_guide.md"
+    estimated_time: "15 минут"
+    complexity_score: 5
+
+  - id: task_038
+    category: specialized
+    type: debug
+    title: "Отладка best practices implementation"
+    description: "Найти ошибки в реализации best practices в коде"
+    expected_agent: "Debug"
+    expected_files:
+      - "lib/best_practices/code.dart"
+    success_criteria:
+      - "Ошибки найдены"
+      - "Исправлены"
+    auto_check:
+      - type: "syntax_valid"
+        params:
+          path: "lib/best_practices/code.dart"
+    estimated_time: "10 минут"
+    complexity_score: 4
+
+  - id: task_039
+    category: specialized
+    type: coding
+    title: "Рефакторинг legacy code"
+    description: "Рефакторить legacy код для улучшения читаемости и производительности"
+    expected_agent: "Coder"
+    expected_files:
+      - "lib/legacy/refactored_code.dart"
+    success_criteria:
+      - "Код рефакторен"
+      - "Читаемость улучшена"
+    auto_check:
+      - type: "file_exists"
+        params:
+          path: "lib/legacy/refactored_code.dart"
+    estimated_time: "25 минут"
+    complexity_score: 7
+
+  - id: task_040
+    category: specialized
+    type: architecture
+    title: "Проектирование testing strategy"
+    description: "Спроектировать комплексную стратегию тестирования для проекта"
+    expected_agent: "Architect"
+    expected_files:
+      - "docs/testing/testing_strategy.md"
+    success_criteria:
+      - "Стратегия спроектирована"
+      - "Все типы тестов учтены"
+    auto_check:
+      - type: "file_exists"
+        params:
+          path: "docs/testing/testing_strategy.md"
+    estimated_time: "20 минут"
+    complexity_score: 6
+
+# Метаданные
+metadata:
+  version: "2.0"
+  created_at: "2026-01-12"
+  total_tasks: 40
+  categories:
+    simple: 10
+    medium: 15
+    complex: 10
+    specialized: 5
+  types:
+    coding: 16
+    architecture: 8
+    debug: 8
+    question: 4
+    mixed: 4
+  description: "Полный набор из 40 задач для POC эксперимента с multi-agent системой"
+  notes: |
+    Этот файл содержит полный benchmark из 40 задач для тестирования multi-agent POC.
+    Распределение: 10 простых, 15 средних, 10 сложных, 5 специализированных.
+    Типы: 16 coding, 8 architecture, 8 debug, 4 question, 4 mixed.

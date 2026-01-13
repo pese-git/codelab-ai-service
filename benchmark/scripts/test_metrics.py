@@ -13,8 +13,8 @@ import sys
 from pathlib import Path
 from uuid import UUID
 
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Add agent-runtime directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "agent-runtime"))
 
 from app.core.config import AppConfig, logger
 from app.services.database import init_database, get_db, init_db, close_db

@@ -22,8 +22,8 @@ from uuid import UUID
 
 import yaml
 
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Add agent-runtime directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "agent-runtime"))
 
 from app.core.config import AppConfig
 from app.services.database import init_database, get_db, init_db
@@ -375,8 +375,8 @@ async def main():
     parser.add_argument(
         "--tasks",
         type=Path,
-        default=Path("poc_benchmark_tasks.yaml"),
-        help="Path to tasks YAML file (default: poc_benchmark_tasks.yaml)"
+        default=Path(__file__).parent.parent / "poc_benchmark_tasks.yaml",
+        help="Path to tasks YAML file (default: ../poc_benchmark_tasks.yaml)"
     )
     parser.add_argument(
         "--db-url",
