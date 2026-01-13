@@ -301,7 +301,7 @@ class IntegratedPOCRunner:
         try:
             while not task_completed and iteration < max_iterations:
                 iteration += 1
-                logger.debug(f"Iteration {iteration}/{max_iterations}")
+                logger.info(f"=== Iteration {iteration}/{max_iterations}, message={'<task_description>' if message == task_description else '<empty>' if not message else '<continuation>'} ===")
                 
                 tool_call_detected = False
                 
@@ -359,6 +359,8 @@ class IntegratedPOCRunner:
                                     result=json.dumps(tool_result)
                                 )
                                 
+                                logger.info(f"Tool result added to session history, will continue conversation")
+                                
                                 # Mark that we need to continue with tool result
                                 tool_call_detected = True
                                 message = ""  # Empty message to continue after tool result
@@ -412,10 +414,17 @@ class IntegratedPOCRunner:
                         task_completed = True
                         break
                 
-                # If no tool call detected and not completed, something is wrong
-                if not tool_call_detected and not task_completed:
-                    logger.warning("No tool call and not final - breaking loop")
-                    break
+                # Check loop continuation
+                if tool_call_detected:
+                    logger.info(f"Tool call detected, continuing to iteration {iteration + 1}")
+                    # Continue while loop with empty message
+                elif task_completed:
+                    logger.info("Task completed (is_final received)")
+                else:
+                    logger.warning("No tool call and not final - task may be incomplete")
+                    task_completed = True  # Exit loop
+            
+            logger.info(f"Task execution loop completed after {iteration} iterations, task_completed={task_completed}")
             
             # Evaluate success based on response
             success = not has_error and len(response_text) > 0
