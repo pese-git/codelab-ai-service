@@ -174,19 +174,41 @@ class OrchestratorAgent(BaseAgent):
             content = response["choices"][0]["message"]["content"]
             logger.debug(f"LLM classification response: {content}")
             
-            # Parse JSON response
+            # Parse JSON response with improved error handling
+            classification = None
+            
+            # Try direct JSON parsing first
             try:
                 classification = json.loads(content)
             except json.JSONDecodeError:
                 # Try to extract JSON from markdown code block
                 if "```json" in content:
-                    json_str = content.split("```json")[1].split("```")[0].strip()
-                    classification = json.loads(json_str)
+                    try:
+                        json_str = content.split("```json")[1].split("```")[0].strip()
+                        classification = json.loads(json_str)
+                    except (IndexError, json.JSONDecodeError):
+                        pass
                 elif "```" in content:
-                    json_str = content.split("```")[1].split("```")[0].strip()
-                    classification = json.loads(json_str)
-                else:
-                    raise
+                    try:
+                        json_str = content.split("```")[1].split("```")[0].strip()
+                        classification = json.loads(json_str)
+                    except (IndexError, json.JSONDecodeError):
+                        pass
+                
+                # Try to find JSON object in the content
+                if not classification:
+                    import re
+                    json_match = re.search(r'\{[^{}]*"agent"[^{}]*\}', content)
+                    if json_match:
+                        try:
+                            classification = json.loads(json_match.group(0))
+                        except json.JSONDecodeError:
+                            pass
+                
+                # If still no classification, raise error
+                if not classification:
+                    logger.error(f"Failed to parse JSON from LLM response: {content}")
+                    raise json.JSONDecodeError("Could not extract valid JSON", content, 0)
             
             # Extract agent type
             agent_str = classification.get("agent", "coder").lower()

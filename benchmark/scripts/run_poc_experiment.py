@@ -384,6 +384,42 @@ async def main():
         default=None,
         help="Database URL (default: from config)"
     )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Limit number of tasks to run (for testing)"
+    )
+    parser.add_argument(
+        "--task-id",
+        type=str,
+        default=None,
+        help="Run specific task by ID (e.g., task_001)"
+    )
+    parser.add_argument(
+        "--task-ids",
+        type=str,
+        default=None,
+        help="Run specific tasks by IDs, comma-separated (e.g., task_001,task_005,task_010)"
+    )
+    parser.add_argument(
+        "--task-range",
+        type=str,
+        default=None,
+        help="Run tasks in range (e.g., 1-10 or task_001-task_010)"
+    )
+    parser.add_argument(
+        "--category",
+        choices=["simple", "medium", "complex", "specialized"],
+        default=None,
+        help="Run only tasks of specific category"
+    )
+    parser.add_argument(
+        "--type",
+        choices=["coding", "architecture", "debug", "question", "mixed"],
+        default=None,
+        help="Run only tasks of specific type"
+    )
     
     args = parser.parse_args()
     
@@ -396,6 +432,79 @@ async def main():
     
     # Run experiment
     runner = POCExperimentRunner(tasks_file=args.tasks, mode=args.mode)
+    runner.load_tasks()
+    
+    # Filter tasks based on arguments
+    original_count = len(runner.tasks)
+    
+    if args.task_id:
+        # Run single task
+        runner.tasks = [t for t in runner.tasks if t['id'] == args.task_id]
+        if not runner.tasks:
+            logger.error(f"Task {args.task_id} not found")
+            sys.exit(1)
+        logger.info(f"Running single task: {args.task_id}")
+    
+    elif args.task_ids:
+        # Run specific tasks
+        task_ids = [tid.strip() for tid in args.task_ids.split(',')]
+        runner.tasks = [t for t in runner.tasks if t['id'] in task_ids]
+        if not runner.tasks:
+            logger.error(f"No tasks found matching: {task_ids}")
+            sys.exit(1)
+        logger.info(f"Running {len(runner.tasks)} specific tasks: {task_ids}")
+    
+    elif args.task_range:
+        # Run tasks in range
+        range_str = args.task_range
+        
+        # Parse range (supports "1-10" or "task_001-task_010")
+        if '-' in range_str:
+            start_str, end_str = range_str.split('-', 1)
+            
+            # Extract numbers
+            import re
+            start_match = re.search(r'(\d+)', start_str)
+            end_match = re.search(r'(\d+)', end_str)
+            
+            if start_match and end_match:
+                start_num = int(start_match.group(1))
+                end_num = int(end_match.group(1))
+                
+                # Filter tasks by number
+                runner.tasks = [
+                    t for t in runner.tasks
+                    if start_num <= int(re.search(r'(\d+)', t['id']).group(1)) <= end_num
+                ]
+                logger.info(f"Running tasks {start_num}-{end_num} ({len(runner.tasks)} tasks)")
+            else:
+                logger.error(f"Invalid range format: {range_str}")
+                sys.exit(1)
+        else:
+            logger.error(f"Invalid range format: {range_str}. Use format: 1-10 or task_001-task_010")
+            sys.exit(1)
+    
+    elif args.category:
+        # Filter by category
+        runner.tasks = [t for t in runner.tasks if t['category'] == args.category]
+        logger.info(f"Running {len(runner.tasks)} tasks with category: {args.category}")
+    
+    elif args.type:
+        # Filter by type
+        runner.tasks = [t for t in runner.tasks if t['type'] == args.type]
+        logger.info(f"Running {len(runner.tasks)} tasks with type: {args.type}")
+    
+    elif args.limit:
+        # Limit number of tasks
+        runner.tasks = runner.tasks[:args.limit]
+        logger.info(f"Limited to {args.limit} tasks")
+    
+    if not runner.tasks:
+        logger.error("No tasks to run after filtering")
+        sys.exit(1)
+    
+    if len(runner.tasks) != original_count:
+        logger.info(f"Filtered: {len(runner.tasks)}/{original_count} tasks will be executed")
     
     try:
         await runner.run()
