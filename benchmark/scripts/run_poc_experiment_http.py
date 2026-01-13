@@ -20,9 +20,9 @@ from typing import Dict, Any, List, Optional, AsyncGenerator
 from uuid import UUID
 import yaml
 import os
-from dotenv import load_dotenv
 
-# Load environment variables
+# IMPORTANT: Load .env BEFORE importing AppConfig
+from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent.parent.parent / "agent-runtime" / ".env")
 
 # Add agent-runtime directory to path for imports (only for metrics)
@@ -145,14 +145,37 @@ class HTTPPOCRunner:
             ) as response:
                 response.raise_for_status()
                 
-                async for line in response.aiter_lines():
-                    if line.startswith("data: "):
-                        data_str = line[6:]  # Remove "data: " prefix
-                        try:
-                            chunk = json.loads(data_str)
-                            yield chunk
-                        except json.JSONDecodeError:
-                            logger.warning(f"Failed to parse SSE data: {data_str}")
+                buffer = ""
+                async for chunk_bytes in response.aiter_bytes():
+                    buffer += chunk_bytes.decode('utf-8')
+                    
+                    # Process complete lines
+                    while '\n' in buffer:
+                        line, buffer = buffer.split('\n', 1)
+                        line = line.strip()
+                        
+                        if not line:
+                            continue
+                        
+                        if line.startswith("data: "):
+                            data_str = line[6:]
+                            
+                            # Check for done event
+                            if data_str == "[DONE]" or "status" in data_str and "completed" in data_str:
+                                logger.debug("Received done event")
+                                return
+                            
+                            try:
+                                chunk = json.loads(data_str)
+                                yield chunk
+                            except json.JSONDecodeError:
+                                logger.debug(f"Skipping non-JSON data: {data_str[:100]}")
+                        
+                        elif line.startswith("event: "):
+                            event_type = line[7:]
+                            logger.debug(f"SSE event: {event_type}")
+                            if event_type == "done":
+                                return
     
     async def send_tool_result(
         self,
@@ -190,14 +213,31 @@ class HTTPPOCRunner:
             ) as response:
                 response.raise_for_status()
                 
-                async for line in response.aiter_lines():
-                    if line.startswith("data: "):
-                        data_str = line[6:]
-                        try:
-                            chunk = json.loads(data_str)
-                            yield chunk
-                        except json.JSONDecodeError:
-                            pass
+                buffer = ""
+                async for chunk_bytes in response.aiter_bytes():
+                    buffer += chunk_bytes.decode('utf-8')
+                    
+                    while '\n' in buffer:
+                        line, buffer = buffer.split('\n', 1)
+                        line = line.strip()
+                        
+                        if not line:
+                            continue
+                        
+                        if line.startswith("data: "):
+                            data_str = line[6:]
+                            
+                            if data_str == "[DONE]" or "status" in data_str and "completed" in data_str:
+                                return
+                            
+                            try:
+                                chunk = json.loads(data_str)
+                                yield chunk
+                            except json.JSONDecodeError:
+                                pass
+                        
+                        elif line.startswith("event: done"):
+                            return
     
     async def execute_task_http(
         self,

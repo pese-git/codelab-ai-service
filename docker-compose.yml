@@ -101,8 +101,8 @@ services:
       context: ./gateway
       dockerfile: Dockerfile
     # Убираем внешний порт - доступ только через nginx
-    expose:
-      - "${GATEWAY_PORT}"
+    ports:
+      - "${GATEWAY_PORT}:${GATEWAY_PORT}"
     environment:
       - ENVIRONMENT=${ENVIRONMENT}
       - PORT=${GATEWAY_PORT}
