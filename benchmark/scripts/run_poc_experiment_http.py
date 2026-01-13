@@ -19,6 +19,11 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, AsyncGenerator
 from uuid import UUID
 import yaml
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv(Path(__file__).parent.parent.parent / "agent-runtime" / ".env")
 
 # Add agent-runtime directory to path for imports (only for metrics)
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "agent-runtime"))
