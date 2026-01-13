@@ -54,11 +54,26 @@ uv run python ../benchmark/scripts/test_metrics.py
 ```bash
 cd codelab-ai-service/agent-runtime
 
-# Оба режима (single-agent + multi-agent)
+# Все задачи, оба режима
 uv run python ../benchmark/scripts/run_poc_experiment.py --mode both
 
-# Только один режим
-uv run python ../benchmark/scripts/run_poc_experiment.py --mode multi-agent
+# Одна задача
+uv run python ../benchmark/scripts/run_poc_experiment.py --mode single-agent --task-id task_001
+
+# Несколько задач
+uv run python ../benchmark/scripts/run_poc_experiment.py --mode single-agent --task-ids task_001,task_005,task_010
+
+# Диапазон задач
+uv run python ../benchmark/scripts/run_poc_experiment.py --mode single-agent --task-range 1-10
+
+# По категории
+uv run python ../benchmark/scripts/run_poc_experiment.py --mode single-agent --category simple
+
+# По типу
+uv run python ../benchmark/scripts/run_poc_experiment.py --mode single-agent --type coding
+
+# Ограничить количество
+uv run python ../benchmark/scripts/run_poc_experiment.py --mode single-agent --limit 5
 ```
 
 ### 3. Запуск реальной интеграции (требует LLM proxy)
@@ -66,10 +81,24 @@ uv run python ../benchmark/scripts/run_poc_experiment.py --mode multi-agent
 ```bash
 # Терминал 1: Запустить LLM proxy
 cd codelab-ai-service/llm-proxy
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8001
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8002
 
-# Терминал 2: Запустить benchmark
+# Терминал 2: Запустить benchmark с различными фильтрами
 cd codelab-ai-service/agent-runtime
+
+# Одна задача
+uv run python ../benchmark/scripts/run_poc_experiment_integrated.py --mode multi-agent --task-id task_001
+
+# Диапазон задач
+uv run python ../benchmark/scripts/run_poc_experiment_integrated.py --mode multi-agent --task-range 1-5
+
+# По категории
+uv run python ../benchmark/scripts/run_poc_experiment_integrated.py --mode multi-agent --category simple
+
+# По типу
+uv run python ../benchmark/scripts/run_poc_experiment_integrated.py --mode multi-agent --type coding
+
+# Ограничить количество
 uv run python ../benchmark/scripts/run_poc_experiment_integrated.py --mode multi-agent --limit 5
 ```
 

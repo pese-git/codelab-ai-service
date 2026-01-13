@@ -25,7 +25,24 @@
 ### Использование
 ```bash
 cd codelab-ai-service/agent-runtime
+
+# Все задачи
 uv run python ../benchmark/scripts/run_poc_experiment.py --mode both
+
+# Одна задача
+uv run python ../benchmark/scripts/run_poc_experiment.py --mode single-agent --task-id task_001
+
+# Несколько задач
+uv run python ../benchmark/scripts/run_poc_experiment.py --mode single-agent --task-ids task_001,task_005,task_010
+
+# Диапазон задач
+uv run python ../benchmark/scripts/run_poc_experiment.py --mode single-agent --task-range 1-10
+
+# По категории
+uv run python ../benchmark/scripts/run_poc_experiment.py --mode single-agent --category simple
+
+# По типу
+uv run python ../benchmark/scripts/run_poc_experiment.py --mode single-agent --type coding
 ```
 
 ### Когда использовать
@@ -68,9 +85,29 @@ uv run python ../benchmark/scripts/run_poc_experiment_integrated.py --mode multi
 
 ### Параметры
 - `--mode` - режим (single-agent, multi-agent, both)
-- `--limit` - ограничить количество задач (для тестирования)
+- `--task-id` - запустить одну задачу (e.g., task_001)
+- `--task-ids` - запустить несколько задач через запятую (e.g., task_001,task_005)
+- `--task-range` - запустить диапазон задач (e.g., 1-10)
+- `--category` - фильтр по категории (simple/medium/complex/specialized)
+- `--type` - фильтр по типу (coding/architecture/debug/question/mixed)
+- `--limit` - ограничить количество задач
 - `--tasks` - путь к файлу задач
 - `--db-url` - URL базы данных
+
+### Примеры фильтрации
+```bash
+# Только простые задачи
+uv run python ../benchmark/scripts/run_poc_experiment_integrated.py --mode multi-agent --category simple
+
+# Только coding задачи
+uv run python ../benchmark/scripts/run_poc_experiment_integrated.py --mode multi-agent --type coding
+
+# Задачи 1-5
+uv run python ../benchmark/scripts/run_poc_experiment_integrated.py --mode multi-agent --task-range 1-5
+
+# Конкретные задачи
+uv run python ../benchmark/scripts/run_poc_experiment_integrated.py --mode multi-agent --task-ids task_001,task_011,task_026
+```
 
 ### Когда использовать
 - Реальное тестирование multi-agent системы
