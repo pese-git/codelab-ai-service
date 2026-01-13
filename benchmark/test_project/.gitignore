@@ -32,6 +32,27 @@ migrate_working_dir/
 .pub/
 /build/
 
+# Allow base test files (with bugs for benchmark)
+!lib/models/
+!lib/screens/
+!lib/constants/
+!lib/utils/
+!lib/README.md
+
+# But ignore generated files by agents
+lib/widgets/
+lib/blocs/
+lib/services/
+lib/repositories/
+lib/hooks/
+lib/l10n/
+lib/legacy/
+lib/best_practices/
+lib/modules/
+lib/features/
+lib/providers/
+lib/riverpod/
+
 # Symbolication related
 app.*.symbols
 
