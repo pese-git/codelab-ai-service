@@ -15,8 +15,10 @@ benchmark/
 ├── scripts/                               # Скрипты для запуска
 │   ├── run_poc_experiment.py              # Симуляция (для тестирования)
 │   ├── run_poc_experiment_integrated.py   # Реальная интеграция (для POC)
+│   ├── task_validator.py                  # Автоматическая проверка задач
 │   ├── generate_metrics_report.py         # Генерация отчетов
 │   └── test_metrics.py                    # Тестирование метрик
+├── test_project/                          # Flutter проект для валидации
 └── reports/                               # Сгенерированные отчеты
 ```
 
@@ -100,6 +102,9 @@ uv run python ../benchmark/scripts/run_poc_experiment_integrated.py --mode multi
 
 # Ограничить количество
 uv run python ../benchmark/scripts/run_poc_experiment_integrated.py --mode multi-agent --limit 5
+
+# С автоматической проверкой (требует test_project)
+uv run python ../benchmark/scripts/run_poc_experiment_integrated.py --mode multi-agent --task-id task_001 --enable-validation
 ```
 
 ### 4. Генерация отчета

@@ -35,6 +35,9 @@ from app.services.agent_context_async import agent_context_manager
 from app.agents.base_agent import AgentType
 from app.models.schemas import StreamChunk
 
+# Import task validator
+from task_validator import TaskValidator
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -51,17 +54,30 @@ class IntegratedPOCRunner:
     и собирает реальные метрики.
     """
     
-    def __init__(self, tasks_file: Path, mode: str):
+    def __init__(self, tasks_file: Path, mode: str, enable_validation: bool = False):
         """
         Initialize POC runner.
         
         Args:
             tasks_file: Path to YAML file with benchmark tasks
             mode: Execution mode ('single-agent', 'multi-agent', or 'both')
+            enable_validation: Enable auto_check validation
         """
         self.tasks_file = tasks_file
         self.mode = mode
         self.tasks: List[Dict[str, Any]] = []
+        self.enable_validation = enable_validation
+        self.validator: Optional[TaskValidator] = None
+        
+        # Initialize validator if enabled
+        if self.enable_validation:
+            project_path = Path(__file__).parent.parent / "test_project"
+            if project_path.exists():
+                self.validator = TaskValidator(project_path)
+                logger.info(f"Task validation enabled with project: {project_path}")
+            else:
+                logger.warning(f"Validation enabled but test project not found: {project_path}")
+                self.enable_validation = False
         
     def load_tasks(self) -> None:
         """Load tasks from YAML file."""
@@ -344,18 +360,38 @@ class IntegratedPOCRunner:
             # Evaluate success based on response
             success = not has_error and len(response_text) > 0
             
+            # Run auto_check validation if enabled
+            validation_result = None
+            if self.enable_validation and self.validator:
+                try:
+                    validation_result = await self.validator.validate_task(task)
+                    logger.info(
+                        f"Validation: {validation_result['passed_checks']}/{validation_result['total_checks']} checks passed"
+                    )
+                    
+                    # Update success based on validation
+                    if validation_result['total_checks'] > 0:
+                        success = validation_result['success_rate'] >= 0.5  # 50% threshold
+                except Exception as e:
+                    logger.error(f"Validation error: {e}")
+            
             # Record quality evaluation
+            eval_details = {
+                "response_length": len(response_text),
+                "llm_calls": llm_call_count,
+                "tool_calls": tool_call_count,
+                "agent_switches": len(agent_switches)
+            }
+            
+            if validation_result:
+                eval_details["validation"] = validation_result
+            
             await collector.record_quality_evaluation(
                 task_execution_id=task_execution_id,
                 evaluation_type="completion_check",
                 score=1.0 if success else 0.0,
                 passed=success,
-                details={
-                    "response_length": len(response_text),
-                    "llm_calls": llm_call_count,
-                    "tool_calls": tool_call_count,
-                    "agent_switches": len(agent_switches)
-                }
+                details=eval_details
             )
             
             logger.info(
@@ -503,6 +539,11 @@ async def main():
         default=None,
         help="Run only tasks of specific type"
     )
+    parser.add_argument(
+        "--enable-validation",
+        action="store_true",
+        help="Enable auto_check validation (requires test_project)"
+    )
     
     args = parser.parse_args()
     
@@ -522,7 +563,11 @@ async def main():
     logger.info("Session and agent context managers initialized")
     
     # Run experiment
-    runner = IntegratedPOCRunner(tasks_file=args.tasks, mode=args.mode)
+    runner = IntegratedPOCRunner(
+        tasks_file=args.tasks,
+        mode=args.mode,
+        enable_validation=args.enable_validation
+    )
     runner.load_tasks()
     
     # Filter tasks based on arguments
