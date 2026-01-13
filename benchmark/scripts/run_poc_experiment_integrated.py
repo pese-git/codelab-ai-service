@@ -252,7 +252,7 @@ class IntegratedPOCRunner:
         session_id: str
     ) -> bool:
         """
-        Execute task through real multi-agent orchestrator.
+        Execute task through real multi-agent orchestrator with tool execution loop.
         
         Args:
             collector: MetricsCollector instance
@@ -292,100 +292,129 @@ class IntegratedPOCRunner:
         has_error = False
         response_text = ""
         
+        # Tool execution loop
+        task_completed = False
+        message = task_description
+        max_iterations = 10  # Prevent infinite loops
+        iteration = 0
+        
         try:
-            # Process message through orchestrator
-            async for chunk in multi_agent_orchestrator.process_message(
-                session_id=session_id,
-                message=task_description
-            ):
-                logger.debug(f"Received chunk: type={chunk.type}, is_final={chunk.is_final}")
+            while not task_completed and iteration < max_iterations:
+                iteration += 1
+                logger.debug(f"Iteration {iteration}/{max_iterations}")
                 
-                # Track different chunk types
-                if chunk.type == "assistant_message":
-                    response_text += chunk.content or ""
+                tool_call_detected = False
+                
+                # Process message through orchestrator
+                async for chunk in multi_agent_orchestrator.process_message(
+                    session_id=session_id,
+                    message=message
+                ):
+                    logger.debug(f"Received chunk: type={chunk.type}, is_final={chunk.is_final}")
                     
-                    # Record LLM call (approximate - one per message chunk)
-                    if chunk.metadata:
-                        llm_call_count += 1
-                        await collector.record_llm_call(
+                    # Track different chunk types
+                    if chunk.type == "assistant_message":
+                        response_text += chunk.content or ""
+                        
+                        # Record LLM call (approximate - one per message chunk)
+                        if chunk.metadata:
+                            llm_call_count += 1
+                            await collector.record_llm_call(
+                                task_execution_id=task_execution_id,
+                                agent_type=current_agent,
+                                input_tokens=chunk.metadata.get('input_tokens', 0),
+                                output_tokens=chunk.metadata.get('output_tokens', 0),
+                                model=chunk.metadata.get('model', AppConfig.LLM_MODEL),
+                                duration_seconds=chunk.metadata.get('duration', 0)
+                            )
+                    
+                    elif chunk.type == "tool_call":
+                        tool_call_count += 1
+                        tool_name = chunk.metadata.get('tool_name', 'unknown') if chunk.metadata else 'unknown'
+                        call_id = chunk.metadata.get('call_id') if chunk.metadata else None
+                        arguments = chunk.metadata.get('arguments', {}) if chunk.metadata else {}
+                        
+                        logger.debug(f"Tool call: {tool_name} (call_id={call_id})")
+                        
+                        # Execute tool if mock executor is available
+                        tool_success = True
+                        tool_duration = 0.1
+                        tool_result = None
+                        
+                        if self.tool_executor and call_id:
+                            try:
+                                import time as time_module
+                                start = time_module.time()
+                                tool_result = await self.tool_executor.execute_tool(tool_name, arguments)
+                                tool_duration = time_module.time() - start
+                                tool_success = tool_result.get('success', False)
+                                
+                                logger.info(f"Executed tool {tool_name}: success={tool_success}")
+                                
+                                # Add tool result to session history
+                                await async_session_mgr.append_tool_result(
+                                    session_id,
+                                    call_id=call_id,
+                                    tool_name=tool_name,
+                                    result=json.dumps(tool_result)
+                                )
+                                
+                                # Mark that we need to continue with tool result
+                                tool_call_detected = True
+                                message = ""  # Empty message to continue after tool result
+                                
+                            except Exception as e:
+                                logger.error(f"Tool execution failed: {e}")
+                                tool_success = False
+                                tool_duration = 0.0
+                        
+                        # Record tool call
+                        await collector.record_tool_call(
                             task_execution_id=task_execution_id,
-                            agent_type=current_agent,
-                            input_tokens=chunk.metadata.get('input_tokens', 0),
-                            output_tokens=chunk.metadata.get('output_tokens', 0),
-                            model=chunk.metadata.get('model', AppConfig.LLM_MODEL),
-                            duration_seconds=chunk.metadata.get('duration', 0)
+                            tool_name=tool_name,
+                            success=tool_success,
+                            duration_seconds=tool_duration
                         )
+                        
+                        # Break to continue conversation with tool result
+                        if tool_call_detected:
+                            break
+                    
+                    elif chunk.type == "agent_switched":
+                        from_agent = chunk.metadata.get('from_agent', current_agent) if chunk.metadata else current_agent
+                        to_agent = chunk.metadata.get('to_agent', current_agent) if chunk.metadata else current_agent
+                        reason = chunk.metadata.get('reason', 'Unknown') if chunk.metadata else 'Unknown'
+                        
+                        logger.info(f"Agent switch: {from_agent} -> {to_agent}")
+                        
+                        # Record agent switch
+                        await collector.record_agent_switch(
+                            task_execution_id=task_execution_id,
+                            from_agent=from_agent,
+                            to_agent=to_agent,
+                            reason=reason
+                        )
+                        
+                        current_agent = to_agent
+                        agent_switches.append({
+                            'from': from_agent,
+                            'to': to_agent,
+                            'reason': reason
+                        })
+                    
+                    elif chunk.type == "error":
+                        has_error = True
+                        logger.error(f"Task error: {chunk.content}")
+                    
+                    # Check if final
+                    if chunk.is_final:
+                        logger.debug("Received final chunk")
+                        task_completed = True
+                        break
                 
-                elif chunk.type == "tool_call":
-                    tool_call_count += 1
-                    tool_name = chunk.metadata.get('tool_name', 'unknown') if chunk.metadata else 'unknown'
-                    call_id = chunk.metadata.get('call_id') if chunk.metadata else None
-                    arguments = chunk.metadata.get('arguments', {}) if chunk.metadata else {}
-                    
-                    logger.debug(f"Tool call: {tool_name} (call_id={call_id})")
-                    
-                    # Execute tool if mock executor is available
-                    tool_success = True
-                    tool_duration = 0.1
-                    tool_result = None
-                    
-                    if self.tool_executor and call_id:
-                        try:
-                            import time
-                            start = time.time()
-                            tool_result = await self.tool_executor.execute_tool(tool_name, arguments)
-                            tool_duration = time.time() - start
-                            tool_success = tool_result.get('success', False)
-                            
-                            logger.info(f"Executed tool {tool_name}: success={tool_success}")
-                            
-                            # Send tool result back to agent
-                            # Note: In real implementation, this would continue the conversation
-                            # For now, we just log it
-                            if tool_success:
-                                logger.debug(f"Tool result: {tool_result}")
-                        except Exception as e:
-                            logger.error(f"Tool execution failed: {e}")
-                            tool_success = False
-                            tool_duration = 0.0
-                    
-                    # Record tool call
-                    await collector.record_tool_call(
-                        task_execution_id=task_execution_id,
-                        tool_name=tool_name,
-                        success=tool_success,
-                        duration_seconds=tool_duration
-                    )
-                
-                elif chunk.type == "agent_switched":
-                    from_agent = chunk.metadata.get('from_agent', current_agent) if chunk.metadata else current_agent
-                    to_agent = chunk.metadata.get('to_agent', current_agent) if chunk.metadata else current_agent
-                    reason = chunk.metadata.get('reason', 'Unknown') if chunk.metadata else 'Unknown'
-                    
-                    logger.info(f"Agent switch: {from_agent} -> {to_agent}")
-                    
-                    # Record agent switch
-                    await collector.record_agent_switch(
-                        task_execution_id=task_execution_id,
-                        from_agent=from_agent,
-                        to_agent=to_agent,
-                        reason=reason
-                    )
-                    
-                    current_agent = to_agent
-                    agent_switches.append({
-                        'from': from_agent,
-                        'to': to_agent,
-                        'reason': reason
-                    })
-                
-                elif chunk.type == "error":
-                    has_error = True
-                    logger.error(f"Task error: {chunk.content}")
-                
-                # Check if final
-                if chunk.is_final:
-                    logger.debug("Received final chunk")
+                # If no tool call detected and not completed, something is wrong
+                if not tool_call_detected and not task_completed:
+                    logger.warning("No tool call and not final - breaking loop")
                     break
             
             # Evaluate success based on response
