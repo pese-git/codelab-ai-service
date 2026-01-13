@@ -298,7 +298,7 @@ class IntegratedPOCRunner:
                 
                 elif chunk.type == "tool_call":
                     tool_call_count += 1
-                    tool_name = chunk.metadata.get('tool_name', 'unknown')
+                    tool_name = chunk.metadata.get('tool_name', 'unknown') if chunk.metadata else 'unknown'
                     
                     logger.debug(f"Tool call: {tool_name}")
                     
@@ -311,9 +311,9 @@ class IntegratedPOCRunner:
                     )
                 
                 elif chunk.type == "agent_switched":
-                    from_agent = chunk.metadata.get('from_agent', current_agent)
-                    to_agent = chunk.metadata.get('to_agent', current_agent)
-                    reason = chunk.metadata.get('reason', 'Unknown')
+                    from_agent = chunk.metadata.get('from_agent', current_agent) if chunk.metadata else current_agent
+                    to_agent = chunk.metadata.get('to_agent', current_agent) if chunk.metadata else current_agent
+                    reason = chunk.metadata.get('reason', 'Unknown') if chunk.metadata else 'Unknown'
                     
                     logger.info(f"Agent switch: {from_agent} -> {to_agent}")
                     
