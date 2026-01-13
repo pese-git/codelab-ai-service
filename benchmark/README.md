@@ -6,48 +6,83 @@
 
 ```
 benchmark/
-├── README.md                           # Этот файл
-├── poc_benchmark_tasks.yaml            # 40 задач для тестирования
-├── MULTI_AGENT_POC_BENCHMARK.md        # Спецификация benchmark
-├── MULTI_AGENT_POC_METRICS.md          # Описание метрик
-├── POC_METRICS_README.md               # Документация по метрикам
-├── scripts/                            # Скрипты для запуска
-│   ├── run_poc_experiment.py           # Запуск экспериментов
-│   ├── generate_metrics_report.py      # Генерация отчетов
-│   └── test_metrics.py                 # Тестирование метрик
-└── reports/                            # Сгенерированные отчеты
+├── README.md                              # Этот файл
+├── INTEGRATION_GUIDE.md                   # Руководство по интеграции
+├── poc_benchmark_tasks.yaml               # 40 задач для тестирования
+├── MULTI_AGENT_POC_BENCHMARK.md           # Спецификация benchmark
+├── MULTI_AGENT_POC_METRICS.md             # Описание метрик
+├── POC_METRICS_README.md                  # Документация по метрикам
+├── scripts/                               # Скрипты для запуска
+│   ├── run_poc_experiment.py              # Симуляция (для тестирования)
+│   ├── run_poc_experiment_integrated.py   # Реальная интеграция (для POC)
+│   ├── generate_metrics_report.py         # Генерация отчетов
+│   └── test_metrics.py                    # Тестирование метрик
+└── reports/                               # Сгенерированные отчеты
 ```
+
+## Два режима работы
+
+### 🔧 Режим 1: Симуляция (для разработки)
+**Скрипт:** `run_poc_experiment.py`
+
+- Симулирует выполнение задач
+- Не требует LLM proxy
+- Быстрое выполнение
+- Для тестирования инфраструктуры метрик
+
+### 🚀 Режим 2: Реальная интеграция (для POC)
+**Скрипт:** `run_poc_experiment_integrated.py`
+
+- Реальное выполнение через multi-agent orchestrator
+- Требует запущенный LLM proxy
+- Реальные метрики и стоимость
+- Для полноценного POC эксперимента
+
+**См. подробности в:** [`INTEGRATION_GUIDE.md`](INTEGRATION_GUIDE.md)
 
 ## Быстрый старт
 
-### 1. Запуск тестов метрик
+### 1. Тестирование инфраструктуры метрик
 
 ```bash
-cd codelab-ai-service/benchmark
-python scripts/test_metrics.py
+cd codelab-ai-service/agent-runtime
+uv run python ../benchmark/scripts/test_metrics.py
 ```
 
-### 2. Запуск POC эксперимента
+### 2. Запуск симуляции (быстрое тестирование)
 
 ```bash
-# Single-agent режим
-python scripts/run_poc_experiment.py --mode single-agent
+cd codelab-ai-service/agent-runtime
 
-# Multi-agent режим
-python scripts/run_poc_experiment.py --mode multi-agent
+# Оба режима (single-agent + multi-agent)
+uv run python ../benchmark/scripts/run_poc_experiment.py --mode both
 
-# Оба режима
-python scripts/run_poc_experiment.py --mode both
+# Только один режим
+uv run python ../benchmark/scripts/run_poc_experiment.py --mode multi-agent
 ```
 
-### 3. Генерация отчета
+### 3. Запуск реальной интеграции (требует LLM proxy)
 
 ```bash
+# Терминал 1: Запустить LLM proxy
+cd codelab-ai-service/llm-proxy
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8001
+
+# Терминал 2: Запустить benchmark
+cd codelab-ai-service/agent-runtime
+uv run python ../benchmark/scripts/run_poc_experiment_integrated.py --mode multi-agent --limit 5
+```
+
+### 4. Генерация отчета
+
+```bash
+cd codelab-ai-service/agent-runtime
+
 # Последние эксперименты
-python scripts/generate_metrics_report.py --latest --output reports/poc_report.md
+uv run python ../benchmark/scripts/generate_metrics_report.py --latest --output ../benchmark/reports/poc_report.md
 
 # Конкретный эксперимент
-python scripts/generate_metrics_report.py --experiment-id <uuid> --output reports/report.md
+uv run python ../benchmark/scripts/generate_metrics_report.py --experiment-id <uuid> --output ../benchmark/reports/report.md
 ```
 
 ## Файлы
@@ -92,18 +127,44 @@ python scripts/generate_metrics_report.py --experiment-id <uuid> --output report
 
 ## Скрипты
 
-### run_poc_experiment.py
+### run_poc_experiment.py (Симуляция)
 
-Автоматический запуск benchmark задач с сбором метрик.
+Автоматический запуск benchmark задач с **симуляцией** выполнения.
+
+**Назначение:** Тестирование инфраструктуры метрик без реальных LLM вызовов.
 
 **Параметры:**
 - `--mode` - режим выполнения (single-agent, multi-agent, both)
-- `--tasks` - путь к файлу с задачами (по умолчанию: poc_benchmark_tasks.yaml)
-- `--db-url` - URL базы данных (по умолчанию: из конфига)
+- `--tasks` - путь к файлу с задачами
+- `--db-url` - URL базы данных
 
 **Пример:**
 ```bash
-python scripts/run_poc_experiment.py --mode both --tasks poc_benchmark_tasks.yaml
+cd codelab-ai-service/agent-runtime
+uv run python ../benchmark/scripts/run_poc_experiment.py --mode both
+```
+
+### run_poc_experiment_integrated.py (Реальная интеграция)
+
+Запуск benchmark задач через **реальный** multi-agent orchestrator.
+
+**Назначение:** Полноценный POC эксперимент с реальными агентами.
+
+**Требования:**
+- Запущенный LLM proxy на порту 8001
+- Настроенный API ключ для LLM
+- Инициализированная база данных
+
+**Параметры:**
+- `--mode` - режим выполнения (single-agent, multi-agent, both)
+- `--tasks` - путь к файлу с задачами
+- `--limit` - ограничить количество задач (для тестирования)
+- `--db-url` - URL базы данных
+
+**Пример:**
+```bash
+cd codelab-ai-service/agent-runtime
+uv run python ../benchmark/scripts/run_poc_experiment_integrated.py --mode multi-agent --limit 5
 ```
 
 ### generate_metrics_report.py
