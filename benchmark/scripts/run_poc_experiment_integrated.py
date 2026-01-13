@@ -35,8 +35,9 @@ from app.services.agent_context_async import agent_context_manager
 from app.agents.base_agent import AgentType
 from app.models.schemas import StreamChunk
 
-# Import task validator
+# Import task validator and mock tool executor
 from task_validator import TaskValidator
+from mock_tool_executor import MockToolExecutor
 
 # Configure logging
 logging.basicConfig(
@@ -68,13 +69,16 @@ class IntegratedPOCRunner:
         self.tasks: List[Dict[str, Any]] = []
         self.enable_validation = enable_validation
         self.validator: Optional[TaskValidator] = None
+        self.tool_executor: Optional[MockToolExecutor] = None
         
-        # Initialize validator if enabled
+        # Initialize validator and tool executor if enabled
         if self.enable_validation:
             project_path = Path(__file__).parent.parent / "test_project"
             if project_path.exists():
                 self.validator = TaskValidator(project_path)
+                self.tool_executor = MockToolExecutor(project_path)
                 logger.info(f"Task validation enabled with project: {project_path}")
+                logger.info(f"Mock tool executor initialized")
             else:
                 logger.warning(f"Validation enabled but test project not found: {project_path}")
                 self.enable_validation = False
@@ -315,15 +319,42 @@ class IntegratedPOCRunner:
                 elif chunk.type == "tool_call":
                     tool_call_count += 1
                     tool_name = chunk.metadata.get('tool_name', 'unknown') if chunk.metadata else 'unknown'
+                    call_id = chunk.metadata.get('call_id') if chunk.metadata else None
+                    arguments = chunk.metadata.get('arguments', {}) if chunk.metadata else {}
                     
-                    logger.debug(f"Tool call: {tool_name}")
+                    logger.debug(f"Tool call: {tool_name} (call_id={call_id})")
+                    
+                    # Execute tool if mock executor is available
+                    tool_success = True
+                    tool_duration = 0.1
+                    tool_result = None
+                    
+                    if self.tool_executor and call_id:
+                        try:
+                            import time
+                            start = time.time()
+                            tool_result = await self.tool_executor.execute_tool(tool_name, arguments)
+                            tool_duration = time.time() - start
+                            tool_success = tool_result.get('success', False)
+                            
+                            logger.info(f"Executed tool {tool_name}: success={tool_success}")
+                            
+                            # Send tool result back to agent
+                            # Note: In real implementation, this would continue the conversation
+                            # For now, we just log it
+                            if tool_success:
+                                logger.debug(f"Tool result: {tool_result}")
+                        except Exception as e:
+                            logger.error(f"Tool execution failed: {e}")
+                            tool_success = False
+                            tool_duration = 0.0
                     
                     # Record tool call
                     await collector.record_tool_call(
                         task_execution_id=task_execution_id,
                         tool_name=tool_name,
-                        success=True,  # Will be updated if error occurs
-                        duration_seconds=0.1  # Placeholder
+                        success=tool_success,
+                        duration_seconds=tool_duration
                     )
                 
                 elif chunk.type == "agent_switched":
