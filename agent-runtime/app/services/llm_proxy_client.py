@@ -9,6 +9,12 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 from app.core.config import AppConfig
+from app.services.retry_service import (
+    RetryableError,
+    NonRetryableError,
+    is_retryable_http_error,
+    llm_retry
+)
 
 logger = logging.getLogger("agent-runtime.llm_proxy_client")
 
@@ -38,6 +44,7 @@ class LLMProxyClient:
         self.api_key = api_key or AppConfig.INTERNAL_API_KEY
         self.timeout = timeout
 
+    @llm_retry
     async def chat_completion(
         self,
         model: str,
@@ -47,7 +54,10 @@ class LLMProxyClient:
         extra_params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
-        Send chat completion request to LLM Proxy.
+        Send chat completion request to LLM Proxy with automatic retry.
+        
+        Automatically retries on transient errors (timeouts, rate limits, 503/504).
+        Uses exponential backoff: 2s, 4s, 8s (max 10s).
         
         Args:
             model: Model identifier
@@ -60,7 +70,8 @@ class LLMProxyClient:
             LLM response as dictionary
             
         Raises:
-            httpx.HTTPError: If request fails
+            RetryableError: If all retry attempts fail
+            NonRetryableError: If a non-retryable error occurs
         """
         # Build request payload
         payload: Dict[str, Any] = {
@@ -103,17 +114,26 @@ class LLMProxyClient:
             return result
             
         except httpx.HTTPError as e:
-            logger.error(
-                f"HTTP error in chat_completion: {e}",
-                exc_info=True
-            )
-            raise
+            # Check if error is retryable
+            if is_retryable_http_error(e):
+                logger.warning(
+                    f"Retryable HTTP error in chat_completion: {e}",
+                    exc_info=True
+                )
+                raise RetryableError(f"LLM request failed (retryable): {e}") from e
+            else:
+                logger.error(
+                    f"Non-retryable HTTP error in chat_completion: {e}",
+                    exc_info=True
+                )
+                raise NonRetryableError(f"LLM request failed: {e}") from e
+                
         except Exception as e:
             logger.error(
                 f"Unexpected error in chat_completion: {e}",
                 exc_info=True
             )
-            raise
+            raise NonRetryableError(f"Unexpected error: {e}") from e
 
 
 # Singleton instance for global use
