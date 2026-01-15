@@ -4,12 +4,15 @@ Multi-Agent Orchestrator - coordinates work between specialized agents.
 Manages agent switching, context preservation, and message routing.
 """
 import logging
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator, Optional, Any, TYPE_CHECKING
 from app.agents.base_agent import AgentType
 from app.models.schemas import StreamChunk
 from app.services.agent_router import agent_router
 from app.services.agent_context_async import agent_context_manager
 from app.services.session_manager_async import session_manager
+
+if TYPE_CHECKING:
+    from app.services.session_manager_async import AsyncSessionManager
 
 logger = logging.getLogger("agent-runtime.multi_agent_orchestrator")
 
@@ -53,6 +56,46 @@ class MultiAgentOrchestrator:
         
         context = await async_ctx_mgr.get_or_create(session_id)
         
+        # Get session manager for passing to agents
+        from app.services.session_manager_async import session_manager as async_session_mgr
+        
+        if async_session_mgr is None:
+            raise RuntimeError("SessionManager not initialized")
+        
+        # Check if there's an active execution plan
+        if async_session_mgr.has_plan(session_id):
+            logger.info(f"Session {session_id} has active execution plan, continuing execution")
+            async for chunk in self._execute_plan(session_id, async_session_mgr, context):
+                yield chunk
+            return
+
+        # Check if there's a plan waiting for user confirmation
+        if async_session_mgr.has_pending_plan_confirmation(session_id):
+            logger.info(f"Session {session_id} has plan waiting for confirmation")
+            confirmation_result = self._handle_plan_confirmation(session_id, message, async_session_mgr, context)
+            if confirmation_result["action"] == "execute":
+                logger.info(f"User confirmed plan execution for session {session_id}")
+                async for chunk in self._execute_plan(session_id, async_session_mgr, context):
+                    yield chunk
+                return
+            elif confirmation_result["action"] == "cancel":
+                logger.info(f"User cancelled plan execution for session {session_id}")
+                async_session_mgr.clear_pending_plan_confirmation(session_id)
+                yield StreamChunk(
+                    type="assistant_message",
+                    content="План отменен. Чем могу помочь?",
+                    is_final=True
+                )
+                return
+            else:
+                # Ask for clarification
+                yield StreamChunk(
+                    type="assistant_message",
+                    content=confirmation_result["message"],
+                    is_final=True
+                )
+                return
+        
         # Handle explicit agent switch request
         if agent_type:
             if context.current_agent != agent_type:
@@ -74,27 +117,35 @@ class MultiAgentOrchestrator:
                     is_final=False
                 )
         
-        # Get session manager for passing to agents
-        from app.services.session_manager_async import session_manager as async_session_mgr
-        
-        if async_session_mgr is None:
-            raise RuntimeError("SessionManager not initialized")
-        
         # If current agent is Orchestrator and we have a message, let it route
         if context.current_agent == AgentType.ORCHESTRATOR and message:
-            logger.debug("Current agent is Orchestrator, will route to specialist")
+            logger.debug("Current agent is Orchestrator, will route to specialist or create plan")
             orchestrator = agent_router.get_agent(AgentType.ORCHESTRATOR)
             
-            # Orchestrator will analyze and return switch_agent chunk
+            # Orchestrator will analyze and return switch_agent chunk or create plan
             async for chunk in orchestrator.process(
                 session_id=session_id,
                 message=message,
                 context=context.model_dump(),
                 session_mgr=async_session_mgr
             ):
-                if chunk.type == "switch_agent":
+                if chunk.type == "plan_notification":
+                    # Plan created, waiting for user confirmation
+                    logger.info(f"Plan notification sent for session {session_id}, waiting for confirmation")
+                    yield chunk
+                    return  # Wait for user response
+                elif chunk.type == "switch_agent":
                     # Extract target agent from metadata
                     target_agent_str = chunk.metadata.get("target_agent")
+                    
+                    # Check if this is plan execution request
+                    if target_agent_str == "plan_executor":
+                        logger.info(f"Starting plan execution for session {session_id}")
+                        # Execute the plan
+                        async for plan_chunk in self._execute_plan(session_id, async_session_mgr, context):
+                            yield plan_chunk
+                        return
+                    
                     target_agent = AgentType(target_agent_str)
                     reason = chunk.metadata.get("reason", "Orchestrator routing")
                     
@@ -120,7 +171,7 @@ class MultiAgentOrchestrator:
                     )
                     break
                 else:
-                    # Forward other chunks (shouldn't happen with Orchestrator)
+                    # Forward other chunks
                     yield chunk
         
         # Get current agent and process message
@@ -178,6 +229,208 @@ class MultiAgentOrchestrator:
             # Forward chunk
             yield chunk
     
+    async def _execute_plan(
+        self,
+        session_id: str,
+        session_mgr: "AsyncSessionManager",
+        context: Any
+    ) -> AsyncGenerator[StreamChunk, None]:
+        """
+        Execute an execution plan subtask by subtask.
+        
+        Args:
+            session_id: Session identifier
+            session_mgr: Session manager instance
+            context: Agent context
+            
+        Yields:
+            StreamChunk: Chunks from subtask execution
+        """
+        from app.models.schemas import SubtaskStatus
+        
+        plan = session_mgr.get_plan(session_id)
+        if not plan:
+            logger.error(f"No plan found for session {session_id}")
+            yield StreamChunk(
+                type="error",
+                error="No execution plan found",
+                is_final=True
+            )
+            return
+        
+        logger.info(
+            f"Executing plan {plan.plan_id} for session {session_id}: "
+            f"{len(plan.subtasks)} subtasks"
+        )
+        
+        # Execute subtasks sequentially
+        while not plan.is_complete:
+            # Get next subtask
+            subtask = session_mgr.get_next_subtask(session_id)
+            
+            if not subtask:
+                # No more subtasks or all complete
+                break
+            
+            logger.info(
+                f"Executing subtask {subtask.id}: {subtask.description} "
+                f"(agent: {subtask.agent})"
+            )
+            
+            # Notify about subtask start
+            yield StreamChunk(
+                type="assistant_message",
+                content=f"\n\n**Subtask {plan.current_subtask_index + 1}/{len(plan.subtasks)}**: {subtask.description}",
+                metadata={
+                    "subtask_id": subtask.id,
+                    "subtask_status": "in_progress",
+                    "agent": subtask.agent
+                },
+                is_final=False
+            )
+            
+            # Get appropriate agent
+            try:
+                agent_type = AgentType(subtask.agent)
+                agent = agent_router.get_agent(agent_type)
+            except (ValueError, KeyError) as e:
+                logger.error(f"Invalid agent type for subtask {subtask.id}: {subtask.agent}")
+                session_mgr.mark_subtask_failed(
+                    session_id,
+                    subtask.id,
+                    f"Invalid agent type: {subtask.agent}"
+                )
+                yield StreamChunk(
+                    type="error",
+                    error=f"Invalid agent type for subtask: {subtask.agent}",
+                    is_final=False
+                )
+                continue
+            
+            # Switch context to appropriate agent
+            context.switch_agent(agent_type, f"Executing subtask: {subtask.description}")
+            
+            # Execute subtask
+            try:
+                subtask_result = []
+                async for chunk in agent.process(
+                    session_id=session_id,
+                    message=subtask.description,
+                    context=context.model_dump(),
+                    session_mgr=session_mgr
+                ):
+                    # Collect result for logging
+                    if chunk.type == "assistant_message" and chunk.content:
+                        subtask_result.append(chunk.content)
+                    
+                    # Forward chunk
+                    yield chunk
+                
+                # Mark subtask as complete
+                result_text = "".join(subtask_result) if subtask_result else "Completed"
+                session_mgr.mark_subtask_complete(
+                    session_id,
+                    subtask.id,
+                    result_text[:500]  # Limit result size
+                )
+                
+                logger.info(f"Subtask {subtask.id} completed successfully")
+                
+                # Notify about subtask completion
+                yield StreamChunk(
+                    type="assistant_message",
+                    content=f"\n✓ Subtask {subtask.id} completed",
+                    metadata={
+                        "subtask_id": subtask.id,
+                        "subtask_status": "completed"
+                    },
+                    is_final=False
+                )
+                
+            except Exception as e:
+                logger.error(f"Error executing subtask {subtask.id}: {e}", exc_info=True)
+                session_mgr.mark_subtask_failed(
+                    session_id,
+                    subtask.id,
+                    str(e)
+                )
+                
+                yield StreamChunk(
+                    type="error",
+                    error=f"Subtask {subtask.id} failed: {str(e)}",
+                    metadata={
+                        "subtask_id": subtask.id,
+                        "subtask_status": "failed"
+                    },
+                    is_final=False
+                )
+                
+                # Continue with next subtask despite failure
+                continue
+        
+        # Plan execution complete
+        logger.info(f"Plan execution complete for session {session_id}")
+        
+        # Count completed vs failed
+        completed = sum(1 for st in plan.subtasks if st.status == SubtaskStatus.COMPLETED)
+        failed = sum(1 for st in plan.subtasks if st.status == SubtaskStatus.FAILED)
+        
+        # Final summary
+        yield StreamChunk(
+            type="assistant_message",
+            content=f"\n\n**Plan Execution Complete**\n- Total subtasks: {len(plan.subtasks)}\n- Completed: {completed}\n- Failed: {failed}",
+            metadata={
+                "plan_id": plan.plan_id,
+                "plan_status": "complete",
+                "total_subtasks": len(plan.subtasks),
+                "completed": completed,
+                "failed": failed
+            },
+            is_final=True
+        )
+        
+        # Clear the plan
+        session_mgr.clear_plan(session_id)
+        
+        # Reset to orchestrator
+        context.switch_agent(AgentType.ORCHESTRATOR, "Plan execution complete")
+
+    def _handle_plan_confirmation(
+        self,
+        session_id: str,
+        message: str,
+        session_mgr: "AsyncSessionManager",
+        context: Any
+    ) -> dict:
+        """
+        Handle user confirmation for plan execution.
+
+        Args:
+            session_id: Session identifier
+            message: User message
+            session_mgr: Session manager instance
+            context: Agent context
+
+        Returns:
+            Dict with action and optional message
+        """
+        message_lower = message.lower().strip()
+
+        # Check for positive confirmation
+        if any(word in message_lower for word in ["да", "yes", "y", "давай", "продолжай", "вперед", "ok", "okay", "go", "start", "выполни", "execute"]):
+            return {"action": "execute"}
+
+        # Check for negative confirmation
+        elif any(word in message_lower for word in ["нет", "no", "n", "не надо", "отмена", "cancel", "stop", "отмени"]):
+            return {"action": "cancel"}
+
+        # Ask for clarification
+        else:
+            return {
+                "action": "clarify",
+                "message": "Пожалуйста, подтвердите выполнение плана: 'да' для продолжения или 'нет' для отмены."
+            }
+
     def get_current_agent(self, session_id: str) -> Optional[AgentType]:
         """
         Get current active agent for a session.

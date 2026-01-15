@@ -7,10 +7,13 @@ Thread-safe storage with async persistence.
 import asyncio
 import logging
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, TYPE_CHECKING
 
 from app.models.schemas import Message, SessionState
 from app.services.database import get_db, get_database_service, DatabaseService
+
+if TYPE_CHECKING:
+    from app.models.schemas import ExecutionPlan, Subtask
 
 logger = logging.getLogger("agent-runtime.session_manager")
 
@@ -29,6 +32,8 @@ class AsyncSessionManager:
     def __init__(self):
         """Initialize session manager"""
         self._sessions: Dict[str, SessionState] = {}
+        self._plans: Dict[str, "ExecutionPlan"] = {}  # session_id -> ExecutionPlan
+        self._pending_confirmations: set[str] = set()  # session_ids waiting for plan confirmation
         self._lock = asyncio.Lock()
         self._db_service = get_database_service()
         self._pending_writes: set[str] = set()
@@ -388,6 +393,224 @@ class AsyncSessionManager:
             logger.info("All pending sessions flushed")
         
         logger.info("Session manager shutdown complete")
+    
+    # ===== Plan Management Methods =====
+    
+    def set_plan(self, session_id: str, plan: "ExecutionPlan") -> None:
+        """
+        Store execution plan for a session.
+        
+        Args:
+            session_id: Session identifier
+            plan: ExecutionPlan to store
+        """
+        self._plans[session_id] = plan
+        logger.info(
+            f"Stored execution plan for session {session_id}: "
+            f"{len(plan.subtasks)} subtasks"
+        )
+    
+    def get_plan(self, session_id: str) -> Optional["ExecutionPlan"]:
+        """
+        Get execution plan for a session.
+        
+        Args:
+            session_id: Session identifier
+            
+        Returns:
+            ExecutionPlan if exists, None otherwise
+        """
+        plan = self._plans.get(session_id)
+        if plan:
+            logger.debug(
+                f"Retrieved plan for session {session_id}: "
+                f"subtask {plan.current_subtask_index + 1}/{len(plan.subtasks)}"
+            )
+        return plan
+    
+    def has_plan(self, session_id: str) -> bool:
+        """
+        Check if session has an active execution plan.
+        
+        Args:
+            session_id: Session identifier
+            
+        Returns:
+            True if plan exists, False otherwise
+        """
+        return session_id in self._plans
+    
+    def mark_subtask_complete(
+        self,
+        session_id: str,
+        subtask_id: str,
+        result: Optional[str] = None
+    ) -> bool:
+        """
+        Mark a subtask as completed.
+        
+        Args:
+            session_id: Session identifier
+            subtask_id: Subtask identifier
+            result: Optional result/output from subtask execution
+            
+        Returns:
+            True if subtask was found and marked, False otherwise
+        """
+        plan = self.get_plan(session_id)
+        if not plan:
+            logger.warning(f"No plan found for session {session_id}")
+            return False
+        
+        # Find and update subtask
+        for subtask in plan.subtasks:
+            if subtask.id == subtask_id:
+                from app.models.schemas import SubtaskStatus
+                subtask.status = SubtaskStatus.COMPLETED
+                if result:
+                    subtask.result = result
+                logger.info(
+                    f"Marked subtask {subtask_id} as completed in session {session_id}"
+                )
+                return True
+        
+        logger.warning(
+            f"Subtask {subtask_id} not found in plan for session {session_id}"
+        )
+        return False
+    
+    def mark_subtask_failed(
+        self,
+        session_id: str,
+        subtask_id: str,
+        error: str
+    ) -> bool:
+        """
+        Mark a subtask as failed.
+        
+        Args:
+            session_id: Session identifier
+            subtask_id: Subtask identifier
+            error: Error message
+            
+        Returns:
+            True if subtask was found and marked, False otherwise
+        """
+        plan = self.get_plan(session_id)
+        if not plan:
+            logger.warning(f"No plan found for session {session_id}")
+            return False
+        
+        # Find and update subtask
+        for subtask in plan.subtasks:
+            if subtask.id == subtask_id:
+                from app.models.schemas import SubtaskStatus
+                subtask.status = SubtaskStatus.FAILED
+                subtask.error = error
+                logger.error(
+                    f"Marked subtask {subtask_id} as failed in session {session_id}: {error}"
+                )
+                return True
+        
+        logger.warning(
+            f"Subtask {subtask_id} not found in plan for session {session_id}"
+        )
+        return False
+    
+    def get_next_subtask(self, session_id: str) -> Optional["Subtask"]:
+        """
+        Get the next pending subtask to execute.
+        
+        Args:
+            session_id: Session identifier
+            
+        Returns:
+            Next Subtask to execute, or None if all complete
+        """
+        plan = self.get_plan(session_id)
+        if not plan:
+            return None
+        
+        from app.models.schemas import SubtaskStatus
+        
+        # Find next pending subtask that has all dependencies met
+        for i, subtask in enumerate(plan.subtasks):
+            if subtask.status == SubtaskStatus.PENDING:
+                # Check if all dependencies are completed
+                dependencies_met = True
+                for dep_id in subtask.dependencies:
+                    dep_subtask = next(
+                        (s for s in plan.subtasks if s.id == dep_id),
+                        None
+                    )
+                    if not dep_subtask or dep_subtask.status != SubtaskStatus.COMPLETED:
+                        dependencies_met = False
+                        break
+                
+                if dependencies_met:
+                    # Mark as in progress
+                    subtask.status = SubtaskStatus.IN_PROGRESS
+                    plan.current_subtask_index = i
+                    logger.info(
+                        f"Next subtask for session {session_id}: "
+                        f"{subtask.id} ({i + 1}/{len(plan.subtasks)})"
+                    )
+                    return subtask
+        
+        # Check if all subtasks are complete
+        all_complete = all(
+            s.status in [SubtaskStatus.COMPLETED, SubtaskStatus.SKIPPED]
+            for s in plan.subtasks
+        )
+        
+        if all_complete:
+            plan.is_complete = True
+            logger.info(f"All subtasks completed for session {session_id}")
+        
+        return None
+    
+    def clear_plan(self, session_id: str) -> None:
+        """
+        Clear execution plan for a session.
+
+        Args:
+            session_id: Session identifier
+        """
+        if session_id in self._plans:
+            del self._plans[session_id]
+            logger.info(f"Cleared execution plan for session {session_id}")
+
+    def set_pending_plan_confirmation(self, session_id: str) -> None:
+        """
+        Mark session as waiting for plan confirmation.
+
+        Args:
+            session_id: Session identifier
+        """
+        self._pending_confirmations.add(session_id)
+        logger.info(f"Set pending confirmation for session {session_id}")
+
+    def has_pending_plan_confirmation(self, session_id: str) -> bool:
+        """
+        Check if session is waiting for plan confirmation.
+
+        Args:
+            session_id: Session identifier
+
+        Returns:
+            True if waiting for confirmation, False otherwise
+        """
+        return session_id in self._pending_confirmations
+
+    def clear_pending_plan_confirmation(self, session_id: str) -> None:
+        """
+        Clear pending confirmation state for a session.
+
+        Args:
+            session_id: Session identifier
+        """
+        self._pending_confirmations.discard(session_id)
+        logger.info(f"Cleared pending confirmation for session {session_id}")
 
 
 # Global instance

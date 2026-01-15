@@ -1,8 +1,76 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
+
+
+# ===== Planning Models =====
+
+class SubtaskStatus(str, Enum):
+    """Status of a subtask in execution plan"""
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
+class Subtask(BaseModel):
+    """Individual subtask in an execution plan"""
+    
+    id: str = Field(description="Unique identifier for the subtask")
+    description: str = Field(description="Description of what needs to be done")
+    agent: str = Field(description="Agent type that should handle this subtask (coder, architect, debug, ask)")
+    estimated_time: Optional[str] = Field(default=None, description="Estimated time to complete (e.g., '2 min', '5 min')")
+    status: SubtaskStatus = Field(default=SubtaskStatus.PENDING, description="Current status of the subtask")
+    result: Optional[str] = Field(default=None, description="Result or output after completion")
+    error: Optional[str] = Field(default=None, description="Error message if subtask failed")
+    dependencies: List[str] = Field(default_factory=list, description="IDs of subtasks that must complete before this one")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "id": "subtask_1",
+                "description": "Add Riverpod dependency to pubspec.yaml",
+                "agent": "coder",
+                "estimated_time": "2 min",
+                "status": "pending",
+                "dependencies": []
+            }
+        }
+
+
+class ExecutionPlan(BaseModel):
+    """Execution plan for complex tasks"""
+    
+    plan_id: str = Field(description="Unique identifier for the plan")
+    session_id: str = Field(description="Session this plan belongs to")
+    original_task: str = Field(description="Original user task that triggered planning")
+    subtasks: List[Subtask] = Field(description="List of subtasks to execute")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    current_subtask_index: int = Field(default=0, description="Index of currently executing subtask")
+    is_complete: bool = Field(default=False, description="Whether all subtasks are complete")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "plan_id": "plan_abc123",
+                "session_id": "session_123",
+                "original_task": "Migrate from Provider to Riverpod",
+                "subtasks": [
+                    {
+                        "id": "subtask_1",
+                        "description": "Add riverpod dependency",
+                        "agent": "coder",
+                        "estimated_time": "2 min",
+                        "status": "pending"
+                    }
+                ],
+                "current_subtask_index": 0,
+                "is_complete": False
+            }
+        }
 
 
 class HealthResponse(BaseModel):

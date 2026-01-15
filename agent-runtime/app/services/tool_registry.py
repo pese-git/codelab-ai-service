@@ -52,13 +52,37 @@ def switch_mode_tool(mode: str, reason: str = "Agent requested switch") -> str:
     return f"__SWITCH_MODE__|{mode}|{reason}"
 
 
+def create_plan_tool(subtasks: List[Dict[str, Any]]) -> str:
+    """
+    Create an execution plan for complex tasks.
+    
+    This tool allows the Orchestrator to break down complex tasks into
+    manageable subtasks that will be executed sequentially by specialized agents.
+    
+    Args:
+        subtasks: List of subtask definitions, each containing:
+            - id: Unique identifier (e.g., "subtask_1")
+            - description: What needs to be done
+            - agent: Which agent should handle it (coder, architect, debug, ask)
+            - estimated_time: Optional time estimate (e.g., "2 min")
+            - dependencies: Optional list of subtask IDs that must complete first
+    
+    Returns:
+        Special marker string that will be processed by the orchestrator
+    """
+    import json
+    # Return a special marker with the plan data
+    return f"__CREATE_PLAN__|{json.dumps(subtasks)}"
+
+
 # ===== Tool Registry =====
 
 # Local tools that can be executed in agent-runtime
 LOCAL_TOOLS: Dict[str, Callable] = {
     "echo": echo_tool,
     "calculator": calculator_tool,
-    "switch_mode": switch_mode_tool
+    "switch_mode": switch_mode_tool,
+    "create_plan": create_plan_tool
 }
 
 
@@ -133,6 +157,54 @@ TOOLS_SPEC: List[Dict[str, Any]] = [
                 }
             },
             "required": ["mode"]
+        }
+    ),
+    _create_tool_spec(
+        name="create_plan",
+        description=(
+            "Create an execution plan for complex tasks by breaking them down into subtasks. "
+            "Use this when a task requires multiple steps, coordination between different agents, "
+            "or when the task is too complex to handle in a single agent session. "
+            "Each subtask will be executed sequentially by the appropriate specialized agent."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "subtasks": {
+                    "type": "array",
+                    "description": "List of subtasks to execute in order",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "string",
+                                "description": "Unique identifier for the subtask (e.g., 'subtask_1', 'subtask_2')"
+                            },
+                            "description": {
+                                "type": "string",
+                                "description": "Clear description of what needs to be done in this subtask"
+                            },
+                            "agent": {
+                                "type": "string",
+                                "enum": ["coder", "architect", "debug", "ask"],
+                                "description": "Which specialized agent should handle this subtask"
+                            },
+                            "estimated_time": {
+                                "type": "string",
+                                "description": "Optional estimated time to complete (e.g., '2 min', '5 min')"
+                            },
+                            "dependencies": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Optional list of subtask IDs that must complete before this one",
+                                "default": []
+                            }
+                        },
+                        "required": ["id", "description", "agent"]
+                    }
+                }
+            },
+            "required": ["subtasks"]
         }
     ),
     

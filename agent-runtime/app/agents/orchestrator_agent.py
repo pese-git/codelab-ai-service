@@ -84,7 +84,7 @@ class OrchestratorAgent(BaseAgent):
                 "search_in_code"
             ]
         )
-        logger.info("Orchestrator agent initialized with LLM-based classification")
+        logger.info("Orchestrator agent initialized with LLM-based classification and planning")
     
     async def process(
         self,
@@ -94,16 +94,16 @@ class OrchestratorAgent(BaseAgent):
         session_mgr: "AsyncSessionManager"
     ) -> AsyncGenerator[StreamChunk, None]:
         """
-        Analyze request using LLM and determine which agent should handle it.
+        Analyze request and either route to agent or create execution plan.
         
         Args:
             session_id: Session identifier
             message: User message to analyze
             context: Agent context with history
-            session_mgr: Async session manager for session operations (not used by orchestrator)
+            session_mgr: Async session manager for session operations
             
         Yields:
-            StreamChunk: Switch agent chunk with routing decision
+            StreamChunk: Switch agent chunk or plan creation notification
         """
         logger.info(f"Orchestrator analyzing request for session {session_id}")
         logger.debug(f"Message: {message[:100]}...")
@@ -121,28 +121,62 @@ class OrchestratorAgent(BaseAgent):
                 "confidence": "high",
                 "reasoning": "Single-agent mode: only Universal agent available"
             }
+            
+            # Send switch_agent chunk
+            yield StreamChunk(
+                type="switch_agent",
+                content=f"Routing to {target_agent.value} agent",
+                metadata={
+                    "target_agent": target_agent.value,
+                    "reason": classification_info.get("reasoning"),
+                    "confidence": classification_info.get("confidence", "medium"),
+                    "classification_method": "llm"
+                },
+                is_final=True
+            )
+            return
+        
+        # Multi-agent mode: Let LLM decide whether to route to Architect or route directly
+        # For complex tasks, LLM should route to Architect for planning
+        from app.services.llm_stream_service import stream_response
+        
+        # Get session history
+        history = session_mgr.get_history(session_id)
+        
+        # Update system prompt
+        if history and history[0].get("role") == "system":
+            history[0]["content"] = self.system_prompt
         else:
-            # Multi-agent mode: classify the task type using LLM
-            target_agent, classification_info = await self.classify_task_with_llm(message)
+            history.insert(0, {"role": "system", "content": self.system_prompt})
         
-        logger.info(
-            f"Orchestrator routing to {target_agent.value} agent "
-            f"for session {session_id} "
-            f"(confidence: {classification_info.get('confidence', 'unknown')})"
-        )
-        
-        # Send switch_agent chunk
-        yield StreamChunk(
-            type="switch_agent",
-            content=f"Routing to {target_agent.value} agent",
-            metadata={
-                "target_agent": target_agent.value,
-                "reason": classification_info.get("reasoning", f"Task classified as {target_agent.value}"),
-                "confidence": classification_info.get("confidence", "medium"),
-                "classification_method": "llm"
-            },
-            is_final=True
-        )
+        # Stream LLM response - it will route to appropriate agent
+        async for chunk in stream_response(session_id, history, self.allowed_tools, session_mgr):
+            # Check if it's a routing decision
+            if chunk.type == "assistant_message" and chunk.is_final:
+                # LLM decided on routing - classify and route
+                target_agent, classification_info = await self.classify_task_with_llm(message)
+
+                logger.info(
+                    f"Orchestrator routing to {target_agent.value} agent "
+                    f"for session {session_id}"
+                )
+
+                # Send switch_agent chunk
+                yield StreamChunk(
+                    type="switch_agent",
+                    content=f"Routing to {target_agent.value} agent",
+                    metadata={
+                        "target_agent": target_agent.value,
+                        "reason": classification_info.get("reasoning", f"Task classified as {target_agent.value}"),
+                        "confidence": classification_info.get("confidence", "medium"),
+                        "classification_method": "llm"
+                    },
+                    is_final=True
+                )
+                return
+
+            # Forward other chunks
+            yield chunk
     
     async def classify_task_with_llm(self, message: str) -> tuple[AgentType, Dict[str, Any]]:
         """
