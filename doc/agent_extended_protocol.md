@@ -81,8 +81,11 @@ Human-in-the-Loop (HITL) позволяет реализовать безопа�
 }
 ```
 
-### 3. План (Plan update)  ❗️**НОВЫЙ**
-*Визуализируется как текущий высокоуровневый план агента или шаги рассуждения (COT).* 
+### 3. План (Plan update)  ❗️**НОВЫЙ** ✅ **РЕАЛИЗОВАНО**
+*Визуализируется как текущий высокоуровневый план агента или шаги рассуждения (COT).*
+
+**Статус**: ✅ Полностью реализовано в agent-runtime (commit e70847c) и IDE (commit 1457e53)
+
 ```json
 {
   "type": "plan_update",
@@ -95,19 +98,37 @@ Human-in-the-Loop (HITL) позволяет реализовать безопа�
   "current_step": "1"
 }
 ```
-- `status`: [pending, running, blocked, error, done]
+- `status`: [pending, in_progress, completed, failed, skipped]
 
-### 4. Прогресс по плану / результат  ❗️**НОВЫЙ**
+**Реализация**:
+- Orchestrator Agent автоматически создает планы для сложных задач
+- Инструмент `create_plan` доступен для LLM
+- Планы хранятся в SessionManager
+- Последовательное выполнение подзадач с автоматическим переключением агентов
+- Поддержка зависимостей между подзадачами
+
+**Документация**: См. [`PLANNING_SYSTEM_GUIDE.md`](../agent-runtime/PLANNING_SYSTEM_GUIDE.md)
+
+### 4. Прогресс по плану / результат  ❗️**НОВЫЙ** ✅ **РЕАЛИЗОВАНО**
 *Промежуточный статус выбранного шага плана.*
+
+**Статус**: ✅ Реализовано в agent-runtime
+
 ```json
 {
   "type": "plan_progress",
   "plan_id": "plan-6ca1",
   "step_id": "1",
   "result": "main.py прочитан. Готов рефакторинг.",
-  "status": "done"
+  "status": "completed"
 }
 ```
+
+**Метаданные для клиента**:
+- `subtask_started` - начало выполнения подзадачи
+- `subtask_progress` - прогресс выполнения
+- `subtask_completed` - завершение подзадачи
+- `plan_summary` - итоговая статистика выполнения плана
 
 ### 5. Tool Call (как и прежде, с привязкой к plan/step)
 ```json
@@ -180,5 +201,108 @@ Human-in-the-Loop (HITL) позволяет реализовать безопа�
 
 ---
 
+## Новые типы сообщений для планирования ⭐ **РЕАЛИЗОВАНО**
+
+### plan_notification
+Уведомление о создании плана (для подтверждения пользователем в будущем).
+
+```json
+{
+  "type": "plan_notification",
+  "plan_id": "plan-abc123",
+  "session_id": "session-xyz",
+  "original_task": "Migrate from Provider to Riverpod",
+  "subtasks": [
+    {
+      "id": "subtask_1",
+      "description": "Add riverpod dependency to pubspec.yaml",
+      "agent": "coder",
+      "estimated_time": "2 min",
+      "status": "pending",
+      "dependencies": []
+    },
+    {
+      "id": "subtask_2",
+      "description": "Create provider definitions using Riverpod",
+      "agent": "coder",
+      "estimated_time": "5 min",
+      "status": "pending",
+      "dependencies": ["subtask_1"]
+    }
+  ],
+  "created_at": "2026-01-15T10:00:00Z"
+}
+```
+
+### plan_approval
+Подтверждение или отклонение плана пользователем (для будущей реализации).
+
+```json
+{
+  "type": "plan_approval",
+  "plan_id": "plan-abc123",
+  "decision": "approve",  // или "reject", "modify"
+  "feedback": "Выглядит хорошо, начинай выполнение"
+}
+```
+
+### Метаданные прогресса
+
+**subtask_started**:
+```json
+{
+  "type": "metadata",
+  "metadata_type": "subtask_started",
+  "plan_id": "plan-abc123",
+  "subtask_id": "subtask_1",
+  "agent": "coder",
+  "description": "Add riverpod dependency to pubspec.yaml"
+}
+```
+
+**subtask_progress**:
+```json
+{
+  "type": "metadata",
+  "metadata_type": "subtask_progress",
+  "plan_id": "plan-abc123",
+  "subtask_id": "subtask_1",
+  "progress": 50,
+  "message": "Updating pubspec.yaml..."
+}
+```
+
+**subtask_completed**:
+```json
+{
+  "type": "metadata",
+  "metadata_type": "subtask_completed",
+  "plan_id": "plan-abc123",
+  "subtask_id": "subtask_1",
+  "status": "completed",
+  "result": "Dependency added successfully"
+}
+```
+
+**plan_summary**:
+```json
+{
+  "type": "metadata",
+  "metadata_type": "plan_summary",
+  "plan_id": "plan-abc123",
+  "total_subtasks": 5,
+  "completed": 5,
+  "failed": 0,
+  "skipped": 0,
+  "execution_time": "15 min"
+}
+```
+
 ## JSON-схемы (псевдо)
 - (см. примеры выше; для продакшена рекомендуется использовать openapi/json-schema для строгой валидации)
+
+## Ссылки на документацию
+
+- **[Planning System Guide](../agent-runtime/PLANNING_SYSTEM_GUIDE.md)** - Полное руководство по системе планирования
+- **[Planning Implementation Report](../agent-runtime/PLANNING_IMPLEMENTATION_REPORT.md)** - Отчет о реализации
+- **[Planning Integration Report (IDE)](../../codelab_ide/PLANNING_INTEGRATION_REPORT.md)** - Интеграция в IDE
