@@ -51,6 +51,8 @@ class ExecutionPlan(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     current_subtask_index: int = Field(default=0, description="Index of currently executing subtask")
     is_complete: bool = Field(default=False, description="Whether all subtasks are complete")
+    requires_approval: bool = Field(default=True, description="Whether plan requires user approval")
+    is_approved: bool = Field(default=False, description="Whether plan was approved by user")
     
     class Config:
         json_schema_extra = {
@@ -133,7 +135,7 @@ class AgentStreamRequest(BaseModel):
 class StreamChunk(BaseModel):
     """SSE event chunk for streaming responses"""
     
-    type: Literal["assistant_message", "tool_call", "error", "done", "switch_agent", "agent_switched"] = Field(
+    type: Literal["assistant_message", "tool_call", "error", "done", "switch_agent", "agent_switched", "plan_notification"] = Field(
         description="Type of the stream chunk"
     )
     content: Optional[str] = Field(default=None, description="Text content for assistant messages")

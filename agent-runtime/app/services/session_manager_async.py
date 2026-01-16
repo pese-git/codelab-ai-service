@@ -519,7 +519,7 @@ class AsyncSessionManager:
     
     def get_next_subtask(self, session_id: str) -> Optional["Subtask"]:
         """
-        Get the next pending subtask to execute.
+        Get the next pending or in-progress subtask to execute.
         
         Args:
             session_id: Session identifier
@@ -532,6 +532,16 @@ class AsyncSessionManager:
             return None
         
         from app.models.schemas import SubtaskStatus
+        
+        # First, check if there's an IN_PROGRESS subtask (waiting for tool_result)
+        for i, subtask in enumerate(plan.subtasks):
+            if subtask.status == SubtaskStatus.IN_PROGRESS:
+                plan.current_subtask_index = i
+                logger.info(
+                    f"Continuing IN_PROGRESS subtask for session {session_id}: "
+                    f"{subtask.id} ({i + 1}/{len(plan.subtasks)})"
+                )
+                return subtask
         
         # Find next pending subtask that has all dependencies met
         for i, subtask in enumerate(plan.subtasks):

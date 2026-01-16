@@ -64,36 +64,24 @@ class MultiAgentOrchestrator:
         
         # Check if there's an active execution plan
         if async_session_mgr.has_plan(session_id):
-            logger.info(f"Session {session_id} has active execution plan, continuing execution")
-            async for chunk in self._execute_plan(session_id, async_session_mgr, context):
-                yield chunk
-            return
-
-        # Check if there's a plan waiting for user confirmation
-        if async_session_mgr.has_pending_plan_confirmation(session_id):
-            logger.info(f"Session {session_id} has plan waiting for confirmation")
-            confirmation_result = self._handle_plan_confirmation(session_id, message, async_session_mgr, context)
-            if confirmation_result["action"] == "execute":
-                logger.info(f"User confirmed plan execution for session {session_id}")
+            plan = async_session_mgr.get_plan(session_id)
+            
+            # If plan requires approval but not yet approved, wait for plan_decision
+            if plan.requires_approval and not plan.is_approved:
+                logger.info(f"Session {session_id} has plan waiting for approval")
+                # Don't process message, wait for plan_decision
+                yield StreamChunk(
+                    type="assistant_message",
+                    content="Ожидаю подтверждения плана...",
+                    is_final=True
+                )
+                return
+            
+            # Plan is approved, execute it
+            if plan.is_approved and not plan.is_complete:
+                logger.info(f"Session {session_id} has approved plan, continuing execution")
                 async for chunk in self._execute_plan(session_id, async_session_mgr, context):
                     yield chunk
-                return
-            elif confirmation_result["action"] == "cancel":
-                logger.info(f"User cancelled plan execution for session {session_id}")
-                async_session_mgr.clear_pending_plan_confirmation(session_id)
-                yield StreamChunk(
-                    type="assistant_message",
-                    content="План отменен. Чем могу помочь?",
-                    is_final=True
-                )
-                return
-            else:
-                # Ask for clarification
-                yield StreamChunk(
-                    type="assistant_message",
-                    content=confirmation_result["message"],
-                    is_final=True
-                )
                 return
         
         # Handle explicit agent switch request
@@ -264,14 +252,16 @@ class MultiAgentOrchestrator:
         )
         
         # Execute subtasks sequentially
-        while not plan.is_complete:
-            # Get next subtask
-            subtask = session_mgr.get_next_subtask(session_id)
-            
-            if not subtask:
-                # No more subtasks or all complete
-                break
-            
+        # NOTE: We execute ONE subtask at a time and exit if tool is called
+        # When tool_result arrives, process_message will be called again to continue
+        
+        # Get next subtask
+        subtask = session_mgr.get_next_subtask(session_id)
+        
+        if not subtask:
+            # No more subtasks or all complete
+            logger.info(f"No more subtasks to execute for session {session_id}")
+        else:
             logger.info(
                 f"Executing subtask {subtask.id}: {subtask.description} "
                 f"(agent: {subtask.agent})"
@@ -305,7 +295,10 @@ class MultiAgentOrchestrator:
                     error=f"Invalid agent type for subtask: {subtask.agent}",
                     is_final=False
                 )
-                continue
+                # Continue with next subtask
+                async for next_chunk in self._execute_plan(session_id, session_mgr, context):
+                    yield next_chunk
+                return
             
             # Switch context to appropriate agent
             context.switch_agent(agent_type, f"Executing subtask: {subtask.description}")
@@ -313,6 +306,8 @@ class MultiAgentOrchestrator:
             # Execute subtask
             try:
                 subtask_result = []
+                tool_called = False
+                
                 async for chunk in agent.process(
                     session_id=session_id,
                     message=subtask.description,
@@ -323,29 +318,51 @@ class MultiAgentOrchestrator:
                     if chunk.type == "assistant_message" and chunk.content:
                         subtask_result.append(chunk.content)
                     
+                    # Check if tool was called
+                    if chunk.type == "tool_call":
+                        tool_called = True
+                        logger.info(
+                            f"Subtask {subtask.id} called tool {chunk.tool_name}, "
+                            f"waiting for tool_result before continuing"
+                        )
+                    
                     # Forward chunk
                     yield chunk
                 
-                # Mark subtask as complete
-                result_text = "".join(subtask_result) if subtask_result else "Completed"
-                session_mgr.mark_subtask_complete(
-                    session_id,
-                    subtask.id,
-                    result_text[:500]  # Limit result size
-                )
-                
-                logger.info(f"Subtask {subtask.id} completed successfully")
-                
-                # Notify about subtask completion
-                yield StreamChunk(
-                    type="assistant_message",
-                    content=f"\n✓ Subtask {subtask.id} completed",
-                    metadata={
-                        "subtask_id": subtask.id,
-                        "subtask_status": "completed"
-                    },
-                    is_final=False
-                )
+                # Only mark as complete if no tool was called
+                # If tool was called, we'll continue when tool_result arrives
+                if not tool_called:
+                    result_text = "".join(subtask_result) if subtask_result else "Completed"
+                    session_mgr.mark_subtask_complete(
+                        session_id,
+                        subtask.id,
+                        result_text[:500]  # Limit result size
+                    )
+                    
+                    logger.info(f"Subtask {subtask.id} completed successfully")
+                    
+                    # Notify about subtask completion
+                    yield StreamChunk(
+                        type="assistant_message",
+                        content=f"\n✓ Subtask {subtask.id} completed",
+                        metadata={
+                            "subtask_id": subtask.id,
+                            "subtask_status": "completed"
+                        },
+                        is_final=False
+                    )
+                    
+                    # Continue with next subtask immediately
+                    # Recursively call _execute_plan to process next subtask
+                    async for next_chunk in self._execute_plan(session_id, session_mgr, context):
+                        yield next_chunk
+                    return
+                else:
+                    # Tool called - exit and wait for tool_result
+                    logger.info(
+                        f"Exiting _execute_plan, waiting for tool_result for subtask {subtask.id}"
+                    )
+                    return
                 
             except Exception as e:
                 logger.error(f"Error executing subtask {subtask.id}: {e}", exc_info=True)
@@ -366,9 +383,11 @@ class MultiAgentOrchestrator:
                 )
                 
                 # Continue with next subtask despite failure
-                continue
-        
-        # Plan execution complete
+                async for next_chunk in self._execute_plan(session_id, session_mgr, context):
+                    yield next_chunk
+                return
+            
+        # Plan execution complete (no more subtasks)
         logger.info(f"Plan execution complete for session {session_id}")
         
         # Count completed vs failed
@@ -394,42 +413,6 @@ class MultiAgentOrchestrator:
         
         # Reset to orchestrator
         context.switch_agent(AgentType.ORCHESTRATOR, "Plan execution complete")
-
-    def _handle_plan_confirmation(
-        self,
-        session_id: str,
-        message: str,
-        session_mgr: "AsyncSessionManager",
-        context: Any
-    ) -> dict:
-        """
-        Handle user confirmation for plan execution.
-
-        Args:
-            session_id: Session identifier
-            message: User message
-            session_mgr: Session manager instance
-            context: Agent context
-
-        Returns:
-            Dict with action and optional message
-        """
-        message_lower = message.lower().strip()
-
-        # Check for positive confirmation
-        if any(word in message_lower for word in ["да", "yes", "y", "давай", "продолжай", "вперед", "ok", "okay", "go", "start", "выполни", "execute"]):
-            return {"action": "execute"}
-
-        # Check for negative confirmation
-        elif any(word in message_lower for word in ["нет", "no", "n", "не надо", "отмена", "cancel", "stop", "отмени"]):
-            return {"action": "cancel"}
-
-        # Ask for clarification
-        else:
-            return {
-                "action": "clarify",
-                "message": "Пожалуйста, подтвердите выполнение плана: 'да' для продолжения или 'нет' для отмены."
-            }
 
     def get_current_agent(self, session_id: str) -> Optional[AgentType]:
         """

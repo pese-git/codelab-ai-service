@@ -44,10 +44,12 @@ class ArchitectAgent(BaseAgent):
                 "attempt_completion",
                 "ask_followup_question",
                 "switch_mode"  # Allow switching to other agents
+                # NOTE: execute_command, create_directory are NOT allowed
+                # Architect should create plans, not execute implementation tasks
             ],
             file_restrictions=[r".*\.md$"]  # Only markdown files
         )
-        logger.info("Architect agent initialized with .md file restrictions")
+        logger.info("Architect agent initialized with .md file restrictions and planning-only tools")
     
     async def process(
         self,
@@ -69,6 +71,22 @@ class ArchitectAgent(BaseAgent):
             StreamChunk: Chunks for SSE streaming
         """
         logger.info(f"Architect agent processing message for session {session_id}")
+        
+        # Check if there's an approved plan - don't process, let orchestrator handle it
+        if session_mgr.has_plan(session_id):
+            plan = session_mgr.get_plan(session_id)
+            if plan and plan.is_approved and not plan.is_complete:
+                logger.info(
+                    f"Architect: Plan {plan.plan_id} already approved, "
+                    f"should not be processing messages. Delegating to orchestrator."
+                )
+                # Don't process - the orchestrator should handle plan execution
+                yield StreamChunk(
+                    type="assistant_message",
+                    content="План уже подтвержден и выполняется...",
+                    is_final=True
+                )
+                return
         
         # Get session history
         history = session_mgr.get_history(session_id)
@@ -124,7 +142,9 @@ class ArchitectAgent(BaseAgent):
                         plan_id=f"plan_{uuid.uuid4().hex[:8]}",
                         session_id=session_id,
                         original_task=message,
-                        subtasks=subtasks
+                        subtasks=subtasks,
+                        requires_approval=True,
+                        is_approved=False
                     )
 
                     # Store plan in session manager
@@ -159,7 +179,10 @@ class ArchitectAgent(BaseAgent):
                                 plan_summary += f"   - Зависимости: {', '.join(deps)}\n"
                         plan_summary += "\n"
 
-                    plan_summary += "**Хотите продолжить выполнение плана?**"
+                    plan_summary += (
+                        "**Требуется подтверждение:**\n"
+                        "Отправьте `plan_decision` с решением (approve/edit/reject)"
+                    )
 
                     yield StreamChunk(
                         type="plan_notification",
@@ -177,9 +200,9 @@ class ArchitectAgent(BaseAgent):
                                 }
                                 for st in subtasks
                             ],
-                            "requires_confirmation": True
+                            "requires_approval": True
                         },
-                        is_final=False
+                        is_final=True
                     )
                     return
 

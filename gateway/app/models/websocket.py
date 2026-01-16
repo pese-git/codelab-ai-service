@@ -125,3 +125,43 @@ class WSHITLDecision(BaseModel):
                 }
             ]
         }
+
+
+class WSPlanDecision(BaseModel):
+    """WebSocket message for plan user decision from IDE to Agent"""
+    
+    type: Literal["plan_decision"]
+    plan_id: str
+    decision: Literal["approve", "edit", "reject"]
+    modified_subtasks: Optional[list[Dict[str, Any]]] = None
+    feedback: Optional[str] = None
+    
+    class Config:
+        json_schema_extra = {
+            "examples": [
+                {
+                    "type": "plan_decision",
+                    "plan_id": "plan_abc123",
+                    "decision": "approve"
+                },
+                {
+                    "type": "plan_decision",
+                    "plan_id": "plan_abc123",
+                    "decision": "edit",
+                    "modified_subtasks": [
+                        {
+                            "id": "subtask_1",
+                            "description": "Modified description",
+                            "agent": "coder",
+                            "estimated_time": "3 min"
+                        }
+                    ]
+                },
+                {
+                    "type": "plan_decision",
+                    "plan_id": "plan_abc123",
+                    "decision": "reject",
+                    "feedback": "This approach is not suitable"
+                }
+            ]
+        }

@@ -18,52 +18,57 @@ if TYPE_CHECKING:
 logger = logging.getLogger("agent-runtime.orchestrator_agent")
 
 
-# Classification prompt for LLM
-CLASSIFICATION_PROMPT = """You are a task classifier for a multi-agent system. Analyze the user's request and determine which specialized agent should handle it.
+# Classification prompt template for LLM
+CLASSIFICATION_PROMPT_TEMPLATE = """You are a task classifier for a multi-agent system. Analyze the user's request and determine which specialized agent should handle it.
 
 Available agents:
-1. **coder** - for writing, modifying, and refactoring code
+{available_agents}
+
+Analyze the user's request and respond with ONLY a JSON object in this format:
+{{{{
+  "agent": "{agent_options}",
+  "confidence": "high|medium|low",
+  "reasoning": "brief explanation of why this agent was chosen"
+}}}}
+
+User request: {{user_message}}
+
+Response (JSON only):"""
+
+# Agent descriptions for dynamic prompt building
+AGENT_DESCRIPTIONS = {
+    "coder": """**coder** - for writing, modifying, and refactoring code
    - Creating new files or components
    - Modifying existing code
    - Implementing features
    - Fixing bugs in code
-   - Refactoring code
-
-2. **architect** - for planning, designing, and creating technical specifications
+   - Refactoring code""",
+    
+    "architect": """**architect** - for planning, designing, and creating technical specifications
    - Designing system architecture
    - Creating technical specifications
    - Planning implementation strategies
    - Designing data models or APIs
-   - Creating documentation and diagrams
-
-3. **debug** - for troubleshooting, investigating errors, and debugging
+   - Creating documentation and diagrams""",
+    
+    "debug": """**debug** - for troubleshooting, investigating errors, and debugging
    - Analyzing error messages
    - Investigating bugs
    - Finding root causes
    - Troubleshooting issues
-   - Analyzing logs or stack traces
-
-4. **ask** - for answering questions, explaining concepts, and providing documentation
+   - Analyzing logs or stack traces""",
+    
+    "ask": """**ask** - for answering questions, explaining concepts, and providing documentation
    - Explaining programming concepts
    - Answering technical questions
    - Providing documentation
    - Teaching or learning
-   - General knowledge queries
-
-5. **universal** - universal agent that can handle any task (used in single-agent mode)
+   - General knowledge queries""",
+    
+    "universal": """**universal** - universal agent that can handle any task (used in single-agent mode)
    - All of the above capabilities combined
-   - Used when only one agent is available
-
-Analyze the user's request and respond with ONLY a JSON object in this format:
-{{
-  "agent": "coder|architect|debug|ask|universal",
-  "confidence": "high|medium|low",
-  "reasoning": "brief explanation of why this agent was chosen"
-}}
-
-User request: {user_message}
-
-Response (JSON only):"""
+   - Used when only one agent is available"""
+}
 
 
 class OrchestratorAgent(BaseAgent):
@@ -189,8 +194,43 @@ class OrchestratorAgent(BaseAgent):
             Tuple of (AgentType, classification_info dict)
         """
         try:
-            # Prepare classification prompt
-            classification_prompt = CLASSIFICATION_PROMPT.format(user_message=message)
+            # Get available agents dynamically
+            from app.services.agent_router import agent_router
+            available_agents = agent_router.list_agents()
+            
+            # Build dynamic agent list for prompt (exclude ORCHESTRATOR)
+            agent_list_parts = []
+            agent_names = []
+            counter = 1
+            
+            # Map AgentType to description keys
+            agent_type_to_key = {
+                AgentType.CODER: "coder",
+                AgentType.ARCHITECT: "architect",
+                AgentType.DEBUG: "debug",
+                AgentType.ASK: "ask",
+                AgentType.UNIVERSAL: "universal"
+            }
+            
+            for agent_type in available_agents:
+                if agent_type == AgentType.ORCHESTRATOR:
+                    continue  # Skip orchestrator itself
+                
+                key = agent_type_to_key.get(agent_type)
+                if key and key in AGENT_DESCRIPTIONS:
+                    agent_list_parts.append(f"{counter}. {AGENT_DESCRIPTIONS[key]}")
+                    agent_names.append(key)
+                    counter += 1
+            
+            # Build final prompt
+            available_agents_text = "\n\n".join(agent_list_parts)
+            agent_options = "|".join(agent_names)
+            
+            classification_prompt = CLASSIFICATION_PROMPT_TEMPLATE.format(
+                available_agents=available_agents_text,
+                agent_options=agent_options,
+                user_message=message
+            )
             
             # Call LLM for classification
             logger.debug("Calling LLM for task classification")
@@ -225,7 +265,10 @@ class OrchestratorAgent(BaseAgent):
             # Extract agent type
             agent_str = classification.get("agent", "coder").lower()
             
-            # Map to AgentType
+            # Map to AgentType (only include agents that are actually available)
+            from app.services.agent_router import agent_router
+            available_agents = agent_router.list_agents()
+            
             agent_mapping = {
                 "coder": AgentType.CODER,
                 "architect": AgentType.ARCHITECT,
@@ -235,6 +278,16 @@ class OrchestratorAgent(BaseAgent):
             }
             
             target_agent = agent_mapping.get(agent_str, AgentType.CODER)
+            
+            # Validate that target agent is registered
+            if target_agent not in available_agents:
+                logger.warning(
+                    f"LLM suggested '{target_agent.value}' but it's not registered. "
+                    f"Falling back to CODER"
+                )
+                target_agent = AgentType.CODER
+                classification["agent"] = "coder"
+                classification["reasoning"] = f"Fallback to coder (original: {agent_str} not available)"
             
             logger.info(
                 f"LLM classified task as '{agent_str}' "
