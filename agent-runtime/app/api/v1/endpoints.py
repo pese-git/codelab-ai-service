@@ -413,6 +413,7 @@ async def message_stream_sse(request: AgentStreamRequest):
                             "data": chunk_json
                         }
                         
+                        # Break on is_final (plan_completed, error, or regular completion)
                         if chunk.is_final:
                             break
                 
@@ -497,6 +498,7 @@ async def message_stream_sse(request: AgentStreamRequest):
                         "data": chunk_json
                     }
                     
+                    # Break on plan_completed, error, or regular is_final (for non-plan tasks)
                     if chunk.is_final:
                         logger.info(
                             f"Stream completed for session {request.session_id}: "

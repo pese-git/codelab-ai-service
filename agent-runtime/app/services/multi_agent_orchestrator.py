@@ -262,21 +262,19 @@ class MultiAgentOrchestrator:
             # No more subtasks or all complete
             logger.info(f"No more subtasks to execute for session {session_id}")
         else:
+            # Check if this is a new subtask (PENDING -> IN_PROGRESS transition)
+            # or continuing existing one (already IN_PROGRESS)
+            from app.models.schemas import SubtaskStatus
+            is_new_subtask = subtask.status == SubtaskStatus.IN_PROGRESS
+            
+            # Note: get_next_subtask() already marks PENDING as IN_PROGRESS
+            # So if it's IN_PROGRESS now, it was just transitioned
+            # We need to check if we already sent subtask_started for this subtask
+            # by checking if it was just marked as IN_PROGRESS
+            
             logger.info(
                 f"Executing subtask {subtask.id}: {subtask.description} "
-                f"(agent: {subtask.agent})"
-            )
-            
-            # Notify about subtask start
-            yield StreamChunk(
-                type="assistant_message",
-                content=f"\n\n**Subtask {plan.current_subtask_index + 1}/{len(plan.subtasks)}**: {subtask.description}",
-                metadata={
-                    "subtask_id": subtask.id,
-                    "subtask_status": "in_progress",
-                    "agent": subtask.agent
-                },
-                is_final=False
+                f"(agent: {subtask.agent}, status: {subtask.status.value})"
             )
             
             # Get appropriate agent
@@ -303,35 +301,95 @@ class MultiAgentOrchestrator:
             # Switch context to appropriate agent
             context.switch_agent(agent_type, f"Executing subtask: {subtask.description}")
             
+            # Only send subtask_started if this is first time executing this subtask
+            if not subtask.started_notified:
+                # Notify about subtask start
+                yield StreamChunk(
+                    type="subtask_started",
+                    content=f"\n\n**Subtask {plan.current_subtask_index + 1}/{len(plan.subtasks)}**: {subtask.description}",
+                    metadata={
+                        "subtask_id": subtask.id,
+                        "subtask_status": "in_progress",
+                        "agent": subtask.agent
+                    },
+                    is_final=False
+                )
+                # Mark as notified
+                subtask.started_notified = True
+            
             # Execute subtask
             try:
                 subtask_result = []
                 tool_called = False
+                agent_finished = False
                 
-                async for chunk in agent.process(
-                    session_id=session_id,
-                    message=subtask.description,
-                    context=context.model_dump(),
-                    session_mgr=session_mgr
-                ):
-                    # Collect result for logging
-                    if chunk.type == "assistant_message" and chunk.content:
-                        subtask_result.append(chunk.content)
+                # If subtask already started, continue with LLM directly (no new user message)
+                # Otherwise start with full description
+                if subtask.started_notified:
+                    # Continue after tool_result - call LLM directly without adding user message
+                    logger.debug(f"Continuing subtask {subtask.id} after tool_result (no new user message)")
                     
-                    # Check if tool was called
-                    if chunk.type == "tool_call":
-                        tool_called = True
-                        logger.info(
-                            f"Subtask {subtask.id} called tool {chunk.tool_name}, "
-                            f"waiting for tool_result before continuing"
-                        )
+                    # Call LLM stream service directly with current history
+                    from app.services.llm_stream_service import stream_response
+                    history = session_mgr.get_history(session_id)
                     
-                    # Forward chunk
-                    yield chunk
+                    async for chunk in stream_response(
+                        session_id=session_id,
+                        history=history,
+                        allowed_tools=agent.allowed_tools,
+                        session_mgr=session_mgr
+                    ):
+                        # Collect result for logging
+                        if chunk.type == "assistant_message" and chunk.content:
+                            subtask_result.append(chunk.content)
+                            
+                            # Check if this is the final message from agent
+                            if chunk.is_final:
+                                agent_finished = True
+                                logger.info(f"Subtask {subtask.id} received final message from LLM")
+                        
+                        # Check if tool was called
+                        if chunk.type == "tool_call":
+                            tool_called = True
+                            logger.info(
+                                f"Subtask {subtask.id} called tool {chunk.tool_name}, "
+                                f"waiting for tool_result before continuing"
+                            )
+                        
+                        # Forward chunk
+                        yield chunk
+                else:
+                    # Start new subtask with full description
+                    logger.debug(f"Starting subtask {subtask.id} with description")
+                    
+                    async for chunk in agent.process(
+                        session_id=session_id,
+                        message=subtask.description,
+                        context=context.model_dump(),
+                        session_mgr=session_mgr
+                    ):
+                        # Collect result for logging
+                        if chunk.type == "assistant_message" and chunk.content:
+                            subtask_result.append(chunk.content)
+                            
+                            # Check if this is the final message from agent
+                            if chunk.is_final:
+                                agent_finished = True
+                                logger.info(f"Subtask {subtask.id} received final message from agent")
+                        
+                        # Check if tool was called
+                        if chunk.type == "tool_call":
+                            tool_called = True
+                            logger.info(
+                                f"Subtask {subtask.id} called tool {chunk.tool_name}, "
+                                f"waiting for tool_result before continuing"
+                            )
+                        
+                        # Forward chunk
+                        yield chunk
                 
-                # Only mark as complete if no tool was called
-                # If tool was called, we'll continue when tool_result arrives
-                if not tool_called:
+                # Mark as complete if agent finished (sent is_final=True)
+                if agent_finished or not tool_called:
                     result_text = "".join(subtask_result) if subtask_result else "Completed"
                     session_mgr.mark_subtask_complete(
                         session_id,
@@ -343,7 +401,7 @@ class MultiAgentOrchestrator:
                     
                     # Notify about subtask completion
                     yield StreamChunk(
-                        type="assistant_message",
+                        type="subtask_completed",
                         content=f"\n✓ Subtask {subtask.id} completed",
                         metadata={
                             "subtask_id": subtask.id,
@@ -358,9 +416,11 @@ class MultiAgentOrchestrator:
                         yield next_chunk
                     return
                 else:
-                    # Tool called - exit and wait for tool_result
+                    # Tool called but agent not finished - exit and wait for tool_result
+                    # When tool_result arrives, process_message will be called again
+                    # and we'll continue from here (subtask is still IN_PROGRESS)
                     logger.info(
-                        f"Exiting _execute_plan, waiting for tool_result for subtask {subtask.id}"
+                        f"Subtask {subtask.id} called tool, exiting to wait for tool_result"
                     )
                     return
                 
@@ -396,7 +456,7 @@ class MultiAgentOrchestrator:
         
         # Final summary
         yield StreamChunk(
-            type="assistant_message",
+            type="plan_completed",
             content=f"\n\n**Plan Execution Complete**\n- Total subtasks: {len(plan.subtasks)}\n- Completed: {completed}\n- Failed: {failed}",
             metadata={
                 "plan_id": plan.plan_id,

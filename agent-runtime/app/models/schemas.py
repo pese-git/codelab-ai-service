@@ -27,6 +27,7 @@ class Subtask(BaseModel):
     result: Optional[str] = Field(default=None, description="Result or output after completion")
     error: Optional[str] = Field(default=None, description="Error message if subtask failed")
     dependencies: List[str] = Field(default_factory=list, description="IDs of subtasks that must complete before this one")
+    started_notified: bool = Field(default=False, description="Whether subtask_started event was already sent")
     
     class Config:
         json_schema_extra = {
@@ -135,7 +136,18 @@ class AgentStreamRequest(BaseModel):
 class StreamChunk(BaseModel):
     """SSE event chunk for streaming responses"""
     
-    type: Literal["assistant_message", "tool_call", "error", "done", "switch_agent", "agent_switched", "plan_notification"] = Field(
+    type: Literal[
+        "assistant_message",
+        "tool_call",
+        "error",
+        "done",
+        "switch_agent",
+        "agent_switched",
+        "plan_notification",
+        "subtask_started",
+        "subtask_completed",
+        "plan_completed"
+    ] = Field(
         description="Type of the stream chunk"
     )
     content: Optional[str] = Field(default=None, description="Text content for assistant messages")

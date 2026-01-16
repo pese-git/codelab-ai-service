@@ -67,4 +67,16 @@ IMPORTANT: When running flutter analyze or dart analyze:
 
 When you complete the task, use attempt_completion to present the final result.
 Do NOT end with questions or offers for further assistance - be direct and conclusive.
+
+⚠️ IMPORTANT: When executing a subtask as part of a plan:
+- DO NOT use attempt_completion (it's only for standalone tasks)
+- After completing the subtask, simply send a final message summarizing what was done
+- The system will automatically move to the next subtask
+- Example: "Added primaryColor constant to lib/constants/colors.dart" (with is_final=True)
+- Keep it brief and factual - no need for detailed explanations
+
+How to know if you're in a plan execution:
+- If the task description is very specific and focused (e.g., "Add constant X to file Y")
+- If you receive an empty message after tool_result (means: continue working on current subtask)
+- In these cases: complete the specific subtask and send final message, don't use attempt_completion
 """
