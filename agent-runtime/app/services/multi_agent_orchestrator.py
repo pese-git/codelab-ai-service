@@ -262,15 +262,15 @@ class MultiAgentOrchestrator:
             # No more subtasks or all complete
             logger.info(f"No more subtasks to execute for session {session_id}")
         else:
-            # Check if this is a new subtask (PENDING -> IN_PROGRESS transition)
-            # or continuing existing one (already IN_PROGRESS)
+            # Check if this is a continuation after tool_result
+            # If subtask was already IN_PROGRESS before get_next_subtask(), it means
+            # we're continuing after a tool call. Otherwise, it's a new subtask.
             from app.models.schemas import SubtaskStatus
-            is_new_subtask = subtask.status == SubtaskStatus.IN_PROGRESS
             
-            # Note: get_next_subtask() already marks PENDING as IN_PROGRESS
-            # So if it's IN_PROGRESS now, it was just transitioned
-            # We need to check if we already sent subtask_started for this subtask
-            # by checking if it was just marked as IN_PROGRESS
+            # get_next_subtask() returns IN_PROGRESS subtask if one exists (continuation)
+            # or marks PENDING as IN_PROGRESS (new subtask)
+            # We can check started_notified to determine if this is continuation
+            is_continuation = subtask.started_notified
             
             logger.info(
                 f"Executing subtask {subtask.id}: {subtask.description} "
@@ -302,7 +302,7 @@ class MultiAgentOrchestrator:
             context.switch_agent(agent_type, f"Executing subtask: {subtask.description}")
             
             # Only send subtask_started if this is first time executing this subtask
-            if not subtask.started_notified:
+            if not is_continuation:
                 # Notify about subtask start
                 yield StreamChunk(
                     type="subtask_started",
@@ -314,7 +314,7 @@ class MultiAgentOrchestrator:
                     },
                     is_final=False
                 )
-                # Mark as notified
+                # Mark as notified to prevent duplicate notifications
                 subtask.started_notified = True
             
             # Execute subtask
@@ -323,15 +323,18 @@ class MultiAgentOrchestrator:
                 tool_called = False
                 agent_finished = False
                 
-                # If subtask already started, continue with LLM directly (no new user message)
-                # Otherwise start with full description
-                if subtask.started_notified:
+                # If this is continuation after tool_result, call LLM directly with history
+                # Otherwise start new subtask with full description
+                if is_continuation:
                     # Continue after tool_result - call LLM directly without adding user message
                     logger.debug(f"Continuing subtask {subtask.id} after tool_result (no new user message)")
                     
                     # Call LLM stream service directly with current history
+                    # History already contains: assistant message with tool_call + tool message with result
                     from app.services.llm_stream_service import stream_response
                     history = session_mgr.get_history(session_id)
+                    
+                    logger.debug(f"History for continuation: {len(history)} messages, last message role: {history[-1].get('role') if history else 'none'}")
                     
                     async for chunk in stream_response(
                         session_id=session_id,
