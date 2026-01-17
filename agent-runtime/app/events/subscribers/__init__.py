@@ -12,11 +12,7 @@ Subscribers react to published events and perform various actions:
 
 from .metrics_collector import MetricsCollector, metrics_collector
 from .audit_logger import AuditLogger, audit_logger
-from .agent_context_subscriber import (
-    AgentContextSubscriber,
-    agent_context_subscriber,
-    init_agent_context_subscriber
-)
+from .agent_context_subscriber import AgentContextSubscriber, agent_context_subscriber
 
 __all__ = [
     "MetricsCollector",
@@ -25,5 +21,4 @@ __all__ = [
     "audit_logger",
     "AgentContextSubscriber",
     "agent_context_subscriber",
-    "init_agent_context_subscriber",
 ]

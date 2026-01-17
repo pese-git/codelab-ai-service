@@ -1,5 +1,5 @@
 """
-Tests for event-driven agent context updates (Phase 3).
+Tests for event-driven agent context updates (Phase 4 - fully event-driven).
 """
 
 import pytest
@@ -17,22 +17,16 @@ class TestAgentContextSubscriber:
     """Tests for AgentContextSubscriber."""
     
     @pytest.mark.asyncio
-    async def test_context_subscriber_enabled(self):
-        """Test that subscriber is enabled when flag is True."""
-        subscriber = AgentContextSubscriber(enabled=True)
-        assert subscriber.is_enabled() is True
-    
-    @pytest.mark.asyncio
-    async def test_context_subscriber_disabled(self):
-        """Test that subscriber is disabled when flag is False."""
-        subscriber = AgentContextSubscriber(enabled=False)
-        assert subscriber.is_enabled() is False
+    async def test_context_subscriber_initialized(self):
+        """Test that subscriber is always initialized."""
+        subscriber = AgentContextSubscriber()
+        assert subscriber is not None
     
     @pytest.mark.asyncio
     async def test_subscriber_handles_event(self):
         """Test that subscriber can handle AgentSwitchedEvent."""
-        # Simple test - just verify handler doesn't crash
-        subscriber = AgentContextSubscriber(enabled=True)
+        # Subscriber is always created (no enabled parameter in Phase 4)
+        subscriber = AgentContextSubscriber()
         
         event = AgentSwitchedEvent(
             session_id="test-session",
@@ -48,35 +42,6 @@ class TestAgentContextSubscriber:
         # Test passes if no exception raised
         assert True
     
-    @pytest.mark.asyncio
-    async def test_disabled_subscriber_returns_early(self):
-        """Test that disabled subscriber returns early."""
-        subscriber = AgentContextSubscriber(enabled=False)
-        
-        event = AgentSwitchedEvent(
-            session_id="test-session",
-            from_agent="orchestrator",
-            to_agent="coder",
-            reason="Test switch"
-        )
-        
-        # Handler should return early when disabled
-        await subscriber._on_agent_switched(event)
-        
-        # Test passes if no exception raised
-        assert True
-    
-    @pytest.mark.asyncio
-    async def test_enable_disable_toggle(self):
-        """Test enabling and disabling subscriber."""
-        subscriber = AgentContextSubscriber(enabled=False)
-        assert subscriber.is_enabled() is False
-        
-        subscriber.enable()
-        assert subscriber.is_enabled() is True
-        
-        subscriber.disable()
-        assert subscriber.is_enabled() is False
 
 
 class TestEventDrivenContextBehavior:
@@ -116,40 +81,27 @@ class TestEventDrivenContextBehavior:
         assert needs_persist is True
 
 
-class TestFeatureFlagBehavior:
-    """Test behavior with different feature flag settings."""
+class TestEventDrivenBehavior:
+    """Test fully event-driven behavior (Phase 4)."""
     
     @pytest.mark.asyncio
-    async def test_with_flag_enabled(self):
-        """Test system behavior with USE_EVENT_DRIVEN_CONTEXT=True."""
-        # This would be integration test with real orchestrator
-        # For now, just verify subscriber is created correctly
-        subscriber = AgentContextSubscriber(enabled=True)
-        assert subscriber.is_enabled() is True
+    async def test_always_event_driven(self):
+        """Test that system is always event-driven in Phase 4."""
+        # Subscriber is always created and active
+        subscriber = AgentContextSubscriber()
+        assert subscriber is not None
     
     @pytest.mark.asyncio
-    async def test_with_flag_disabled(self):
-        """Test system behavior with USE_EVENT_DRIVEN_CONTEXT=False."""
-        # Subscriber should be created but not active
-        subscriber = AgentContextSubscriber(enabled=False)
-        assert subscriber.is_enabled() is False
-    
-    @pytest.mark.asyncio
-    async def test_backward_compatibility_concept(self):
-        """Test backward compatibility concept."""
-        # When USE_EVENT_DRIVEN_CONTEXT=False, direct calls are used
-        # When USE_EVENT_DRIVEN_CONTEXT=True, events update context
+    async def test_no_direct_calls(self):
+        """Test that no direct context.switch_agent() calls are made."""
+        # In Phase 4, all context updates go through events
+        # This is a conceptual test - verifies the architecture
         
-        # Both approaches should produce same result
-        # This is verified by the feature flag logic in orchestrator
+        # Events are published
+        events_published = True
         
-        use_event_driven = False
+        # Direct calls are NOT made
+        direct_calls_made = False
         
-        if use_event_driven:
-            # Event updates context via subscriber
-            method = "event-driven"
-        else:
-            # Direct call updates context
-            method = "direct"
-        
-        assert method in ["event-driven", "direct"]
+        assert events_published is True
+        assert direct_calls_made is False

@@ -1,17 +1,14 @@
 """
 Agent Context subscriber that updates agent context based on events.
 
-This is part of Phase 3 migration - replacing direct context.switch_agent() calls
-with event-driven approach.
+Phase 4: Fully event-driven - always enabled.
 """
 
 import logging
-from typing import Optional
 
 from ..event_bus import event_bus
 from ..base_event import BaseEvent
 from ..event_types import EventType
-from app.core.config import AppConfig
 
 logger = logging.getLogger(__name__)
 
@@ -20,27 +17,16 @@ class AgentContextSubscriber:
     """
     Subscribes to agent events and updates agent context accordingly.
     
-    This enables event-driven context management:
+    Event-driven context management (Phase 4 - always enabled):
     - Listens to AgentSwitchedEvent
     - Updates AgentContext automatically
-    - Controlled by USE_EVENT_DRIVEN_CONTEXT feature flag
+    - No feature flag - always active
     """
     
-    def __init__(self, enabled: bool = None):
-        """
-        Initialize agent context subscriber.
-        
-        Args:
-            enabled: Whether to enable event-driven context updates
-                    (defaults to AppConfig.USE_EVENT_DRIVEN_CONTEXT)
-        """
-        self._enabled = enabled if enabled is not None else AppConfig.USE_EVENT_DRIVEN_CONTEXT
-        
-        if self._enabled:
-            self._setup_subscriptions()
-            logger.info("AgentContextSubscriber initialized (event-driven mode ENABLED)")
-        else:
-            logger.info("AgentContextSubscriber initialized (event-driven mode DISABLED)")
+    def __init__(self):
+        """Initialize agent context subscriber."""
+        self._setup_subscriptions()
+        logger.info("AgentContextSubscriber initialized (event-driven mode)")
     
     def _setup_subscriptions(self):
         """Subscribe to agent events."""
@@ -55,10 +41,7 @@ class AgentContextSubscriber:
         Handle agent switched event.
         
         Updates the agent context when an agent switch occurs.
-        This is the event-driven alternative to direct context.switch_agent() calls.
         """
-        if not self._enabled:
-            return
         
         session_id = event.session_id
         if not session_id:
@@ -116,41 +99,5 @@ class AgentContextSubscriber:
         except ValueError as e:
             logger.error(f"Invalid agent type in event: {to_agent}, error: {e}")
     
-    def is_enabled(self) -> bool:
-        """Check if event-driven context is enabled."""
-        return self._enabled
-    
-    def enable(self):
-        """Enable event-driven context updates."""
-        if not self._enabled:
-            self._enabled = True
-            self._setup_subscriptions()
-            logger.info("Event-driven context updates ENABLED")
-    
-    def disable(self):
-        """Disable event-driven context updates."""
-        if self._enabled:
-            self._enabled = False
-            # Note: We don't unsubscribe to avoid complexity
-            # Handler will just return early if disabled
-            logger.info("Event-driven context updates DISABLED")
-
-
 # Global singleton instance
-agent_context_subscriber: Optional[AgentContextSubscriber] = None
-
-
-def init_agent_context_subscriber(enabled: bool = None):
-    """
-    Initialize global agent context subscriber.
-    
-    Args:
-        enabled: Whether to enable event-driven context
-                (defaults to AppConfig.USE_EVENT_DRIVEN_CONTEXT)
-    """
-    global agent_context_subscriber
-    
-    if agent_context_subscriber is None:
-        agent_context_subscriber = AgentContextSubscriber(enabled=enabled)
-    
-    return agent_context_subscriber
+agent_context_subscriber = AgentContextSubscriber()

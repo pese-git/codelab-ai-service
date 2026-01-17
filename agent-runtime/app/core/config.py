@@ -59,13 +59,11 @@ class AppConfig:
         "true"
     ).lower() in ("true", "1", "yes")
     
-    # Event-Driven Architecture feature flags (Phase 3)
-    # These flags control gradual migration to event-driven approach
-    USE_EVENT_DRIVEN_CONTEXT: bool = os.getenv(
-        "AGENT_RUNTIME__USE_EVENT_DRIVEN_CONTEXT",
-        "true"
-    ).lower() in ("true", "1", "yes")
+    # Event-Driven Architecture (Phase 4 - fully migrated)
+    # Context updates are now always event-driven
+    # Feature flag removed - always using event-driven approach
     
+    # Reserved for future use
     USE_EVENT_DRIVEN_PERSISTENCE: bool = os.getenv(
         "AGENT_RUNTIME__USE_EVENT_DRIVEN_PERSISTENCE",
         "false"
@@ -74,7 +72,7 @@ class AppConfig:
     # Service metadata
     VERSION: str = os.getenv(
         "AGENT_RUNTIME__VERSION",
-        "0.2.0"
+        "0.3.0"
     )
 
 

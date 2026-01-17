@@ -26,16 +26,10 @@ async def lifespan(app: FastAPI):
         from app.events.subscribers import (
             metrics_collector,
             audit_logger,
-            init_agent_context_subscriber
+            agent_context_subscriber
         )
         logger.info("✓ Event Bus initialized with subscribers")
-        
-        # Initialize agent context subscriber (Phase 3)
-        init_agent_context_subscriber()
-        if AppConfig.USE_EVENT_DRIVEN_CONTEXT:
-            logger.info("✓ Event-driven context updates ENABLED")
-        else:
-            logger.info("ℹ Event-driven context updates DISABLED (using direct calls)")
+        logger.info("✓ Event-driven architecture fully active (Phase 4)")
         
         # Initialize database
         from app.services.database import init_database, init_db

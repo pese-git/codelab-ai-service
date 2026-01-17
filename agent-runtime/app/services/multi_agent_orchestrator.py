@@ -2,6 +2,8 @@
 Multi-Agent Orchestrator - coordinates work between specialized agents.
 
 Manages agent switching, context preservation, and message routing.
+
+Uses Event-Driven Architecture for agent switching and context management.
 """
 import logging
 import time
@@ -12,7 +14,6 @@ from app.models.schemas import StreamChunk
 from app.services.agent_router import agent_router
 from app.services.agent_context_async import agent_context_manager
 from app.services.session_manager_async import session_manager
-from app.core.config import AppConfig
 
 # Event-Driven Architecture imports
 from app.events.event_bus import event_bus
@@ -78,7 +79,7 @@ class MultiAgentOrchestrator:
             if context.current_agent != agent_type:
                 from_agent = context.current_agent
                 
-                # Publish agent switched event FIRST
+                # Publish agent switched event (context updated by AgentContextSubscriber)
                 await event_bus.publish(
                     AgentSwitchedEvent(
                         session_id=session_id,
@@ -89,14 +90,9 @@ class MultiAgentOrchestrator:
                     )
                 )
                 
-                # Update context (direct call if event-driven disabled)
-                if not AppConfig.USE_EVENT_DRIVEN_CONTEXT:
-                    context.switch_agent(agent_type, "User requested agent switch")
-                
                 logger.info(
                     f"Explicit agent switch for session {session_id}: "
-                    f"{from_agent.value} -> {agent_type.value} "
-                    f"(event-driven={AppConfig.USE_EVENT_DRIVEN_CONTEXT})"
+                    f"{from_agent.value} -> {agent_type.value}"
                 )
                 
                 # Notify about the switch
@@ -146,7 +142,7 @@ class MultiAgentOrchestrator:
                     reason = chunk.metadata.get("reason", "Orchestrator routing")
                     confidence = chunk.metadata.get("confidence", "medium")
                     
-                    # Publish agent switched event FIRST
+                    # Publish agent switched event (context updated by AgentContextSubscriber)
                     await event_bus.publish(
                         AgentSwitchedEvent(
                             session_id=session_id,
@@ -158,14 +154,9 @@ class MultiAgentOrchestrator:
                         )
                     )
                     
-                    # Update context (direct call if event-driven disabled)
-                    if not AppConfig.USE_EVENT_DRIVEN_CONTEXT:
-                        context.switch_agent(target_agent, reason)
-                    
                     logger.info(
                         f"Orchestrator routed to {target_agent.value} "
-                        f"for session {session_id} "
-                        f"(event-driven={AppConfig.USE_EVENT_DRIVEN_CONTEXT})"
+                        f"for session {session_id}"
                     )
                     
                     # Notify about the switch
@@ -208,7 +199,7 @@ class MultiAgentOrchestrator:
                     reason = chunk.metadata.get("reason", "Agent requested switch")
                     from_agent = context.current_agent
                     
-                    # Publish agent switched event FIRST
+                    # Publish agent switched event (context updated by AgentContextSubscriber)
                     await event_bus.publish(
                         AgentSwitchedEvent(
                             session_id=session_id,
@@ -219,13 +210,8 @@ class MultiAgentOrchestrator:
                         )
                     )
                     
-                    # Update context (direct call if event-driven disabled)
-                    if not AppConfig.USE_EVENT_DRIVEN_CONTEXT:
-                        context.switch_agent(target_agent, reason)
-                    
                     logger.info(
-                        f"Agent switch requested: {from_agent.value} -> {target_agent.value} "
-                        f"(event-driven={AppConfig.USE_EVENT_DRIVEN_CONTEXT})"
+                        f"Agent switch requested: {from_agent.value} -> {target_agent.value}"
                     )
                     
                     # Notify about the switch
