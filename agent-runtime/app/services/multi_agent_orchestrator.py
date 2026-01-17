@@ -321,6 +321,7 @@ class MultiAgentOrchestrator:
             try:
                 subtask_result = []
                 tool_called = False
+                attempt_completion_called = False
                 agent_finished = False
                 
                 # If this is continuation after tool_result, call LLM directly with history
@@ -354,10 +355,15 @@ class MultiAgentOrchestrator:
                         # Check if tool was called
                         if chunk.type == "tool_call":
                             tool_called = True
-                            logger.info(
-                                f"Subtask {subtask.id} called tool {chunk.tool_name}, "
-                                f"waiting for tool_result before continuing"
-                            )
+                            # Check if it's attempt_completion
+                            if chunk.tool_name == "attempt_completion":
+                                attempt_completion_called = True
+                                logger.info(f"Subtask {subtask.id} called attempt_completion - task complete!")
+                            else:
+                                logger.info(
+                                    f"Subtask {subtask.id} called tool {chunk.tool_name}, "
+                                    f"waiting for tool_result before continuing"
+                                )
                         
                         # Forward chunk
                         yield chunk
@@ -383,16 +389,21 @@ class MultiAgentOrchestrator:
                         # Check if tool was called
                         if chunk.type == "tool_call":
                             tool_called = True
-                            logger.info(
-                                f"Subtask {subtask.id} called tool {chunk.tool_name}, "
-                                f"waiting for tool_result before continuing"
-                            )
+                            # Check if it's attempt_completion
+                            if chunk.tool_name == "attempt_completion":
+                                attempt_completion_called = True
+                                logger.info(f"Subtask {subtask.id} called attempt_completion - task complete!")
+                            else:
+                                logger.info(
+                                    f"Subtask {subtask.id} called tool {chunk.tool_name}, "
+                                    f"waiting for tool_result before continuing"
+                                )
                         
                         # Forward chunk
                         yield chunk
                 
-                # Mark as complete if agent finished (sent is_final=True)
-                if agent_finished or not tool_called:
+                # Mark as complete if attempt_completion was called OR agent finished without calling tools
+                if attempt_completion_called or (agent_finished and not tool_called):
                     result_text = "".join(subtask_result) if subtask_result else "Completed"
                     session_mgr.mark_subtask_complete(
                         session_id,
@@ -419,11 +430,12 @@ class MultiAgentOrchestrator:
                         yield next_chunk
                     return
                 else:
-                    # Tool called but agent not finished - exit and wait for tool_result
+                    # Tool called but not attempt_completion - exit and wait for tool_result
                     # When tool_result arrives, process_message will be called again
                     # and we'll continue from here (subtask is still IN_PROGRESS)
                     logger.info(
-                        f"Subtask {subtask.id} called tool, exiting to wait for tool_result"
+                        f"Subtask {subtask.id} called tool (not attempt_completion), "
+                        f"exiting to wait for tool_result"
                     )
                     return
                 
