@@ -120,9 +120,11 @@ async def stream_response(
         
         # Extract usage information (may be None for some providers)
         usage = response_data.get("usage") or {}
+        logger.debug(f"Usage data: {usage}")
         prompt_tokens = usage.get("prompt_tokens", 0)
         completion_tokens = usage.get("completion_tokens", 0)
         total_tokens = usage.get("total_tokens", 0)
+        logger.debug(f"Tokens: prompt={prompt_tokens}, completion={completion_tokens}, total={total_tokens}")
         
         # Extract message from response
         result_message = response_data["choices"][0]["message"]

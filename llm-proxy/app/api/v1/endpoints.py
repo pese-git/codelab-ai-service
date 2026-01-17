@@ -43,8 +43,10 @@ async def chat_completions(
         result = await adapter.chat(request)
         if not request.stream:
             # НЕ-СТРИМОВЫЙ РЕЖИМ
-            # result - это список словарей с сообщениями от адаптера
-            # Каждый словарь содержит role, content и возможно tool_calls
+            # result может быть:
+            # 1. Полный dict с choices и usage (новый формат от LiteLLM)
+            # 2. Список словарей с сообщениями (старый формат)
+            # 3. Строка с ошибкой
             
             if isinstance(result, str):
                 # Обработка ошибки (строка)
@@ -55,8 +57,19 @@ async def chat_completions(
                         finish_reason="stop",
                     )
                 ]
+                resp = ChatCompletionResponse.model_construct(
+                    id=req_id,
+                    object="chat.completion",
+                    created=created,
+                    model=request.model,
+                    choices=choices,
+                )
+            elif isinstance(result, dict) and "choices" in result:
+                # Новый формат - полный ответ с usage
+                # Просто возвращаем как есть, LiteLLM уже вернул правильный формат
+                return ChatCompletionResponse.model_construct(**result)
             else:
-                # Обработка списка сообщений от адаптера
+                # Старый формат - список сообщений от адаптера
                 choices = []
                 for idx, msg_dict in enumerate(result):
                     # msg_dict уже содержит role, content и возможно tool_calls
@@ -68,15 +81,14 @@ async def chat_completions(
                             finish_reason="stop",
                         )
                     )
+                resp = ChatCompletionResponse.model_construct(
+                    id=req_id,
+                    object="chat.completion",
+                    created=created,
+                    model=request.model,
+                    choices=choices,
+                )
             
-            resp = ChatCompletionResponse.model_construct(
-                id=req_id,
-                object="chat.completion",
-                created=created,
-                model=request.model,
-                choices=choices,
-                # usage -- опционально
-            )
             return resp
         else:
             # СТРИМИНГОВЫЙ РЕЖИМ (sse)
