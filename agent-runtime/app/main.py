@@ -26,10 +26,18 @@ async def lifespan(app: FastAPI):
         from app.events.subscribers import (
             metrics_collector,
             audit_logger,
-            agent_context_subscriber
+            agent_context_subscriber,
+            init_persistence_subscriber
         )
         logger.info("✓ Event Bus initialized with subscribers")
         logger.info("✓ Event-driven architecture fully active (Phase 4)")
+        
+        # Initialize persistence subscriber (optional)
+        persistence_sub = init_persistence_subscriber()
+        if persistence_sub.is_enabled():
+            logger.info("✓ Event-driven persistence ENABLED")
+        else:
+            logger.info("ℹ Event-driven persistence DISABLED (using timer-based)")
         
         # Initialize database
         from app.services.database import init_database, init_db
@@ -70,6 +78,15 @@ async def lifespan(app: FastAPI):
     # Shutdown logic
     logger.info("Shutting down Agent Runtime Service...")
     
+    # Shutdown persistence subscriber first (flush pending)
+    try:
+        from app.events.subscribers import persistence_subscriber
+        if persistence_subscriber and persistence_subscriber.is_enabled():
+            await persistence_subscriber.shutdown()
+            logger.info("✓ Persistence subscriber shutdown")
+    except Exception as e:
+        logger.error(f"Error shutting down persistence subscriber: {e}")
+    
     # Publish system shutdown event
     try:
         from app.events.event_bus import event_bus
@@ -88,7 +105,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Error publishing shutdown event: {e}")
     
-    # Shutdown managers (flush pending writes)
+    # Shutdown managers (flush pending writes if timer-based still active)
     try:
         from app.services.session_manager_async import session_manager
         from app.services.agent_context_async import agent_context_manager
