@@ -402,8 +402,28 @@ class MultiAgentOrchestrator:
                         # Forward chunk
                         yield chunk
                 
-                # Mark as complete if attempt_completion was called OR agent finished without calling tools
-                if attempt_completion_called or (agent_finished and not tool_called):
+                # Determine if subtask should be completed
+                should_complete = False
+                completion_reason = ""
+                
+                if attempt_completion_called:
+                    should_complete = True
+                    completion_reason = "attempt_completion tool called"
+                elif agent_finished and not tool_called:
+                    should_complete = True
+                    completion_reason = "agent finished without calling tools"
+                elif agent_finished and tool_called and not attempt_completion_called:
+                    # Agent sent final message but called other tools (not attempt_completion)
+                    # This is likely a bug - agent should call attempt_completion
+                    # But to prevent infinite loops, we'll complete the subtask anyway
+                    should_complete = True
+                    completion_reason = "agent finished with is_final=True (fallback - agent should use attempt_completion)"
+                    logger.warning(
+                        f"Subtask {subtask.id}: Agent sent is_final=True but didn't call attempt_completion. "
+                        f"Completing subtask anyway to prevent infinite loop."
+                    )
+                
+                if should_complete:
                     result_text = "".join(subtask_result) if subtask_result else "Completed"
                     session_mgr.mark_subtask_complete(
                         session_id,
@@ -411,7 +431,7 @@ class MultiAgentOrchestrator:
                         result_text[:500]  # Limit result size
                     )
                     
-                    logger.info(f"Subtask {subtask.id} completed successfully")
+                    logger.info(f"Subtask {subtask.id} completed successfully ({completion_reason})")
                     
                     # Notify about subtask completion
                     yield StreamChunk(
@@ -419,7 +439,8 @@ class MultiAgentOrchestrator:
                         content=f"\n✓ Subtask {subtask.id} completed",
                         metadata={
                             "subtask_id": subtask.id,
-                            "subtask_status": "completed"
+                            "subtask_status": "completed",
+                            "completion_reason": completion_reason
                         },
                         is_final=False
                     )
@@ -430,7 +451,7 @@ class MultiAgentOrchestrator:
                         yield next_chunk
                     return
                 else:
-                    # Tool called but not attempt_completion - exit and wait for tool_result
+                    # Tool called but agent not finished - exit and wait for tool_result
                     # When tool_result arrives, process_message will be called again
                     # and we'll continue from here (subtask is still IN_PROGRESS)
                     logger.info(
