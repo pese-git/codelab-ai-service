@@ -323,6 +323,8 @@ class MultiAgentOrchestrator:
                 tool_called = False
                 attempt_completion_called = False
                 agent_finished = False
+                tool_call_count = 0
+                MAX_TOOL_CALLS_PER_SUBTASK = 20  # Prevent infinite loops
                 
                 # If this is continuation after tool_result, call LLM directly with history
                 # Otherwise start new subtask with full description
@@ -351,21 +353,36 @@ class MultiAgentOrchestrator:
                             if chunk.is_final:
                                 agent_finished = True
                                 logger.info(f"Subtask {subtask.id} received final message from LLM")
+                                # Don't forward is_final=True to client yet - we need to complete subtask first
+                                chunk.is_final = False
                         
                         # Check if tool was called
                         if chunk.type == "tool_call":
                             tool_called = True
+                            tool_call_count += 1
+                            
                             # Check if it's attempt_completion
                             if chunk.tool_name == "attempt_completion":
                                 attempt_completion_called = True
                                 logger.info(f"Subtask {subtask.id} called attempt_completion - task complete!")
                             else:
                                 logger.info(
-                                    f"Subtask {subtask.id} called tool {chunk.tool_name}, "
+                                    f"Subtask {subtask.id} called tool {chunk.tool_name} "
+                                    f"({tool_call_count}/{MAX_TOOL_CALLS_PER_SUBTASK}), "
                                     f"waiting for tool_result before continuing"
                                 )
+                                
+                                # Check if we've exceeded max tool calls
+                                if tool_call_count >= MAX_TOOL_CALLS_PER_SUBTASK:
+                                    logger.error(
+                                        f"Subtask {subtask.id} exceeded max tool calls ({MAX_TOOL_CALLS_PER_SUBTASK}). "
+                                        f"Forcing completion to prevent infinite loop."
+                                    )
+                                    agent_finished = True
+                                    # Don't yield this chunk - force completion instead
+                                    break
                         
-                        # Forward chunk
+                        # Forward chunk (with modified is_final if needed)
                         yield chunk
                 else:
                     # Start new subtask with full description
@@ -385,21 +402,36 @@ class MultiAgentOrchestrator:
                             if chunk.is_final:
                                 agent_finished = True
                                 logger.info(f"Subtask {subtask.id} received final message from agent")
+                                # Don't forward is_final=True to client yet - we need to complete subtask first
+                                chunk.is_final = False
                         
                         # Check if tool was called
                         if chunk.type == "tool_call":
                             tool_called = True
+                            tool_call_count += 1
+                            
                             # Check if it's attempt_completion
                             if chunk.tool_name == "attempt_completion":
                                 attempt_completion_called = True
                                 logger.info(f"Subtask {subtask.id} called attempt_completion - task complete!")
                             else:
                                 logger.info(
-                                    f"Subtask {subtask.id} called tool {chunk.tool_name}, "
+                                    f"Subtask {subtask.id} called tool {chunk.tool_name} "
+                                    f"({tool_call_count}/{MAX_TOOL_CALLS_PER_SUBTASK}), "
                                     f"waiting for tool_result before continuing"
                                 )
+                                
+                                # Check if we've exceeded max tool calls
+                                if tool_call_count >= MAX_TOOL_CALLS_PER_SUBTASK:
+                                    logger.error(
+                                        f"Subtask {subtask.id} exceeded max tool calls ({MAX_TOOL_CALLS_PER_SUBTASK}). "
+                                        f"Forcing completion to prevent infinite loop."
+                                    )
+                                    agent_finished = True
+                                    # Don't yield this chunk - force completion instead
+                                    break
                         
-                        # Forward chunk
+                        # Forward chunk (with modified is_final if needed)
                         yield chunk
                 
                 # Determine if subtask should be completed
@@ -421,6 +453,14 @@ class MultiAgentOrchestrator:
                     logger.warning(
                         f"Subtask {subtask.id}: Agent sent is_final=True but didn't call attempt_completion. "
                         f"Completing subtask anyway to prevent infinite loop."
+                    )
+                elif tool_call_count >= MAX_TOOL_CALLS_PER_SUBTASK:
+                    # Exceeded max tool calls - force completion
+                    should_complete = True
+                    completion_reason = f"exceeded max tool calls ({MAX_TOOL_CALLS_PER_SUBTASK})"
+                    logger.error(
+                        f"Subtask {subtask.id}: Exceeded max tool calls. "
+                        f"Forcing completion to prevent infinite loop."
                     )
                 
                 if should_complete:
