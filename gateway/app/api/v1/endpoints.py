@@ -228,6 +228,223 @@ async def get_pending_approvals(session_id: str):
             )
 
 
+@router.get("/events/metrics/session/{session_id}")
+async def get_session_metrics(session_id: str):
+    """
+    Proxy endpoint: Get LLM metrics for a specific session.
+    
+    Returns detailed metrics about LLM requests for the session:
+    - Total requests (successful and failed)
+    - Token usage (prompt, completion, total)
+    - Average duration
+    - Requests with tool calls
+    - Individual request details
+    
+    Proxies to: GET /events/metrics/session/{session_id} on Agent Runtime
+    
+    Args:
+        session_id: Session identifier
+        
+    Returns:
+        Session metrics with aggregated stats and request history
+    """
+    logger.debug(f"Proxying session metrics request for {session_id}")
+    
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            response = await client.get(
+                f"{AppConfig.AGENT_URL}/events/metrics/session/{session_id}",
+                headers={"X-Internal-Auth": AppConfig.INTERNAL_API_KEY},
+            )
+            
+            if response.status_code == 404:
+                return JSONResponse(
+                    status_code=404,
+                    content={"error": f"No metrics found for session {session_id}"}
+                )
+            
+            response.raise_for_status()
+            return response.json()
+            
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Agent Runtime error: {e.response.status_code}, {e.response.text}")
+            return JSONResponse(
+                status_code=e.response.status_code,
+                content={"error": f"Agent Runtime error: {e.response.status_code}"}
+            )
+        except Exception as e:
+            logger.error(f"Error proxying session metrics request: {e}", exc_info=True)
+            return JSONResponse(
+                status_code=500,
+                content={"error": f"Gateway error: {str(e)}"}
+            )
+
+
+@router.get("/events/metrics/sessions")
+async def get_all_session_metrics():
+    """
+    Proxy endpoint: Get list of all sessions with LLM metrics.
+    
+    Proxies to: GET /events/metrics/sessions on Agent Runtime
+    
+    Returns:
+        List of session IDs that have metrics data
+    """
+    logger.debug("Proxying all session metrics request")
+    
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            response = await client.get(
+                f"{AppConfig.AGENT_URL}/events/metrics/sessions",
+                headers={"X-Internal-Auth": AppConfig.INTERNAL_API_KEY},
+            )
+            response.raise_for_status()
+            return response.json()
+            
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Agent Runtime error: {e.response.status_code}, {e.response.text}")
+            return JSONResponse(
+                status_code=e.response.status_code,
+                content={"error": f"Agent Runtime error: {e.response.status_code}"}
+            )
+        except Exception as e:
+            logger.error(f"Error proxying session metrics list: {e}", exc_info=True)
+            return JSONResponse(
+                status_code=500,
+                content={"error": f"Gateway error: {str(e)}"}
+            )
+
+
+@router.get("/events/metrics")
+async def get_event_metrics():
+    """
+    Proxy endpoint: Get metrics collected from events.
+    
+    Returns metrics automatically collected by MetricsCollector:
+    - Agent switches
+    - Agent processing durations
+    - Tool executions
+    - HITL decisions
+    - Errors
+    
+    Proxies to: GET /events/metrics on Agent Runtime
+    
+    Returns:
+        Dictionary with all collected metrics
+    """
+    logger.debug("Proxying event metrics request")
+    
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            response = await client.get(
+                f"{AppConfig.AGENT_URL}/events/metrics",
+                headers={"X-Internal-Auth": AppConfig.INTERNAL_API_KEY},
+            )
+            response.raise_for_status()
+            return response.json()
+            
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Agent Runtime error: {e.response.status_code}, {e.response.text}")
+            return JSONResponse(
+                status_code=e.response.status_code,
+                content={"error": f"Agent Runtime error: {e.response.status_code}"}
+            )
+        except Exception as e:
+            logger.error(f"Error proxying event metrics: {e}", exc_info=True)
+            return JSONResponse(
+                status_code=500,
+                content={"error": f"Gateway error: {str(e)}"}
+            )
+
+
+@router.get("/events/audit-log")
+async def get_audit_log(
+    session_id: str = None,
+    event_type: str = None,
+    limit: int = 100
+):
+    """
+    Proxy endpoint: Get audit log of critical events.
+    
+    Proxies to: GET /events/audit-log on Agent Runtime
+    
+    Args:
+        session_id: Filter by session ID (optional)
+        event_type: Filter by event type (optional)
+        limit: Maximum number of entries (default: 100)
+    
+    Returns:
+        List of audit log entries with filtering
+    """
+    logger.debug(f"Proxying audit log request: session_id={session_id}, event_type={event_type}")
+    
+    params = {}
+    if session_id:
+        params["session_id"] = session_id
+    if event_type:
+        params["event_type"] = event_type
+    if limit:
+        params["limit"] = limit
+    
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            response = await client.get(
+                f"{AppConfig.AGENT_URL}/events/audit-log",
+                params=params,
+                headers={"X-Internal-Auth": AppConfig.INTERNAL_API_KEY},
+            )
+            response.raise_for_status()
+            return response.json()
+            
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Agent Runtime error: {e.response.status_code}, {e.response.text}")
+            return JSONResponse(
+                status_code=e.response.status_code,
+                content={"error": f"Agent Runtime error: {e.response.status_code}"}
+            )
+        except Exception as e:
+            logger.error(f"Error proxying audit log: {e}", exc_info=True)
+            return JSONResponse(
+                status_code=500,
+                content={"error": f"Gateway error: {str(e)}"}
+            )
+
+
+@router.get("/events/stats")
+async def get_event_bus_stats():
+    """
+    Proxy endpoint: Get Event Bus statistics.
+    
+    Proxies to: GET /events/stats on Agent Runtime
+    
+    Returns:
+        Statistics about event publishing and handling
+    """
+    logger.debug("Proxying event bus stats request")
+    
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            response = await client.get(
+                f"{AppConfig.AGENT_URL}/events/stats",
+                headers={"X-Internal-Auth": AppConfig.INTERNAL_API_KEY},
+            )
+            response.raise_for_status()
+            return response.json()
+            
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Agent Runtime error: {e.response.status_code}, {e.response.text}")
+            return JSONResponse(
+                status_code=e.response.status_code,
+                content={"error": f"Agent Runtime error: {e.response.status_code}"}
+            )
+        except Exception as e:
+            logger.error(f"Error proxying event bus stats: {e}", exc_info=True)
+            return JSONResponse(
+                status_code=500,
+                content={"error": f"Gateway error: {str(e)}"}
+            )
+
+
 # ==================== WebSocket Endpoint ====================
 
 @router.websocket("/ws/{session_id}")
