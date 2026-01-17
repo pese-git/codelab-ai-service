@@ -768,3 +768,56 @@ async def get_event_bus_stats():
     }
 
 
+@router.get("/events/metrics/session/{session_id}")
+async def get_session_metrics(session_id: str):
+    """
+    Get LLM metrics for a specific session.
+    
+    Returns detailed metrics about LLM requests for the session:
+    - Total requests (successful and failed)
+    - Token usage (prompt, completion, total)
+    - Average duration
+    - Requests with tool calls
+    - Individual request details
+    
+    Args:
+        session_id: Session identifier
+    
+    Returns:
+        Session metrics with aggregated stats and request history
+    """
+    logger.debug(f"Getting session metrics for {session_id}")
+    
+    from app.events.subscribers import session_metrics_collector
+    
+    metrics = session_metrics_collector.get_session_metrics(session_id)
+    
+    if not metrics:
+        return JSONResponse(
+            content={"error": f"No metrics found for session {session_id}"},
+            status_code=404
+        )
+    
+    return metrics.to_dict()
+
+
+@router.get("/events/metrics/sessions")
+async def get_all_session_metrics():
+    """
+    Get list of all sessions with LLM metrics.
+    
+    Returns:
+        List of session IDs that have metrics data
+    """
+    logger.debug("Getting all sessions with metrics")
+    
+    from app.events.subscribers import session_metrics_collector
+    
+    sessions = session_metrics_collector.get_all_sessions()
+    
+    return {
+        "sessions": sessions,
+        "count": len(sessions)
+    }
+
+

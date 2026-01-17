@@ -27,11 +27,17 @@ async def lifespan(app: FastAPI):
             metrics_collector,
             audit_logger,
             agent_context_subscriber,
-            persistence_subscriber
+            persistence_subscriber,
+            session_metrics_collector
         )
+        
+        # Start session metrics collector
+        await session_metrics_collector.start()
+        
         logger.info("✓ Event Bus initialized with subscribers")
         logger.info("✓ Event-driven architecture fully active (Phase 4)")
         logger.info("✓ Event-driven persistence active")
+        logger.info("✓ Session metrics collector active")
         
         # Initialize database
         from app.services.database import init_database, init_db

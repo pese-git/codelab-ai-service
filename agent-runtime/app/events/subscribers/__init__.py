@@ -15,6 +15,7 @@ from .metrics_collector import MetricsCollector, metrics_collector
 from .audit_logger import AuditLogger, audit_logger
 from .agent_context_subscriber import AgentContextSubscriber, agent_context_subscriber
 from .persistence_subscriber import PersistenceSubscriber, persistence_subscriber
+from .session_metrics_collector import SessionMetricsCollector, session_metrics_collector
 
 __all__ = [
     "MetricsCollector",
@@ -25,4 +26,6 @@ __all__ = [
     "agent_context_subscriber",
     "PersistenceSubscriber",
     "persistence_subscriber",
+    "SessionMetricsCollector",
+    "session_metrics_collector",
 ]

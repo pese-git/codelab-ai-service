@@ -6,6 +6,7 @@ Integrates with HITL (Human-in-the-Loop) for tool approval workflow.
 """
 import json
 import logging
+import time
 from typing import AsyncGenerator, Dict, List, Optional, Tuple
 
 from app.core.config import AppConfig
@@ -22,6 +23,11 @@ from app.events.event_bus import event_bus
 from app.events.tool_events import (
     ToolExecutionRequestedEvent,
     ToolApprovalRequiredEvent
+)
+from app.events.llm_events import (
+    LLMRequestStartedEvent,
+    LLMRequestCompletedEvent,
+    LLMRequestFailedEvent
 )
 
 logger = logging.getLogger("agent-runtime.llm_stream")
@@ -85,6 +91,18 @@ async def stream_response(
 
         logger.debug(f"Calling LLM with model: {AppConfig.LLM_MODEL}, tools: {len(tools_to_use)}")
 
+        # Publish LLM request started event
+        start_time = time.time()
+        await event_bus.publish(
+            LLMRequestStartedEvent(
+                session_id=session_id,
+                model=AppConfig.LLM_MODEL,
+                messages_count=len(history),
+                tools_count=len(tools_to_use),
+                correlation_id=correlation_id
+            )
+        )
+
         # Call LLM proxy
         response_data = await llm_proxy_client.chat_completion(
             model=AppConfig.LLM_MODEL,
@@ -93,7 +111,16 @@ async def stream_response(
             stream=False
         )
         
+        # Calculate duration
+        duration_ms = int((time.time() - start_time) * 1000)
+        
         logger.debug(f"LLM response received: {len(str(response_data))} chars")
+        
+        # Extract usage information
+        usage = response_data.get("usage", {})
+        prompt_tokens = usage.get("prompt_tokens", 0)
+        completion_tokens = usage.get("completion_tokens", 0)
+        total_tokens = usage.get("total_tokens", 0)
         
         # Extract message from response
         result_message = response_data["choices"][0]["message"]
@@ -224,6 +251,20 @@ async def stream_response(
             logger.debug(f"Yielding tool_call chunk: {tool_call.tool_name}")
             yield chunk
             
+            # Publish LLM request completed event (with tool call)
+            await event_bus.publish(
+                LLMRequestCompletedEvent(
+                    session_id=session_id,
+                    model=AppConfig.LLM_MODEL,
+                    duration_ms=duration_ms,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=total_tokens,
+                    has_tool_calls=True,
+                    correlation_id=correlation_id
+                )
+            )
+            
             # Stop generation - wait for tool_result from Gateway
             return
 
@@ -252,11 +293,35 @@ async def stream_response(
         
         logger.debug("Yielding assistant_message chunk")
         yield chunk
+        
+        # Publish LLM request completed event (without tool call)
+        await event_bus.publish(
+            LLMRequestCompletedEvent(
+                session_id=session_id,
+                model=AppConfig.LLM_MODEL,
+                duration_ms=duration_ms,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
+                has_tool_calls=False,
+                correlation_id=correlation_id
+            )
+        )
 
     except Exception as e:
         logger.error(
             f"Exception in stream_response for session {session_id}: {e}",
             exc_info=True
+        )
+        
+        # Publish LLM request failed event
+        await event_bus.publish(
+            LLMRequestFailedEvent(
+                session_id=session_id,
+                model=AppConfig.LLM_MODEL,
+                error=str(e),
+                correlation_id=correlation_id
+            )
         )
         
         # Send error chunk
