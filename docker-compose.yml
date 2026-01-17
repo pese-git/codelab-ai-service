@@ -151,6 +151,9 @@ services:
       - AGENT_RUNTIME__MULTI_AGENT_MODE=${AGENT_RUNTIME__MULTI_AGENT_MODE:-true}
       # Database URL: SQLite по умолчанию, можно переопределить через .env
       - AGENT_RUNTIME__DB_URL=${AGENT_RUNTIME__DB_URL:-sqlite:///data/agent_runtime.db}
+      # Event-Driven Architecture (Phase 3)
+      - AGENT_RUNTIME__USE_EVENT_DRIVEN_CONTEXT=${AGENT_RUNTIME__USE_EVENT_DRIVEN_CONTEXT:-true}
+      - AGENT_RUNTIME__USE_EVENT_DRIVEN_PERSISTENCE=${AGENT_RUNTIME__USE_EVENT_DRIVEN_PERSISTENCE:-false}
     depends_on:
       llm-proxy:
         condition: service_healthy
