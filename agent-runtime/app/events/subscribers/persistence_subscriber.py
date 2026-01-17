@@ -1,7 +1,7 @@
 """
 Persistence subscriber for event-driven database persistence.
 
-Replaces timer-based background writers with event-driven approach.
+Always enabled - replaces timer-based background writers.
 """
 
 import asyncio
@@ -12,14 +12,13 @@ from datetime import datetime, timedelta
 from ..event_bus import event_bus
 from ..base_event import BaseEvent
 from ..event_types import EventType
-from app.core.config import AppConfig
 
 logger = logging.getLogger(__name__)
 
 
 class PersistenceSubscriber:
     """
-    Event-driven persistence subscriber.
+    Event-driven persistence subscriber (always enabled).
     
     Listens to update events and triggers database persistence:
     - Debouncing to avoid too frequent writes
@@ -29,7 +28,6 @@ class PersistenceSubscriber:
     
     def __init__(
         self,
-        enabled: bool = None,
         debounce_seconds: float = 2.0,
         max_batch_size: int = 50
     ):
@@ -37,12 +35,9 @@ class PersistenceSubscriber:
         Initialize persistence subscriber.
         
         Args:
-            enabled: Whether to enable event-driven persistence
-                    (defaults to AppConfig.USE_EVENT_DRIVEN_PERSISTENCE)
             debounce_seconds: Minimum time between persists for same session
             max_batch_size: Maximum sessions to persist in one batch
         """
-        self._enabled = enabled if enabled is not None else AppConfig.USE_EVENT_DRIVEN_PERSISTENCE
         self._debounce_seconds = debounce_seconds
         self._max_batch_size = max_batch_size
         
@@ -59,15 +54,12 @@ class PersistenceSubscriber:
         # Flush task
         self._flush_task: asyncio.Task = None
         
-        if self._enabled:
-            self._setup_subscriptions()
-            self._start_flush_task()
-            logger.info(
-                f"PersistenceSubscriber initialized (ENABLED, "
-                f"debounce={debounce_seconds}s, max_batch={max_batch_size})"
-            )
-        else:
-            logger.info("PersistenceSubscriber initialized (DISABLED)")
+        self._setup_subscriptions()
+        self._start_flush_task()
+        logger.info(
+            f"PersistenceSubscriber initialized "
+            f"(debounce={debounce_seconds}s, max_batch={max_batch_size})"
+        )
     
     def _setup_subscriptions(self):
         """Subscribe to update events."""
@@ -110,9 +102,6 @@ class PersistenceSubscriber:
     
     async def _on_session_updated(self, event: BaseEvent):
         """Handle session updated event."""
-        if not self._enabled:
-            return
-        
         session_id = event.session_id
         if not session_id:
             return
@@ -121,9 +110,6 @@ class PersistenceSubscriber:
     
     async def _on_message_added(self, event: BaseEvent):
         """Handle message added event."""
-        if not self._enabled:
-            return
-        
         session_id = event.session_id
         if not session_id:
             return
@@ -132,9 +118,6 @@ class PersistenceSubscriber:
     
     async def _on_agent_switched(self, event: BaseEvent):
         """Handle agent switched event."""
-        if not self._enabled:
-            return
-        
         session_id = event.session_id
         if not session_id:
             return

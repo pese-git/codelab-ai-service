@@ -27,17 +27,11 @@ async def lifespan(app: FastAPI):
             metrics_collector,
             audit_logger,
             agent_context_subscriber,
-            init_persistence_subscriber
+            persistence_subscriber
         )
         logger.info("✓ Event Bus initialized with subscribers")
         logger.info("✓ Event-driven architecture fully active (Phase 4)")
-        
-        # Initialize persistence subscriber (optional)
-        persistence_sub = init_persistence_subscriber()
-        if persistence_sub.is_enabled():
-            logger.info("✓ Event-driven persistence ENABLED")
-        else:
-            logger.info("ℹ Event-driven persistence DISABLED (using timer-based)")
+        logger.info("✓ Event-driven persistence active")
         
         # Initialize database
         from app.services.database import init_database, init_db
@@ -81,7 +75,7 @@ async def lifespan(app: FastAPI):
     # Shutdown persistence subscriber first (flush pending)
     try:
         from app.events.subscribers import persistence_subscriber
-        if persistence_subscriber and persistence_subscriber.is_enabled():
+        if persistence_subscriber:
             await persistence_subscriber.shutdown()
             logger.info("✓ Persistence subscriber shutdown")
     except Exception as e:
