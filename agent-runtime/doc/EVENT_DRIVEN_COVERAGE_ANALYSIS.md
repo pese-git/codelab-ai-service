@@ -1,7 +1,8 @@
 # EVENT-DRIVEN ARCHITECTURE - АНАЛИЗ ПОКРЫТИЯ ПОДСИСТЕМ
 
-**Дата:** 17 января 2026  
+**Дата:** 17 января 2026
 **Версия:** 0.3.0
+**Статус:** Фазы 1-4 + Event-Driven Persistence завершены
 
 ---
 
@@ -73,33 +74,54 @@
 
 **Файл:** `app/main.py`
 
+#### 7. PersistenceSubscriber ✅
+**Статус:** 100% event-driven (опциональная оптимизация)
+
+**События:**
+- ✅ SESSION_UPDATED - триггер сохранения сессии
+- ✅ MESSAGE_ADDED - триггер сохранения сессии
+- ✅ AGENT_SWITCHED - триггер сохранения контекста
+
+**Функции:**
+- ✅ Event-driven persistence (альтернатива timer-based)
+- ✅ Debouncing (2s) - защита от частых записей
+- ✅ Batch processing (max 50) - эффективность
+- ✅ Асинхронный flush loop (каждые 2s)
+- ✅ Graceful shutdown с финальным flush
+
+**Конфигурация:**
+- ✅ Feature flag: USE_EVENT_DRIVEN_PERSISTENCE
+- ✅ По умолчанию ВЫКЛЮЧЕНО (opt-in)
+- ✅ Timer-based writers работают как fallback
+
+**Преимущества:**
+- Более responsive (сохранение по событию vs каждые 5s)
+- Меньше overhead при низкой активности
+- Настраиваемый debounce и batch size
+
+**Файл:** `app/events/subscribers/persistence_subscriber.py`
+
+**Примечание:** Background Writers (timer-based) остаются как надежный fallback.
+
 ---
 
-### ⚠️ ЧАСТИЧНО ИНТЕГРИРОВАНО
+### ⚠️ ОПЦИОНАЛЬНАЯ ОПТИМИЗАЦИЯ (ДОСТУПНА)
 
-#### 7. Background Writers ⚠️
-**Статус:** Timer-based (НЕ event-driven)
+#### Background Writers (Timer-Based Fallback) ⚠️
+**Статус:** Работают как fallback когда event-driven persistence выключен
 
 **Текущая реализация:**
 - ⚠️ SessionManager._background_writer() - каждые 5 секунд
 - ⚠️ AgentContextManager._background_writer() - каждые 5 секунд
 
-**Что можно улучшить:**
-```python
-# Вместо таймера:
-while True:
-    await asyncio.sleep(5)
-    # persist...
+**Альтернатива (реализована):**
+- ✅ PersistenceSubscriber - event-driven persistence
+- ✅ Включается через USE_EVENT_DRIVEN_PERSISTENCE=true
+- ✅ Более responsive и эффективный
 
-# Можно сделать event-driven:
-@event_bus.subscribe(event_type=EventType.SESSION_UPDATED)
-async def _on_session_updated(self, event):
-    await self._schedule_persist(event.session_id)
-```
-
-**Приоритет:** Средний (работает, но можно оптимизировать)
-
-**Оценка:** 2-3 дня
+**Рекомендация:**
+- Использовать timer-based по умолчанию (надежно, проверено)
+- Включить event-driven для оптимизации (опционально)
 
 **Файлы:**
 - `app/services/session_manager_async.py` (метод `_background_writer`)
@@ -274,7 +296,8 @@ def register_agent(self, agent):
 | HITLManager | ✅ 100% | 2 типа | - |
 | AgentContextManager | ✅ 100% | Через subscriber | - |
 | Main Application | ✅ 100% | 2 типа | - |
-| Background Writers | ⚠️ 0% | - | Средний |
+| PersistenceSubscriber | ✅ 100% | 3 типа (opt-in) | - |
+| Background Writers | ⚠️ Fallback | - | - |
 | Агенты (5 шт) | ❌ 0% | - | Низкий |
 | Tool Registry | ❌ 0% | - | Низкий |
 | Database Service | ❌ 0% | - | Очень низкий |
@@ -287,24 +310,25 @@ def register_agent(self, agent):
 
 ### По критичности
 
-**Критичные подсистемы (6):** 100% ✅
+**Критичные подсистемы (7):** 100% ✅
 - MultiAgentOrchestrator
 - LLMStreamService
 - SessionManager
 - HITLManager
 - AgentContextManager
 - Main Application
+- PersistenceSubscriber (опциональная оптимизация)
 
-**Некритичные подсистемы (6):** 0-17%
-- Background Writers (частично)
+**Некритичные подсистемы (6):** 0%
 - Агенты, Tool Registry, Database, LLM Client, Router
+- Background Writers (fallback)
 
 ### Общее покрытие
 
-**Критичные компоненты:** 100% (6/6) ✅  
-**Все компоненты:** 50% (6/12)
+**Критичные компоненты:** 100% (7/7) ✅
+**Все компоненты:** 58% (7/12)
 
-**Вывод:** Все критичные компоненты полностью интегрированы. Некритичные компоненты можно интегрировать по необходимости.
+**Вывод:** Все критичные компоненты полностью интегрированы, включая опциональную оптимизацию persistence. Некритичные компоненты можно интегрировать по необходимости.
 
 ---
 
@@ -314,12 +338,14 @@ def register_agent(self, agent):
 
 ✅ **Развернуть как есть** - все критичные компоненты интегрированы
 
-### Для оптимизации (опционально)
+### Для оптимизации (реализовано)
 
-1. **Event-Driven Persistence** (средний приоритет)
-   - Мигрировать Background Writers на события
-   - Более responsive persistence
-   - Оценка: 2-3 дня
+1. **Event-Driven Persistence** ✅ РЕАЛИЗОВАНО
+   - PersistenceSubscriber создан
+   - Включается через USE_EVENT_DRIVEN_PERSISTENCE=true
+   - По умолчанию выключено (timer-based fallback)
+
+### Для дальнейшей оптимизации (опционально)
 
 2. **События в агентах** (низкий приоритет)
    - Добавить события в каждый агент
@@ -360,9 +386,25 @@ def register_agent(self, agent):
 - ❌ Локальные инструменты
 - ❌ Низкоуровневые операции БД
 
-**Рекомендация:** Система готова к production. Опциональные улучшения можно добавить позже по необходимости.
+**Что работает через события (обновлено):**
+- ✅ Переключение агентов
+- ✅ Обработка сообщений
+- ✅ Выполнение инструментов
+- ✅ HITL approvals
+- ✅ Управление сессиями
+- ✅ Обновление контекста
+- ✅ Persistence (опционально, через PersistenceSubscriber)
+
+**Что НЕ работает через события (но не критично):**
+- ⚠️ Background persistence (timer-based fallback, когда event-driven выключен)
+- ❌ Внутренняя логика агентов
+- ❌ Локальные инструменты
+- ❌ Низкоуровневые операции БД
+
+**Рекомендация:** Система готова к production. Event-Driven Persistence реализован и доступен как опция. Остальные улучшения можно добавить позже по необходимости.
 
 ---
 
-**Версия отчета:** 1.0  
+**Версия отчета:** 2.0
 **Дата:** 17 января 2026
+**Обновление:** Добавлен PersistenceSubscriber
