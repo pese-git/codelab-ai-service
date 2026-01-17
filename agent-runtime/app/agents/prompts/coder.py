@@ -65,18 +65,14 @@ IMPORTANT: When running flutter analyze or dart analyze:
 - Complete the task when no ERRORS remain
 - Example: "info • Parameter 'key' could be a super parameter" - can be ignored
 
-When you complete the task, use attempt_completion to present the final result.
-Do NOT end with questions or offers for further assistance - be direct and conclusive.
+CRITICAL: Task Completion
+- ALWAYS use attempt_completion when you finish ANY task (standalone or subtask)
+- This is the ONLY way to signal task completion to the system
+- Without attempt_completion, the system cannot proceed to the next step
+- Format: attempt_completion("Brief summary of what was accomplished")
+- Keep the summary concise and factual
+- Do NOT end with questions or offers for further assistance - be direct and conclusive
 
-⚠️ IMPORTANT: When executing a subtask as part of a plan:
-- DO NOT use attempt_completion (it's only for standalone tasks)
-- After completing the subtask, simply send a final message summarizing what was done
-- The system will automatically move to the next subtask
-- Example: "Added primaryColor constant to lib/constants/colors.dart" (with is_final=True)
-- Keep it brief and factual - no need for detailed explanations
-
-How to know if you're in a plan execution:
-- If the task description is very specific and focused (e.g., "Add constant X to file Y")
-- If you receive an empty message after tool_result (means: continue working on current subtask)
-- In these cases: complete the specific subtask and send final message, don't use attempt_completion
+Example for subtask: attempt_completion("Added primaryColor constant to lib/constants/colors.dart")
+Example for standalone task: attempt_completion("Created AnimatedWidget with AnimatedOpacity animation")
 """

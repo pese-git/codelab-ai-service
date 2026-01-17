@@ -24,6 +24,19 @@ CLASSIFICATION_PROMPT_TEMPLATE = """You are a task classifier for a multi-agent 
 Available agents:
 {available_agents}
 
+IMPORTANT CLASSIFICATION RULES:
+- If the task involves CREATING, ADDING, MODIFYING, WRITING, or IMPLEMENTING code/files → use "coder"
+- If the task involves DESIGNING, PLANNING architecture, or creating specifications → use "architect"
+- If the task involves DEBUGGING, FIXING errors, or investigating problems → use "debug"
+- If the task is asking for EXPLANATION, DOCUMENTATION, or LEARNING → use "ask"
+
+Examples:
+- "Add constant to file" → coder
+- "Create new component" → coder
+- "Fix bug in code" → debug
+- "Design system architecture" → architect
+- "Explain how X works" → ask
+
 Analyze the user's request and respond with ONLY a JSON object in this format:
 {{{{
   "agent": "{agent_options}",
@@ -37,33 +50,38 @@ Response (JSON only):"""
 
 # Agent descriptions for dynamic prompt building
 AGENT_DESCRIPTIONS = {
-    "coder": """**coder** - for writing, modifying, and refactoring code
-   - Creating new files or components
-   - Modifying existing code
-   - Implementing features
-   - Fixing bugs in code
-   - Refactoring code""",
+    "coder": """**coder** - for WRITING, MODIFYING, CREATING, ADDING, IMPLEMENTING code and files
+   - Creating new files, components, or constants
+   - Modifying existing code (add/remove/change lines)
+   - Implementing features and functionality
+   - Adding imports, dependencies, or configurations
+   - Refactoring and code improvements
+   - Running commands and tests
+   Keywords: create, add, write, implement, modify, update, change, build, develop""",
     
-    "architect": """**architect** - for planning, designing, and creating technical specifications
-   - Designing system architecture
-   - Creating technical specifications
-   - Planning implementation strategies
-   - Designing data models or APIs
-   - Creating documentation and diagrams""",
+    "architect": """**architect** - for PLANNING, DESIGNING architecture and creating specifications
+   - Designing system architecture and structure
+   - Creating technical specifications and documentation
+   - Planning complex multi-step implementations
+   - Designing data models, APIs, or system flows
+   - Creating diagrams and architectural documents
+   Keywords: design, plan, architecture, structure, specification, blueprint, strategy""",
     
-    "debug": """**debug** - for troubleshooting, investigating errors, and debugging
-   - Analyzing error messages
-   - Investigating bugs
-   - Finding root causes
-   - Troubleshooting issues
-   - Analyzing logs or stack traces""",
+    "debug": """**debug** - for TROUBLESHOOTING, INVESTIGATING errors and debugging issues
+   - Analyzing error messages and stack traces
+   - Investigating bugs and unexpected behavior
+   - Finding root causes of problems
+   - Troubleshooting runtime or compilation issues
+   - Analyzing logs and diagnostic information
+   Keywords: debug, error, bug, issue, problem, crash, exception, fail, investigate, troubleshoot""",
     
-    "ask": """**ask** - for answering questions, explaining concepts, and providing documentation
-   - Explaining programming concepts
-   - Answering technical questions
-   - Providing documentation
-   - Teaching or learning
-   - General knowledge queries""",
+    "ask": """**ask** - for ANSWERING questions, EXPLAINING concepts, and providing information
+   - Explaining programming concepts and patterns
+   - Answering "what is", "how does", "why" questions
+   - Providing documentation and learning resources
+   - Teaching concepts without code changes
+   - General knowledge and information queries
+   Keywords: explain, what is, how does, why, tell me, describe, understand, learn, help me understand""",
     
     "universal": """**universal** - universal agent that can handle any task (used in single-agent mode)
    - All of the above capabilities combined
@@ -314,6 +332,7 @@ class OrchestratorAgent(BaseAgent):
         Fallback classification using simple keyword matching.
         
         Used when LLM classification fails or for testing.
+        Supports both English and Russian keywords.
         
         Args:
             message: User message to classify
@@ -323,17 +342,43 @@ class OrchestratorAgent(BaseAgent):
         """
         message_lower = message.lower()
         
-        # Simple keyword matching as fallback
-        if any(kw in message_lower for kw in ["create", "write", "implement", "fix", "code", "refactor", "modify"]):
+        # Keyword matching for CODER (English + Russian)
+        coder_keywords = [
+            "create", "write", "implement", "add", "build", "develop", "code",
+            "refactor", "modify", "update", "change", "file", "component", "constant",
+            "создать", "создай", "добавить", "добавь", "написать", "напиши",
+            "реализовать", "реализуй", "изменить", "измени", "файл", "константу"
+        ]
+        
+        # Keyword matching for ARCHITECT (English + Russian)
+        architect_keywords = [
+            "design", "architecture", "plan", "spec", "blueprint", "structure",
+            "дизайн", "архитектур", "план", "спецификац", "структур"
+        ]
+        
+        # Keyword matching for DEBUG (English + Russian)
+        debug_keywords = [
+            "debug", "error", "bug", "problem", "why", "investigate", "crash", "fix",
+            "дебаг", "ошибк", "баг", "проблем", "почему", "исследовать", "крэш", "исправ"
+        ]
+        
+        # Keyword matching for ASK (English + Russian)
+        ask_keywords = [
+            "explain", "what is", "how does", "help", "understand", "tell me",
+            "объясни", "что такое", "как работает", "помоги понять", "расскажи"
+        ]
+        
+        # Check keywords in order of priority
+        if any(kw in message_lower for kw in coder_keywords):
             return AgentType.CODER
-        elif any(kw in message_lower for kw in ["design", "architecture", "plan", "spec", "blueprint"]):
+        elif any(kw in message_lower for kw in architect_keywords):
             return AgentType.ARCHITECT
-        elif any(kw in message_lower for kw in ["debug", "error", "bug", "problem", "why", "investigate", "crash"]):
+        elif any(kw in message_lower for kw in debug_keywords):
             return AgentType.DEBUG
-        elif any(kw in message_lower for kw in ["explain", "what is", "how does", "help", "understand"]):
+        elif any(kw in message_lower for kw in ask_keywords):
             return AgentType.ASK
         else:
-            # Default to Coder
+            # Default to Coder for implementation tasks
             return AgentType.CODER
     
     def classify_task(self, message: str) -> AgentType:

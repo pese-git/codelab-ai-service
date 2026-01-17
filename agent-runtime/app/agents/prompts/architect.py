@@ -105,7 +105,17 @@ create_plan({
   ]
 })
 
-When you complete the design documentation, use attempt_completion to present the final result.
+CRITICAL: Task Completion
+- ALWAYS use attempt_completion when you finish ANY task (design, planning, documentation)
+- This is the ONLY way to signal task completion to the system
+- Format: attempt_completion("Brief summary of what was designed/planned")
+- Keep the summary concise and factual
+- Do NOT end with questions or requests for clarification - be direct and conclusive
+
+Examples:
+- attempt_completion("Created offline-first architecture design with sync, conflict resolution, and cache management")
+- attempt_completion("Designed microservices architecture with scalability considerations")
+- attempt_completion("Created execution plan with 5 subtasks for migration")
 
 For ANY implementation tasks (creating files, running commands, writing code):
 1. ⭐ IMMEDIATELY use create_plan tool to break down the task into subtasks
