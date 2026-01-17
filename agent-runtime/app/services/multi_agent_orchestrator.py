@@ -4,12 +4,15 @@ Multi-Agent Orchestrator - coordinates work between specialized agents.
 Manages agent switching, context preservation, and message routing.
 """
 import logging
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator, Optional, Any, TYPE_CHECKING
 from app.agents.base_agent import AgentType
 from app.models.schemas import StreamChunk
 from app.services.agent_router import agent_router
 from app.services.agent_context_async import agent_context_manager
 from app.services.session_manager_async import session_manager
+
+if TYPE_CHECKING:
+    from app.services.session_manager_async import AsyncSessionManager
 
 logger = logging.getLogger("agent-runtime.multi_agent_orchestrator")
 
@@ -53,6 +56,34 @@ class MultiAgentOrchestrator:
         
         context = await async_ctx_mgr.get_or_create(session_id)
         
+        # Get session manager for passing to agents
+        from app.services.session_manager_async import session_manager as async_session_mgr
+        
+        if async_session_mgr is None:
+            raise RuntimeError("SessionManager not initialized")
+        
+        # Check if there's an active execution plan
+        if async_session_mgr.has_plan(session_id):
+            plan = async_session_mgr.get_plan(session_id)
+            
+            # If plan requires approval but not yet approved, wait for plan_decision
+            if plan.requires_approval and not plan.is_approved:
+                logger.info(f"Session {session_id} has plan waiting for approval")
+                # Don't process message, wait for plan_decision
+                yield StreamChunk(
+                    type="assistant_message",
+                    content="Ожидаю подтверждения плана...",
+                    is_final=True
+                )
+                return
+            
+            # Plan is approved, execute it
+            if plan.is_approved and not plan.is_complete:
+                logger.info(f"Session {session_id} has approved plan, continuing execution")
+                async for chunk in self._execute_plan(session_id, async_session_mgr, context):
+                    yield chunk
+                return
+        
         # Handle explicit agent switch request
         if agent_type:
             if context.current_agent != agent_type:
@@ -74,27 +105,35 @@ class MultiAgentOrchestrator:
                     is_final=False
                 )
         
-        # Get session manager for passing to agents
-        from app.services.session_manager_async import session_manager as async_session_mgr
-        
-        if async_session_mgr is None:
-            raise RuntimeError("SessionManager not initialized")
-        
         # If current agent is Orchestrator and we have a message, let it route
         if context.current_agent == AgentType.ORCHESTRATOR and message:
-            logger.debug("Current agent is Orchestrator, will route to specialist")
+            logger.debug("Current agent is Orchestrator, will route to specialist or create plan")
             orchestrator = agent_router.get_agent(AgentType.ORCHESTRATOR)
             
-            # Orchestrator will analyze and return switch_agent chunk
+            # Orchestrator will analyze and return switch_agent chunk or create plan
             async for chunk in orchestrator.process(
                 session_id=session_id,
                 message=message,
                 context=context.model_dump(),
                 session_mgr=async_session_mgr
             ):
-                if chunk.type == "switch_agent":
+                if chunk.type == "plan_notification":
+                    # Plan created, waiting for user confirmation
+                    logger.info(f"Plan notification sent for session {session_id}, waiting for confirmation")
+                    yield chunk
+                    return  # Wait for user response
+                elif chunk.type == "switch_agent":
                     # Extract target agent from metadata
                     target_agent_str = chunk.metadata.get("target_agent")
+                    
+                    # Check if this is plan execution request
+                    if target_agent_str == "plan_executor":
+                        logger.info(f"Starting plan execution for session {session_id}")
+                        # Execute the plan
+                        async for plan_chunk in self._execute_plan(session_id, async_session_mgr, context):
+                            yield plan_chunk
+                        return
+                    
                     target_agent = AgentType(target_agent_str)
                     reason = chunk.metadata.get("reason", "Orchestrator routing")
                     
@@ -120,7 +159,7 @@ class MultiAgentOrchestrator:
                     )
                     break
                 else:
-                    # Forward other chunks (shouldn't happen with Orchestrator)
+                    # Forward other chunks
                     yield chunk
         
         # Get current agent and process message
@@ -178,6 +217,339 @@ class MultiAgentOrchestrator:
             # Forward chunk
             yield chunk
     
+    async def _execute_plan(
+        self,
+        session_id: str,
+        session_mgr: "AsyncSessionManager",
+        context: Any
+    ) -> AsyncGenerator[StreamChunk, None]:
+        """
+        Execute an execution plan subtask by subtask.
+        
+        Args:
+            session_id: Session identifier
+            session_mgr: Session manager instance
+            context: Agent context
+            
+        Yields:
+            StreamChunk: Chunks from subtask execution
+        """
+        from app.models.schemas import SubtaskStatus
+        
+        plan = session_mgr.get_plan(session_id)
+        if not plan:
+            logger.error(f"No plan found for session {session_id}")
+            yield StreamChunk(
+                type="error",
+                error="No execution plan found",
+                is_final=True
+            )
+            return
+        
+        logger.info(
+            f"Executing plan {plan.plan_id} for session {session_id}: "
+            f"{len(plan.subtasks)} subtasks"
+        )
+        
+        # Execute subtasks sequentially
+        # NOTE: We execute ONE subtask at a time and exit if tool is called
+        # When tool_result arrives, process_message will be called again to continue
+        
+        # Get next subtask
+        subtask = session_mgr.get_next_subtask(session_id)
+        
+        if not subtask:
+            # No more subtasks or all complete
+            logger.info(f"No more subtasks to execute for session {session_id}")
+        else:
+            # Check if this is a continuation after tool_result
+            # If subtask was already IN_PROGRESS before get_next_subtask(), it means
+            # we're continuing after a tool call. Otherwise, it's a new subtask.
+            from app.models.schemas import SubtaskStatus
+            
+            # get_next_subtask() returns IN_PROGRESS subtask if one exists (continuation)
+            # or marks PENDING as IN_PROGRESS (new subtask)
+            # We can check started_notified to determine if this is continuation
+            is_continuation = subtask.started_notified
+            
+            logger.info(
+                f"Executing subtask {subtask.id}: {subtask.description} "
+                f"(agent: {subtask.agent}, status: {subtask.status.value})"
+            )
+            
+            # Get appropriate agent
+            try:
+                agent_type = AgentType(subtask.agent)
+                agent = agent_router.get_agent(agent_type)
+            except (ValueError, KeyError) as e:
+                logger.error(f"Invalid agent type for subtask {subtask.id}: {subtask.agent}")
+                session_mgr.mark_subtask_failed(
+                    session_id,
+                    subtask.id,
+                    f"Invalid agent type: {subtask.agent}"
+                )
+                yield StreamChunk(
+                    type="error",
+                    error=f"Invalid agent type for subtask: {subtask.agent}",
+                    is_final=False
+                )
+                # Continue with next subtask
+                async for next_chunk in self._execute_plan(session_id, session_mgr, context):
+                    yield next_chunk
+                return
+            
+            # Switch context to appropriate agent
+            context.switch_agent(agent_type, f"Executing subtask: {subtask.description}")
+            
+            # Only send subtask_started if this is first time executing this subtask
+            if not is_continuation:
+                # Notify about subtask start
+                yield StreamChunk(
+                    type="subtask_started",
+                    content=f"\n\n**Subtask {plan.current_subtask_index + 1}/{len(plan.subtasks)}**: {subtask.description}",
+                    metadata={
+                        "subtask_id": subtask.id,
+                        "subtask_status": "in_progress",
+                        "agent": subtask.agent
+                    },
+                    is_final=False
+                )
+                # Mark as notified to prevent duplicate notifications
+                subtask.started_notified = True
+            
+            # Execute subtask
+            try:
+                subtask_result = []
+                tool_called = False
+                attempt_completion_called = False
+                agent_finished = False
+                tool_call_count = 0
+                MAX_TOOL_CALLS_PER_SUBTASK = 20  # Prevent infinite loops
+                
+                # If this is continuation after tool_result, call LLM directly with history
+                # Otherwise start new subtask with full description
+                if is_continuation:
+                    # Continue after tool_result - call LLM directly without adding user message
+                    logger.debug(f"Continuing subtask {subtask.id} after tool_result (no new user message)")
+                    
+                    # Call LLM stream service directly with current history
+                    # History already contains: assistant message with tool_call + tool message with result
+                    from app.services.llm_stream_service import stream_response
+                    history = session_mgr.get_history(session_id)
+                    
+                    logger.debug(f"History for continuation: {len(history)} messages, last message role: {history[-1].get('role') if history else 'none'}")
+                    
+                    async for chunk in stream_response(
+                        session_id=session_id,
+                        history=history,
+                        allowed_tools=agent.allowed_tools,
+                        session_mgr=session_mgr
+                    ):
+                        # Collect result for logging
+                        if chunk.type == "assistant_message" and chunk.content:
+                            subtask_result.append(chunk.content)
+                            
+                            # Check if this is the final message from agent
+                            if chunk.is_final:
+                                agent_finished = True
+                                logger.info(f"Subtask {subtask.id} received final message from LLM")
+                                # Don't forward is_final=True to client yet - we need to complete subtask first
+                                chunk.is_final = False
+                        
+                        # Check if tool was called
+                        if chunk.type == "tool_call":
+                            tool_called = True
+                            tool_call_count += 1
+                            
+                            # Check if it's attempt_completion
+                            if chunk.tool_name == "attempt_completion":
+                                attempt_completion_called = True
+                                logger.info(f"Subtask {subtask.id} called attempt_completion - task complete!")
+                            else:
+                                logger.info(
+                                    f"Subtask {subtask.id} called tool {chunk.tool_name} "
+                                    f"({tool_call_count}/{MAX_TOOL_CALLS_PER_SUBTASK}), "
+                                    f"waiting for tool_result before continuing"
+                                )
+                                
+                                # Check if we've exceeded max tool calls
+                                if tool_call_count >= MAX_TOOL_CALLS_PER_SUBTASK:
+                                    logger.error(
+                                        f"Subtask {subtask.id} exceeded max tool calls ({MAX_TOOL_CALLS_PER_SUBTASK}). "
+                                        f"Forcing completion to prevent infinite loop."
+                                    )
+                                    agent_finished = True
+                                    # Don't yield this chunk - force completion instead
+                                    break
+                        
+                        # Forward chunk (with modified is_final if needed)
+                        yield chunk
+                else:
+                    # Start new subtask with full description
+                    logger.debug(f"Starting subtask {subtask.id} with description")
+                    
+                    async for chunk in agent.process(
+                        session_id=session_id,
+                        message=subtask.description,
+                        context=context.model_dump(),
+                        session_mgr=session_mgr
+                    ):
+                        # Collect result for logging
+                        if chunk.type == "assistant_message" and chunk.content:
+                            subtask_result.append(chunk.content)
+                            
+                            # Check if this is the final message from agent
+                            if chunk.is_final:
+                                agent_finished = True
+                                logger.info(f"Subtask {subtask.id} received final message from agent")
+                                # Don't forward is_final=True to client yet - we need to complete subtask first
+                                chunk.is_final = False
+                        
+                        # Check if tool was called
+                        if chunk.type == "tool_call":
+                            tool_called = True
+                            tool_call_count += 1
+                            
+                            # Check if it's attempt_completion
+                            if chunk.tool_name == "attempt_completion":
+                                attempt_completion_called = True
+                                logger.info(f"Subtask {subtask.id} called attempt_completion - task complete!")
+                            else:
+                                logger.info(
+                                    f"Subtask {subtask.id} called tool {chunk.tool_name} "
+                                    f"({tool_call_count}/{MAX_TOOL_CALLS_PER_SUBTASK}), "
+                                    f"waiting for tool_result before continuing"
+                                )
+                                
+                                # Check if we've exceeded max tool calls
+                                if tool_call_count >= MAX_TOOL_CALLS_PER_SUBTASK:
+                                    logger.error(
+                                        f"Subtask {subtask.id} exceeded max tool calls ({MAX_TOOL_CALLS_PER_SUBTASK}). "
+                                        f"Forcing completion to prevent infinite loop."
+                                    )
+                                    agent_finished = True
+                                    # Don't yield this chunk - force completion instead
+                                    break
+                        
+                        # Forward chunk (with modified is_final if needed)
+                        yield chunk
+                
+                # Determine if subtask should be completed
+                should_complete = False
+                completion_reason = ""
+                
+                if attempt_completion_called:
+                    should_complete = True
+                    completion_reason = "attempt_completion tool called"
+                elif agent_finished and not tool_called:
+                    should_complete = True
+                    completion_reason = "agent finished without calling tools"
+                elif agent_finished and tool_called and not attempt_completion_called:
+                    # Agent sent final message but called other tools (not attempt_completion)
+                    # This is likely a bug - agent should call attempt_completion
+                    # But to prevent infinite loops, we'll complete the subtask anyway
+                    should_complete = True
+                    completion_reason = "agent finished with is_final=True (fallback - agent should use attempt_completion)"
+                    logger.warning(
+                        f"Subtask {subtask.id}: Agent sent is_final=True but didn't call attempt_completion. "
+                        f"Completing subtask anyway to prevent infinite loop."
+                    )
+                elif tool_call_count >= MAX_TOOL_CALLS_PER_SUBTASK:
+                    # Exceeded max tool calls - force completion
+                    should_complete = True
+                    completion_reason = f"exceeded max tool calls ({MAX_TOOL_CALLS_PER_SUBTASK})"
+                    logger.error(
+                        f"Subtask {subtask.id}: Exceeded max tool calls. "
+                        f"Forcing completion to prevent infinite loop."
+                    )
+                
+                if should_complete:
+                    result_text = "".join(subtask_result) if subtask_result else "Completed"
+                    session_mgr.mark_subtask_complete(
+                        session_id,
+                        subtask.id,
+                        result_text[:500]  # Limit result size
+                    )
+                    
+                    logger.info(f"Subtask {subtask.id} completed successfully ({completion_reason})")
+                    
+                    # Notify about subtask completion
+                    yield StreamChunk(
+                        type="subtask_completed",
+                        content=f"\n✓ Subtask {subtask.id} completed",
+                        metadata={
+                            "subtask_id": subtask.id,
+                            "subtask_status": "completed",
+                            "completion_reason": completion_reason
+                        },
+                        is_final=False
+                    )
+                    
+                    # Continue with next subtask immediately
+                    # Recursively call _execute_plan to process next subtask
+                    async for next_chunk in self._execute_plan(session_id, session_mgr, context):
+                        yield next_chunk
+                    return
+                else:
+                    # Tool called but agent not finished - exit and wait for tool_result
+                    # When tool_result arrives, process_message will be called again
+                    # and we'll continue from here (subtask is still IN_PROGRESS)
+                    logger.info(
+                        f"Subtask {subtask.id} called tool (not attempt_completion), "
+                        f"exiting to wait for tool_result"
+                    )
+                    return
+                
+            except Exception as e:
+                logger.error(f"Error executing subtask {subtask.id}: {e}", exc_info=True)
+                session_mgr.mark_subtask_failed(
+                    session_id,
+                    subtask.id,
+                    str(e)
+                )
+                
+                yield StreamChunk(
+                    type="error",
+                    error=f"Subtask {subtask.id} failed: {str(e)}",
+                    metadata={
+                        "subtask_id": subtask.id,
+                        "subtask_status": "failed"
+                    },
+                    is_final=False
+                )
+                
+                # Continue with next subtask despite failure
+                async for next_chunk in self._execute_plan(session_id, session_mgr, context):
+                    yield next_chunk
+                return
+            
+        # Plan execution complete (no more subtasks)
+        logger.info(f"Plan execution complete for session {session_id}")
+        
+        # Count completed vs failed
+        completed = sum(1 for st in plan.subtasks if st.status == SubtaskStatus.COMPLETED)
+        failed = sum(1 for st in plan.subtasks if st.status == SubtaskStatus.FAILED)
+        
+        # Final summary
+        yield StreamChunk(
+            type="plan_completed",
+            content=f"\n\n**Plan Execution Complete**\n- Total subtasks: {len(plan.subtasks)}\n- Completed: {completed}\n- Failed: {failed}",
+            metadata={
+                "plan_id": plan.plan_id,
+                "plan_status": "complete",
+                "total_subtasks": len(plan.subtasks),
+                "completed": completed,
+                "failed": failed
+            },
+            is_final=True
+        )
+        
+        # Clear the plan
+        session_mgr.clear_plan(session_id)
+        
+        # Reset to orchestrator
+        context.switch_agent(AgentType.ORCHESTRATOR, "Plan execution complete")
+
     def get_current_agent(self, session_id: str) -> Optional[AgentType]:
         """
         Get current active agent for a session.

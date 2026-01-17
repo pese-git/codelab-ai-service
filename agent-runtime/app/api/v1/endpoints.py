@@ -75,7 +75,170 @@ async def message_stream_sse(request: AgentStreamRequest):
             # Process incoming message
             message_type = request.message.get("type", "user_message")
             
-            if message_type == "hitl_decision":
+            if message_type == "plan_decision":
+                # Plan user decision (approve/edit/reject)
+                plan_id = request.message.get("plan_id")
+                decision_str = request.message.get("decision")
+                modified_subtasks = request.message.get("modified_subtasks")
+                feedback = request.message.get("feedback")
+                
+                logger.info(
+                    f"Received plan decision: plan_id={plan_id}, "
+                    f"decision={decision_str}, session={request.session_id}"
+                )
+                
+                # Validate decision
+                try:
+                    from app.models.plan_models import PlanDecision
+                    decision = PlanDecision(decision_str)
+                except ValueError:
+                    error_msg = f"Invalid plan decision: {decision_str}"
+                    logger.error(error_msg)
+                    yield {
+                        "event": "error",
+                        "data": json.dumps({
+                            "type": "error",
+                            "error": error_msg,
+                            "is_final": True
+                        })
+                    }
+                    return
+                
+                # Get plan from session manager
+                plan = async_session_mgr.get_plan(request.session_id)
+                if not plan or plan.plan_id != plan_id:
+                    error_msg = f"No plan found with id={plan_id}"
+                    logger.error(error_msg)
+                    yield {
+                        "event": "error",
+                        "data": json.dumps({
+                            "type": "error",
+                            "error": error_msg,
+                            "is_final": True
+                        })
+                    }
+                    return
+                
+                # Log decision to audit
+                from app.services.plan_manager import plan_manager
+                await plan_manager.log_decision(
+                    session_id=request.session_id,
+                    plan_id=plan_id,
+                    original_task=plan.original_task,
+                    decision=decision,
+                    modified_subtasks=modified_subtasks,
+                    feedback=feedback
+                )
+                
+                # Clear pending confirmation
+                async_session_mgr.clear_pending_plan_confirmation(request.session_id)
+                
+                # Process decision
+                if decision == PlanDecision.APPROVE:
+                    logger.info(f"Plan APPROVED: executing {len(plan.subtasks)} subtasks")
+                    
+                    # Mark plan as approved
+                    plan.is_approved = True
+                    
+                    # Update plan in session manager to persist the change
+                    async_session_mgr.set_plan(request.session_id, plan)
+                    
+                    # Reset current agent to Orchestrator to avoid re-entering Architect
+                    from app.services.agent_context_async import agent_context_manager as async_ctx_mgr
+                    if async_ctx_mgr:
+                        context = await async_ctx_mgr.get_or_create(request.session_id)
+                        context.switch_agent(AgentType.ORCHESTRATOR, "Plan approved, starting execution")
+                        logger.info(f"Switched to Orchestrator for plan execution in session {request.session_id}")
+                    
+                    # Continue with plan execution (orchestrator will handle it)
+                    async for chunk in multi_agent_orchestrator.process_message(
+                        session_id=request.session_id,
+                        message=""  # Empty message to trigger plan execution
+                    ):
+                        chunk_dict = chunk.model_dump(exclude_none=True)
+                        chunk_json = json.dumps(chunk_dict)
+                        
+                        yield {
+                            "event": "message",
+                            "data": chunk_json
+                        }
+                        
+                        if chunk.is_final:
+                            break
+                    
+                elif decision == PlanDecision.EDIT:
+                    logger.info(f"Plan EDITED: updating subtasks")
+                    
+                    if modified_subtasks:
+                        # Update plan with modified subtasks
+                        from app.models.schemas import Subtask, SubtaskStatus
+                        plan.subtasks = [
+                            Subtask(
+                                id=st.get("id", f"subtask_{i+1}"),
+                                description=st["description"],
+                                agent=st["agent"],
+                                estimated_time=st.get("estimated_time"),
+                                status=SubtaskStatus.PENDING,
+                                dependencies=st.get("dependencies", [])
+                            )
+                            for i, st in enumerate(modified_subtasks)
+                        ]
+                        plan.is_approved = True
+                        
+                        # Update plan in session manager to persist the change
+                        async_session_mgr.set_plan(request.session_id, plan)
+                        
+                        # Reset current agent to Orchestrator to avoid re-entering Architect
+                        from app.services.agent_context_async import agent_context_manager as async_ctx_mgr
+                        if async_ctx_mgr:
+                            context = await async_ctx_mgr.get_or_create(request.session_id)
+                            context.switch_agent(AgentType.ORCHESTRATOR, "Plan edited and approved, starting execution")
+                            logger.info(f"Switched to Orchestrator for plan execution in session {request.session_id}")
+                        
+                        # Continue with modified plan execution
+                        async for chunk in multi_agent_orchestrator.process_message(
+                            session_id=request.session_id,
+                            message=""
+                        ):
+                            chunk_dict = chunk.model_dump(exclude_none=True)
+                            chunk_json = json.dumps(chunk_dict)
+                            
+                            yield {
+                                "event": "message",
+                                "data": chunk_json
+                            }
+                            
+                            if chunk.is_final:
+                                break
+                    else:
+                        error_msg = "EDIT decision requires modified_subtasks"
+                        logger.error(error_msg)
+                        yield {
+                            "event": "error",
+                            "data": json.dumps({
+                                "type": "error",
+                                "error": error_msg,
+                                "is_final": True
+                            })
+                        }
+                    
+                elif decision == PlanDecision.REJECT:
+                    logger.info(f"Plan REJECTED: {feedback}")
+                    
+                    # Clear plan
+                    async_session_mgr.clear_plan(request.session_id)
+                    
+                    # Send rejection message
+                    yield {
+                        "event": "message",
+                        "data": json.dumps({
+                            "type": "assistant_message",
+                            "content": f"План отменен. {feedback or 'Чем могу помочь?'}",
+                            "is_final": True
+                        })
+                    }
+                
+            elif message_type == "hitl_decision":
                 # HITL user decision (approve/edit/reject)
                 call_id = request.message.get("call_id")
                 decision_str = request.message.get("decision")
@@ -250,6 +413,7 @@ async def message_stream_sse(request: AgentStreamRequest):
                             "data": chunk_json
                         }
                         
+                        # Break on is_final (plan_completed, error, or regular completion)
                         if chunk.is_final:
                             break
                 
@@ -334,6 +498,7 @@ async def message_stream_sse(request: AgentStreamRequest):
                         "data": chunk_json
                     }
                     
+                    # Break on plan_completed, error, or regular is_final (for non-plan tasks)
                     if chunk.is_final:
                         logger.info(
                             f"Stream completed for session {request.session_id}: "
