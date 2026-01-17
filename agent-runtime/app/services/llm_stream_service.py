@@ -116,8 +116,8 @@ async def stream_response(
         
         logger.debug(f"LLM response received: {len(str(response_data))} chars")
         
-        # Extract usage information
-        usage = response_data.get("usage", {})
+        # Extract usage information (may be None for some providers)
+        usage = response_data.get("usage") or {}
         prompt_tokens = usage.get("prompt_tokens", 0)
         completion_tokens = usage.get("completion_tokens", 0)
         total_tokens = usage.get("total_tokens", 0)
