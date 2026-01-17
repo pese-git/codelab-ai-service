@@ -61,12 +61,11 @@ class AppConfig:
     
     # Event-Driven Architecture (Phase 4 - fully migrated)
     # Context updates are now always event-driven
-    # Feature flag removed - always using event-driven approach
+    # Persistence is now also event-driven by default
     
-    # Reserved for future use
     USE_EVENT_DRIVEN_PERSISTENCE: bool = os.getenv(
         "AGENT_RUNTIME__USE_EVENT_DRIVEN_PERSISTENCE",
-        "false"
+        "true"
     ).lower() in ("true", "1", "yes")
     
     # Service metadata
