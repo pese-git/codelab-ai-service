@@ -15,7 +15,8 @@ class LLMRequestStartedEvent(BaseEvent):
         self,
         session_id: str,
         model: str,
-        message_count: int,
+        messages_count: int,
+        tools_count: int,
         correlation_id: Optional[str] = None
     ):
         super().__init__(
@@ -25,7 +26,8 @@ class LLMRequestStartedEvent(BaseEvent):
             correlation_id=correlation_id,
             data={
                 "model": model,
-                "message_count": message_count
+                "messages_count": messages_count,
+                "tools_count": tools_count
             },
             source="llm_stream_service"
         )
@@ -38,11 +40,11 @@ class LLMRequestCompletedEvent(BaseEvent):
         self,
         session_id: str,
         model: str,
-        input_tokens: int,
-        output_tokens: int,
+        duration_ms: int,
+        prompt_tokens: int,
+        completion_tokens: int,
         total_tokens: int,
-        duration_ms: float,
-        cost: float = 0.0,
+        has_tool_calls: bool,
         correlation_id: Optional[str] = None
     ):
         super().__init__(
@@ -52,11 +54,11 @@ class LLMRequestCompletedEvent(BaseEvent):
             correlation_id=correlation_id,
             data={
                 "model": model,
-                "input_tokens": input_tokens,
-                "output_tokens": output_tokens,
-                "total_tokens": total_tokens,
                 "duration_ms": duration_ms,
-                "cost": cost
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": total_tokens,
+                "has_tool_calls": has_tool_calls
             },
             source="llm_stream_service"
         )
@@ -69,8 +71,7 @@ class LLMRequestFailedEvent(BaseEvent):
         self,
         session_id: str,
         model: str,
-        error_message: str,
-        error_type: str,
+        error: str,
         correlation_id: Optional[str] = None
     ):
         super().__init__(
@@ -80,8 +81,7 @@ class LLMRequestFailedEvent(BaseEvent):
             correlation_id=correlation_id,
             data={
                 "model": model,
-                "error_message": error_message,
-                "error_type": error_type
+                "error": error
             },
             source="llm_stream_service"
         )

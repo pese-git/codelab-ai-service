@@ -123,9 +123,9 @@ class SessionMetricsCollector:
     
     async def start(self):
         """Subscribe to LLM events."""
-        await event_bus.subscribe(EventType.LLM_REQUEST_STARTED, self._on_request_started)
-        await event_bus.subscribe(EventType.LLM_REQUEST_COMPLETED, self._on_request_completed)
-        await event_bus.subscribe(EventType.LLM_REQUEST_FAILED, self._on_request_failed)
+        event_bus.subscribe(EventType.LLM_REQUEST_STARTED, self._on_request_started)
+        event_bus.subscribe(EventType.LLM_REQUEST_COMPLETED, self._on_request_completed)
+        event_bus.subscribe(EventType.LLM_REQUEST_FAILED, self._on_request_failed)
         logger.info("SessionMetricsCollector subscribed to LLM events")
     
     async def _on_request_started(self, event: LLMRequestStartedEvent):
