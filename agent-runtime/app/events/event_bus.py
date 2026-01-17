@@ -117,9 +117,9 @@ class EventBus:
             self._add_subscriber(event_type, event_category, handler, priority)
             
             # Return unsubscribe function
-            def unsubscribe():
-                self.unsubscribe(event_type, event_category, handler)
-            return unsubscribe
+            def unsubscribe_fn():
+                self.unsubscribe(handler, event_type, event_category)
+            return unsubscribe_fn
     
     def _add_subscriber(
         self,
@@ -156,9 +156,9 @@ class EventBus:
     
     def unsubscribe(
         self,
-        event_type: Optional[EventType],
-        event_category: Optional[EventCategory],
-        handler: Callable
+        handler: Callable,
+        event_type: Optional[EventType] = None,
+        event_category: Optional[EventCategory] = None
     ):
         """Unsubscribe a handler from events."""
         if event_type:

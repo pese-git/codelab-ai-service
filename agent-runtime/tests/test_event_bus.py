@@ -255,8 +255,8 @@ class TestEventBus:
         
         # Unsubscribe
         event_bus.unsubscribe(
-            event_type=EventType.AGENT_SWITCHED,
-            handler=handler
+            handler=handler,
+            event_type=EventType.AGENT_SWITCHED
         )
         
         # Publish second event
