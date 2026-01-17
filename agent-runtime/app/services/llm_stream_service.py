@@ -93,6 +93,7 @@ async def stream_response(
 
         # Publish LLM request started event
         start_time = time.time()
+        logger.info(f"📊 Publishing LLM_REQUEST_STARTED event for session {session_id}")
         await event_bus.publish(
             LLMRequestStartedEvent(
                 session_id=session_id,
@@ -102,6 +103,7 @@ async def stream_response(
                 correlation_id=correlation_id
             )
         )
+        logger.debug(f"✓ LLM_REQUEST_STARTED event published")
 
         # Call LLM proxy
         response_data = await llm_proxy_client.chat_completion(
@@ -248,10 +250,8 @@ async def stream_response(
                 is_final=True
             )
             
-            logger.debug(f"Yielding tool_call chunk: {tool_call.tool_name}")
-            yield chunk
-            
-            # Publish LLM request completed event (with tool call)
+            # Publish LLM request completed event (with tool call) BEFORE yield
+            logger.info(f"📊 Publishing LLM_REQUEST_COMPLETED event (with tool call) for session {session_id}")
             await event_bus.publish(
                 LLMRequestCompletedEvent(
                     session_id=session_id,
@@ -264,6 +264,10 @@ async def stream_response(
                     correlation_id=correlation_id
                 )
             )
+            logger.debug(f"✓ LLM_REQUEST_COMPLETED event published")
+            
+            logger.debug(f"Yielding tool_call chunk: {tool_call.tool_name}")
+            yield chunk
             
             # Stop generation - wait for tool_result from Gateway
             return
@@ -291,10 +295,8 @@ async def stream_response(
             is_final=True
         )
         
-        logger.debug("Yielding assistant_message chunk")
-        yield chunk
-        
-        # Publish LLM request completed event (without tool call)
+        # Publish LLM request completed event (without tool call) BEFORE yield
+        logger.info(f"📊 Publishing LLM_REQUEST_COMPLETED event (assistant message) for session {session_id}")
         await event_bus.publish(
             LLMRequestCompletedEvent(
                 session_id=session_id,
@@ -307,6 +309,10 @@ async def stream_response(
                 correlation_id=correlation_id
             )
         )
+        logger.debug(f"✓ LLM_REQUEST_COMPLETED event published")
+        
+        logger.debug("Yielding assistant_message chunk")
+        yield chunk
 
     except Exception as e:
         logger.error(

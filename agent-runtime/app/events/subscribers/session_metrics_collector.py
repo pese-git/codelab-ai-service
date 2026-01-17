@@ -123,26 +123,46 @@ class SessionMetricsCollector:
     
     async def start(self):
         """Subscribe to LLM events."""
-        event_bus.subscribe(EventType.LLM_REQUEST_STARTED, self._on_request_started)
-        event_bus.subscribe(EventType.LLM_REQUEST_COMPLETED, self._on_request_completed)
-        event_bus.subscribe(EventType.LLM_REQUEST_FAILED, self._on_request_failed)
+        event_bus.subscribe(
+            event_type=EventType.LLM_REQUEST_STARTED,
+            handler=self._on_request_started
+        )
+        event_bus.subscribe(
+            event_type=EventType.LLM_REQUEST_COMPLETED,
+            handler=self._on_request_completed
+        )
+        event_bus.subscribe(
+            event_type=EventType.LLM_REQUEST_FAILED,
+            handler=self._on_request_failed
+        )
         logger.info("SessionMetricsCollector subscribed to LLM events")
     
     async def _on_request_started(self, event: LLMRequestStartedEvent):
         """Handle LLM request started event."""
+        # Extract data from event
+        model = event.data.get("model", "unknown")
+        
         logger.debug(f"LLM request started for session {event.session_id}")
         
         # Store pending request data
         self._pending_requests[event.session_id] = {
-            "model": event.model,
+            "model": model,
             "timestamp": event.timestamp
         }
     
     async def _on_request_completed(self, event: LLMRequestCompletedEvent):
         """Handle LLM request completed event."""
+        # Extract data from event
+        duration_ms = event.data.get("duration_ms", 0)
+        total_tokens = event.data.get("total_tokens", 0)
+        prompt_tokens = event.data.get("prompt_tokens", 0)
+        completion_tokens = event.data.get("completion_tokens", 0)
+        has_tool_calls = event.data.get("has_tool_calls", False)
+        model = event.data.get("model", "unknown")
+        
         logger.debug(
             f"LLM request completed for session {event.session_id}: "
-            f"{event.duration_ms}ms, {event.total_tokens} tokens"
+            f"{duration_ms}ms, {total_tokens} tokens"
         )
         
         # Get pending request data
@@ -152,12 +172,12 @@ class SessionMetricsCollector:
         # Create request metrics
         metrics = LLMRequestMetrics(
             timestamp=timestamp,
-            model=event.model,
-            duration_ms=event.duration_ms,
-            prompt_tokens=event.prompt_tokens,
-            completion_tokens=event.completion_tokens,
-            total_tokens=event.total_tokens,
-            has_tool_calls=event.has_tool_calls,
+            model=model,
+            duration_ms=duration_ms,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
+            has_tool_calls=has_tool_calls,
             success=True
         )
         
@@ -178,7 +198,11 @@ class SessionMetricsCollector:
     
     async def _on_request_failed(self, event: LLMRequestFailedEvent):
         """Handle LLM request failed event."""
-        logger.debug(f"LLM request failed for session {event.session_id}: {event.error}")
+        # Extract data from event
+        error = event.data.get("error", "Unknown error")
+        model = event.data.get("model", "unknown")
+        
+        logger.debug(f"LLM request failed for session {event.session_id}: {error}")
         
         # Get pending request data
         pending = self._pending_requests.pop(event.session_id, {})
@@ -187,14 +211,14 @@ class SessionMetricsCollector:
         # Create request metrics
         metrics = LLMRequestMetrics(
             timestamp=timestamp,
-            model=event.model,
+            model=model,
             duration_ms=0,
             prompt_tokens=0,
             completion_tokens=0,
             total_tokens=0,
             has_tool_calls=False,
             success=False,
-            error=event.error
+            error=error
         )
         
         # Get or create session metrics
