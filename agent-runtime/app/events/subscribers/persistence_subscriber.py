@@ -270,10 +270,6 @@ class PersistenceSubscriber:
         await self.flush_all()
         logger.info("PersistenceSubscriber shutdown complete")
     
-    def is_enabled(self) -> bool:
-        """Check if event-driven persistence is enabled."""
-        return self._enabled
-    
     def get_pending_count(self) -> dict:
         """Get count of pending persists."""
         return {
@@ -282,21 +278,5 @@ class PersistenceSubscriber:
         }
 
 
-# Global singleton instance (created only if enabled)
-persistence_subscriber = None
-
-
-def init_persistence_subscriber(enabled: bool = None):
-    """
-    Initialize global persistence subscriber.
-    
-    Args:
-        enabled: Whether to enable event-driven persistence
-                (defaults to AppConfig.USE_EVENT_DRIVEN_PERSISTENCE)
-    """
-    global persistence_subscriber
-    
-    if persistence_subscriber is None:
-        persistence_subscriber = PersistenceSubscriber(enabled=enabled)
-    
-    return persistence_subscriber
+# Global singleton instance (always enabled)
+persistence_subscriber = PersistenceSubscriber()

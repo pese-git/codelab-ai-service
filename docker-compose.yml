@@ -170,8 +170,8 @@ services:
       context: ./llm-proxy
       dockerfile: Dockerfile
     # Внутренний сервис - доступ только внутри Docker сети
-    expose:
-      - "${LLM_PROXY_PORT}"
+    ports:
+      - "${LLM_PROXY_PORT}:${LLM_PROXY_PORT}"
     environment:
       - ENVIRONMENT=${ENVIRONMENT}
       - PORT=${LLM_PROXY_PORT}

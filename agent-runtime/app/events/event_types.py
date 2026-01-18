@@ -52,3 +52,8 @@ class EventType(str, Enum):
     # Metrics Events
     METRICS_COLLECTED = "metrics.collected"
     PERFORMANCE_MEASURED = "metrics.performance.measured"
+    
+    # LLM Events
+    LLM_REQUEST_STARTED = "llm.request.started"
+    LLM_REQUEST_COMPLETED = "llm.request.completed"
+    LLM_REQUEST_FAILED = "llm.request.failed"
