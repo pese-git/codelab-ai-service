@@ -132,8 +132,8 @@ class LiteLLMAdapter(BaseLLMAdapter):
                     + pprint.pformat(response, indent=2, width=120)
                 )
 
-                # Возвращаем список сообщений от всех choices
-                return [choice.message.model_dump() for choice in response.choices]
+                # Возвращаем полный ответ с usage данными
+                return response.model_dump()
 
             except Exception as e:
                 logger.error(f"[LiteLLMAdapter] Completion error: {e}", exc_info=True)

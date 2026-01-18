@@ -59,10 +59,15 @@ class AppConfig:
         "true"
     ).lower() in ("true", "1", "yes")
     
+    # Event-Driven Architecture (Phase 4 - fully migrated)
+    # Context updates are always event-driven
+    # Persistence is always event-driven
+    # All feature flags removed - fully event-driven architecture
+    
     # Service metadata
     VERSION: str = os.getenv(
         "AGENT_RUNTIME__VERSION",
-        "0.1.0"
+        "0.3.0"
     )
 
 

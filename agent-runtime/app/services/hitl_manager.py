@@ -18,6 +18,13 @@ from app.models.hitl_models import (
 )
 from app.services.database import get_db, get_database_service
 
+# Event-Driven Architecture imports
+from app.events.event_bus import event_bus
+from app.events.tool_events import (
+    HITLApprovalRequestedEvent,
+    HITLDecisionMadeEvent
+)
+
 # Lazy import to avoid circular dependency
 if TYPE_CHECKING:
     from app.services.agent_context_async import AsyncAgentContextManager
@@ -100,6 +107,18 @@ class HITLManager:
         logger.info(
             f"Added pending HITL approval: session={session_id}, "
             f"call_id={call_id}, tool={tool_name}"
+        )
+        
+        # Publish HITL approval requested event
+        await event_bus.publish(
+            HITLApprovalRequestedEvent(
+                session_id=session_id,
+                call_id=call_id,
+                tool_name=tool_name,
+                arguments=arguments,
+                reason=reason or "",
+                timeout_seconds=timeout_seconds
+            )
         )
         
         return pending_state
@@ -256,6 +275,18 @@ class HITLManager:
         logger.info(
             f"Logged HITL decision: session={session_id}, call_id={call_id}, "
             f"decision={decision.value}, tool={tool_name}"
+        )
+        
+        # Publish HITL decision made event
+        await event_bus.publish(
+            HITLDecisionMadeEvent(
+                session_id=session_id,
+                call_id=call_id,
+                decision=decision.value,
+                tool_name=tool_name,
+                original_args=original_arguments,
+                modified_args=modified_arguments
+            )
         )
         
         return audit_log

@@ -22,6 +22,23 @@ async def lifespan(app: FastAPI):
     
     # Startup logic
     try:
+        # Initialize Event Bus and subscribers
+        from app.events.subscribers import (
+            metrics_collector,
+            audit_logger,
+            agent_context_subscriber,
+            persistence_subscriber,
+            session_metrics_collector
+        )
+        
+        # Start session metrics collector
+        await session_metrics_collector.start()
+        
+        logger.info("✓ Event Bus initialized with subscribers")
+        logger.info("✓ Event-driven architecture fully active (Phase 4)")
+        logger.info("✓ Event-driven persistence active")
+        logger.info("✓ Session metrics collector active")
+        
         # Initialize database
         from app.services.database import init_database, init_db
         init_database(AppConfig.DB_URL)
@@ -38,6 +55,20 @@ async def lifespan(app: FastAPI):
         await init_agent_context_manager()
         logger.info("✓ Agent context manager initialized")
         
+        # Publish system startup event
+        from app.events.event_bus import event_bus
+        from app.events.base_event import BaseEvent
+        from app.events.event_types import EventType, EventCategory
+        await event_bus.publish(
+            BaseEvent(
+                event_type=EventType.SYSTEM_STARTUP,
+                event_category=EventCategory.SYSTEM,
+                data={"version": AppConfig.VERSION},
+                source="main"
+            )
+        )
+        logger.info("✓ System startup event published")
+        
     except Exception as e:
         logger.error(f"Failed to initialize: {e}")
         raise
@@ -47,7 +78,34 @@ async def lifespan(app: FastAPI):
     # Shutdown logic
     logger.info("Shutting down Agent Runtime Service...")
     
-    # Shutdown managers (flush pending writes)
+    # Shutdown persistence subscriber first (flush pending)
+    try:
+        from app.events.subscribers import persistence_subscriber
+        if persistence_subscriber:
+            await persistence_subscriber.shutdown()
+            logger.info("✓ Persistence subscriber shutdown")
+    except Exception as e:
+        logger.error(f"Error shutting down persistence subscriber: {e}")
+    
+    # Publish system shutdown event
+    try:
+        from app.events.event_bus import event_bus
+        from app.events.base_event import BaseEvent
+        from app.events.event_types import EventType, EventCategory
+        await event_bus.publish(
+            BaseEvent(
+                event_type=EventType.SYSTEM_SHUTDOWN,
+                event_category=EventCategory.SYSTEM,
+                data={},
+                source="main"
+            ),
+            wait_for_handlers=True  # Wait for handlers to complete
+        )
+        logger.info("✓ System shutdown event published")
+    except Exception as e:
+        logger.error(f"Error publishing shutdown event: {e}")
+    
+    # Shutdown managers (flush pending writes if timer-based still active)
     try:
         from app.services.session_manager_async import session_manager
         from app.services.agent_context_async import agent_context_manager

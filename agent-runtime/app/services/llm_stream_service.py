@@ -6,6 +6,7 @@ Integrates with HITL (Human-in-the-Loop) for tool approval workflow.
 """
 import json
 import logging
+import time
 from typing import AsyncGenerator, Dict, List, Optional, Tuple
 
 from app.core.config import AppConfig
@@ -17,6 +18,18 @@ from app.services.tool_registry import TOOLS_SPEC
 from app.services.hitl_policy_service import hitl_policy_service
 from app.services.hitl_manager import hitl_manager
 
+# Event-Driven Architecture imports
+from app.events.event_bus import event_bus
+from app.events.tool_events import (
+    ToolExecutionRequestedEvent,
+    ToolApprovalRequiredEvent
+)
+from app.events.llm_events import (
+    LLMRequestStartedEvent,
+    LLMRequestCompletedEvent,
+    LLMRequestFailedEvent
+)
+
 logger = logging.getLogger("agent-runtime.llm_stream")
 
 
@@ -24,7 +37,8 @@ async def stream_response(
     session_id: str,
     history: List[dict],
     allowed_tools: Optional[List[str]] = None,
-    session_mgr: Optional[AsyncSessionManager] = None
+    session_mgr: Optional[AsyncSessionManager] = None,
+    correlation_id: Optional[str] = None
 ) -> AsyncGenerator[StreamChunk, None]:
     """
     Generate streaming response from LLM.
@@ -37,6 +51,7 @@ async def stream_response(
         history: Message history for LLM
         allowed_tools: List of tool names allowed for this agent (None = all tools)
         session_mgr: Async session manager (optional, uses global if None)
+        correlation_id: Correlation ID for event tracing (optional)
         
     Yields:
         StreamChunk: Chunks for SSE streaming (assistant_message, tool_call, or error)
@@ -76,6 +91,20 @@ async def stream_response(
 
         logger.debug(f"Calling LLM with model: {AppConfig.LLM_MODEL}, tools: {len(tools_to_use)}")
 
+        # Publish LLM request started event
+        start_time = time.time()
+        logger.info(f"📊 Publishing LLM_REQUEST_STARTED event for session {session_id}")
+        await event_bus.publish(
+            LLMRequestStartedEvent(
+                session_id=session_id,
+                model=AppConfig.LLM_MODEL,
+                messages_count=len(history),
+                tools_count=len(tools_to_use),
+                correlation_id=correlation_id
+            )
+        )
+        logger.debug(f"✓ LLM_REQUEST_STARTED event published")
+
         # Call LLM proxy
         response_data = await llm_proxy_client.chat_completion(
             model=AppConfig.LLM_MODEL,
@@ -84,7 +113,18 @@ async def stream_response(
             stream=False
         )
         
+        # Calculate duration
+        duration_ms = int((time.time() - start_time) * 1000)
+        
         logger.debug(f"LLM response received: {len(str(response_data))} chars")
+        
+        # Extract usage information (may be None for some providers)
+        usage = response_data.get("usage") or {}
+        logger.debug(f"Usage data: {usage}")
+        prompt_tokens = usage.get("prompt_tokens", 0)
+        completion_tokens = usage.get("completion_tokens", 0)
+        total_tokens = usage.get("total_tokens", 0)
+        logger.debug(f"Tokens: prompt={prompt_tokens}, completion={completion_tokens}, total={total_tokens}")
         
         # Extract message from response
         result_message = response_data["choices"][0]["message"]
@@ -125,6 +165,25 @@ async def stream_response(
                 f"Tool call detected: {tool_call.tool_name} (call_id={tool_call.id})"
             )
             
+            # Get current agent name from history
+            current_agent = "unknown"
+            for msg in reversed(history):
+                if msg.get("role") == "assistant" and msg.get("name"):
+                    current_agent = msg["name"]
+                    break
+            
+            # Publish tool execution requested event
+            await event_bus.publish(
+                ToolExecutionRequestedEvent(
+                    session_id=session_id,
+                    tool_name=tool_call.tool_name,
+                    arguments=tool_call.arguments,
+                    call_id=tool_call.id,
+                    agent=current_agent,
+                    correlation_id=correlation_id
+                )
+            )
+            
             # Check if approval is required using HITL policy
             requires_approval, reason = hitl_policy_service.requires_approval(tool_call.tool_name)
             
@@ -143,6 +202,18 @@ async def stream_response(
                     reason=reason
                 )
                 logger.info(f"Added HITL pending state for call_id={tool_call.id}")
+                
+                # Publish tool approval required event
+                await event_bus.publish(
+                    ToolApprovalRequiredEvent(
+                        session_id=session_id,
+                        tool_name=tool_call.tool_name,
+                        arguments=tool_call.arguments,
+                        call_id=tool_call.id,
+                        reason=reason,
+                        correlation_id=correlation_id
+                    )
+                )
             
             # Save assistant message with tool_call to history
             assistant_msg = {
@@ -181,6 +252,22 @@ async def stream_response(
                 is_final=True
             )
             
+            # Publish LLM request completed event (with tool call) BEFORE yield
+            logger.info(f"📊 Publishing LLM_REQUEST_COMPLETED event (with tool call) for session {session_id}")
+            await event_bus.publish(
+                LLMRequestCompletedEvent(
+                    session_id=session_id,
+                    model=AppConfig.LLM_MODEL,
+                    duration_ms=duration_ms,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=total_tokens,
+                    has_tool_calls=True,
+                    correlation_id=correlation_id
+                )
+            )
+            logger.debug(f"✓ LLM_REQUEST_COMPLETED event published")
+            
             logger.debug(f"Yielding tool_call chunk: {tool_call.tool_name}")
             yield chunk
             
@@ -210,6 +297,22 @@ async def stream_response(
             is_final=True
         )
         
+        # Publish LLM request completed event (without tool call) BEFORE yield
+        logger.info(f"📊 Publishing LLM_REQUEST_COMPLETED event (assistant message) for session {session_id}")
+        await event_bus.publish(
+            LLMRequestCompletedEvent(
+                session_id=session_id,
+                model=AppConfig.LLM_MODEL,
+                duration_ms=duration_ms,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
+                has_tool_calls=False,
+                correlation_id=correlation_id
+            )
+        )
+        logger.debug(f"✓ LLM_REQUEST_COMPLETED event published")
+        
         logger.debug("Yielding assistant_message chunk")
         yield chunk
 
@@ -217,6 +320,16 @@ async def stream_response(
         logger.error(
             f"Exception in stream_response for session {session_id}: {e}",
             exc_info=True
+        )
+        
+        # Publish LLM request failed event
+        await event_bus.publish(
+            LLMRequestFailedEvent(
+                session_id=session_id,
+                model=AppConfig.LLM_MODEL,
+                error=str(e),
+                correlation_id=correlation_id
+            )
         )
         
         # Send error chunk

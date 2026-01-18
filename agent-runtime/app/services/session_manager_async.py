@@ -12,6 +12,15 @@ from typing import Dict, List, Optional
 from app.models.schemas import Message, SessionState
 from app.services.database import get_db, get_database_service, DatabaseService
 
+# Event-Driven Architecture imports
+from app.events.event_bus import event_bus
+from app.events.session_events import (
+    SessionCreatedEvent,
+    SessionUpdatedEvent,
+    SessionDeletedEvent,
+    MessageAddedEvent
+)
+
 logger = logging.getLogger("agent-runtime.session_manager")
 
 
@@ -185,6 +194,15 @@ class AsyncSessionManager:
         
         # Persist immediately for new sessions
         await self._persist_immediately(session_id)
+        
+        # Publish session created event
+        await event_bus.publish(
+            SessionCreatedEvent(
+                session_id=session_id,
+                system_prompt=system_prompt or ""
+            )
+        )
+        
         return state
     
     def get(self, session_id: str) -> Optional[SessionState]:
@@ -250,6 +268,24 @@ class AsyncSessionManager:
         
         # Schedule for background persistence
         await self._schedule_persist(session_id)
+        
+        # Publish message added event
+        await event_bus.publish(
+            MessageAddedEvent(
+                session_id=session_id,
+                role=role,
+                content_length=len(content),
+                agent_name=name
+            )
+        )
+        
+        # Publish session updated event
+        await event_bus.publish(
+            SessionUpdatedEvent(
+                session_id=session_id,
+                update_type="message_added"
+            )
+        )
     
     async def append_tool_result(
         self,
@@ -347,6 +383,14 @@ class AsyncSessionManager:
         async for db in get_db():
             await self._db_service.delete_session(db, session_id)
             break
+        
+        # Publish session deleted event
+        await event_bus.publish(
+            SessionDeletedEvent(
+                session_id=session_id,
+                soft_delete=True
+            )
+        )
     
     async def shutdown(self):
         """Shutdown session manager - flush pending writes"""
