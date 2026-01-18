@@ -22,29 +22,15 @@ from ....application.queries import (
     ListSessionsHandler
 )
 from ....core.errors import SessionNotFoundError, SessionAlreadyExistsError
+from ....core.dependencies_new import (
+    get_create_session_handler,
+    get_get_session_handler,
+    get_list_sessions_handler
+)
 
 logger = logging.getLogger("agent-runtime.api.sessions")
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
-
-
-# Временные заглушки для dependencies (будут заменены в Этапе 5.6)
-async def get_create_session_handler():
-    """Временная заглушка для CreateSessionHandler"""
-    # TODO: Реализовать через DI в Этапе 5.6
-    raise NotImplementedError("DI not configured yet")
-
-
-async def get_get_session_handler():
-    """Временная заглушка для GetSessionHandler"""
-    # TODO: Реализовать через DI в Этапе 5.6
-    raise NotImplementedError("DI not configured yet")
-
-
-async def get_list_sessions_handler():
-    """Временная заглушка для ListSessionsHandler"""
-    # TODO: Реализовать через DI в Этапе 5.6
-    raise NotImplementedError("DI not configured yet")
 
 
 @router.post("", response_model=CreateSessionResponse, status_code=201)

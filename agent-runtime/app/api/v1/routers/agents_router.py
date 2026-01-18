@@ -17,23 +17,14 @@ from ....application.commands import SwitchAgentCommand, SwitchAgentHandler
 from ....application.queries import GetAgentContextQuery, GetAgentContextHandler
 from ....services.agent_router import agent_router
 from ....core.errors import AgentSwitchError
+from ....core.dependencies_new import (
+    get_switch_agent_handler,
+    get_get_agent_context_handler
+)
 
 logger = logging.getLogger("agent-runtime.api.agents")
 
 router = APIRouter(prefix="/agents", tags=["agents"])
-
-
-# Временные заглушки для dependencies
-async def get_switch_agent_handler():
-    """Временная заглушка для SwitchAgentHandler"""
-    # TODO: Реализовать через DI в Этапе 5.6
-    raise NotImplementedError("DI not configured yet")
-
-
-async def get_get_agent_context_handler():
-    """Временная заглушка для GetAgentContextHandler"""
-    # TODO: Реализовать через DI в Этапе 5.6
-    raise NotImplementedError("DI not configured yet")
 
 
 @router.get("", response_model=ListAgentsResponse)
