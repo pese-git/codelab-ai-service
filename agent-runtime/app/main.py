@@ -11,6 +11,7 @@ from fastapi.openapi.utils import get_openapi
 
 from app.api.v1.endpoints import router as v1_router
 from app.middleware.internal_auth import InternalAuthMiddleware
+from app.api.middleware import RateLimitMiddleware
 from app.core.config import AppConfig, logger
 
 
@@ -175,6 +176,12 @@ app.openapi = custom_openapi  # type: ignore[assignment]
 
 # Add middleware
 app.add_middleware(InternalAuthMiddleware)
+
+# Add rate limiting middleware (60 requests per minute per client)
+app.add_middleware(
+    RateLimitMiddleware,
+    requests_per_minute=60
+)
 
 # Include API routers
 app.include_router(v1_router)
