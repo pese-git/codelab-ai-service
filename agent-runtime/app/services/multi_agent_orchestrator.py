@@ -71,12 +71,11 @@ class MultiAgentOrchestrator:
         
         # Use session lock to prevent race conditions
         async with session_lock_manager.lock(session_id):
-            # Get or create agent context (async)
-            # Import here to avoid circular dependency and get initialized instance
-            from app.services.agent_context_async import agent_context_manager as async_ctx_mgr
+            # Get or create agent context (using adapter)
+            from app.main import agent_context_manager_adapter as async_ctx_mgr
             
             if async_ctx_mgr is None:
-                raise RuntimeError("AgentContextManager not initialized")
+                raise RuntimeError("AgentContextManager adapter not initialized")
             
             context = await async_ctx_mgr.get_or_create(session_id)
             
@@ -118,11 +117,11 @@ class MultiAgentOrchestrator:
                         is_final=False
                     )
         
-            # Get session manager for passing to agents
-            from app.services.session_manager_async import session_manager as async_session_mgr
+            # Get session manager for passing to agents (using adapter)
+            from app.main import session_manager_adapter as async_session_mgr
             
             if async_session_mgr is None:
-                raise RuntimeError("SessionManager not initialized")
+                raise RuntimeError("SessionManager adapter not initialized")
             
             # Publish processing started event
             await event_bus.publish(
@@ -292,8 +291,8 @@ class MultiAgentOrchestrator:
         Returns:
             Current agent type or None if session doesn't exist
         """
-        # Import here to get initialized instance
-        from app.services.agent_context_async import agent_context_manager as async_ctx_mgr
+        # Import here to get initialized instance (using adapter)
+        from app.main import agent_context_manager_adapter as async_ctx_mgr
         context = async_ctx_mgr.get(session_id) if async_ctx_mgr else None
         return context.current_agent if context else None
     
@@ -307,8 +306,8 @@ class MultiAgentOrchestrator:
         Returns:
             List of agent switch records
         """
-        # Import here to get initialized instance
-        from app.services.agent_context_async import agent_context_manager as async_ctx_mgr
+        # Import here to get initialized instance (using adapter)
+        from app.main import agent_context_manager_adapter as async_ctx_mgr
         context = async_ctx_mgr.get(session_id) if async_ctx_mgr else None
         return context.get_agent_history() if context else []
     
@@ -319,8 +318,8 @@ class MultiAgentOrchestrator:
         Args:
             session_id: Session identifier
         """
-        # Import here to get initialized instance
-        from app.services.agent_context_async import agent_context_manager as async_ctx_mgr
+        # Import here to get initialized instance (using adapter)
+        from app.main import agent_context_manager_adapter as async_ctx_mgr
         context = async_ctx_mgr.get(session_id) if async_ctx_mgr else None
         if context:
             context.switch_agent(AgentType.ORCHESTRATOR, "Session reset")

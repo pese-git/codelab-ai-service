@@ -8,8 +8,9 @@ import time
 import logging
 from collections import defaultdict
 from typing import Dict, List
-from fastapi import Request, HTTPException
+from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
 
 logger = logging.getLogger("agent-runtime.middleware.rate_limit")
 
@@ -80,9 +81,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 f"Rate limit exceeded for client {client_id}: "
                 f"{len(self.requests[client_id])} requests in last minute"
             )
-            raise HTTPException(
+            return JSONResponse(
                 status_code=429,
-                detail={
+                content={
                     "error": "Too many requests",
                     "limit": self.requests_per_minute,
                     "window": "1 minute",

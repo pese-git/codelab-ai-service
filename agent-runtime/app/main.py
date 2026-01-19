@@ -14,6 +14,10 @@ from app.middleware.internal_auth import InternalAuthMiddleware
 from app.api.middleware import RateLimitMiddleware
 from app.core.config import AppConfig, logger
 
+# Global adapter instances (initialized in lifespan)
+session_manager_adapter = None
+agent_context_manager_adapter = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -56,47 +60,63 @@ async def lifespan(app: FastAPI):
         await init_agent_context_manager()
         logger.info("✓ Agent context manager initialized")
         
-        # Initialize adapters for backward compatibility
+        # Initialize adapters for new architecture (direct initialization without Depends)
         from app.infrastructure.adapters import (
             SessionManagerAdapter,
-            AgentContextManagerAdapter
+            AgentContextManagerAdapter,
+            EventPublisherAdapter
         )
-        from app.core.dependencies_new import (
-            get_session_management_service,
-            get_agent_orchestration_service
+        from app.domain.services import (
+            SessionManagementService,
+            AgentOrchestrationService
         )
-        
-        try:
-            session_service = await get_session_management_service()
-            orchestration_service = await get_agent_orchestration_service()
-            
-            # Create global adapter instances
-            global session_manager_adapter, agent_context_manager_adapter
-            session_manager_adapter = SessionManagerAdapter(session_service)
-            agent_context_manager_adapter = AgentContextManagerAdapter(orchestration_service)
-            
-            logger.info("✓ Manager adapters initialized")
-        except Exception as e:
-            logger.warning(f"Failed to initialize adapters: {e}")
-            session_manager_adapter = None
-            agent_context_manager_adapter = None
-        
-        # Initialize session cleanup service (prevents memory leaks)
+        from app.infrastructure.persistence.repositories import (
+            SessionRepositoryImpl,
+            AgentContextRepositoryImpl
+        )
         from app.infrastructure.cleanup import SessionCleanupService
+        from app.services.database import get_db
         
         try:
-            if session_service:
+            # Создать репозитории напрямую (без Depends)
+            async for db in get_db():
+                session_repo = SessionRepositoryImpl(db)
+                context_repo = AgentContextRepositoryImpl(db)
+                
+                # Создать event publisher
+                event_publisher = EventPublisherAdapter()
+                
+                # Создать доменные сервисы
+                session_service = SessionManagementService(
+                    repository=session_repo,
+                    event_publisher=event_publisher.publish
+                )
+                orchestration_service = AgentOrchestrationService(
+                    repository=context_repo,
+                    event_publisher=event_publisher.publish
+                )
+                
+                # Создать глобальные адаптеры
+                global session_manager_adapter, agent_context_manager_adapter
+                session_manager_adapter = SessionManagerAdapter(session_service)
+                agent_context_manager_adapter = AgentContextManagerAdapter(orchestration_service)
+                
+                logger.info("✓ Manager adapters initialized")
+                
+                # Initialize session cleanup service
                 cleanup_service = SessionCleanupService(
                     session_service=session_service,
-                    cleanup_interval_hours=1,   # Очистка каждый час
-                    max_age_hours=24            # Удалять сессии старше 24 часов
+                    cleanup_interval_hours=1,
+                    max_age_hours=24
                 )
                 await cleanup_service.start()
-                logger.info("✓ Session cleanup service started (interval=1h, max_age=24h)")
-            else:
-                cleanup_service = None
+                logger.info("✓ Session cleanup service started")
+                
+                break  # Выйти из цикла после первой сессии
         except Exception as e:
-            logger.warning(f"Failed to start cleanup service: {e}")
+            logger.error(f"Failed to initialize adapters: {e}", exc_info=True)
+            session_manager_adapter = None
+            agent_context_manager_adapter = None
             cleanup_service = None
         
         # Publish system startup event
