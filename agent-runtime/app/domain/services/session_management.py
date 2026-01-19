@@ -223,6 +223,57 @@ class SessionManagementService:
         
         return message
     
+    async def add_tool_result(
+        self,
+        session_id: str,
+        call_id: str,
+        result: Optional[str] = None,
+        error: Optional[str] = None
+    ) -> Message:
+        """
+        Добавить результат выполнения инструмента в сессию.
+        
+        Args:
+            session_id: ID сессии
+            call_id: ID вызова инструмента
+            result: Результат выполнения (если успешно) - строка или объект
+            error: Сообщение об ошибке (если неуспешно)
+            
+        Returns:
+            Созданное сообщение с результатом
+            
+        Raises:
+            SessionNotFoundError: Если сессия не найдена
+            
+        Пример:
+            >>> message = await service.add_tool_result(
+            ...     session_id="session-123",
+            ...     call_id="call-456",
+            ...     result="File created successfully"
+            ... )
+        """
+        import json
+        
+        # Формировать содержимое сообщения
+        if error:
+            content = f"Error: {error}"
+        elif result:
+            # Если result - это dict или list, сериализовать в JSON
+            if isinstance(result, (dict, list)):
+                content = json.dumps(result, ensure_ascii=False)
+            else:
+                content = str(result)
+        else:
+            content = "Tool executed successfully"
+        
+        # Добавить как сообщение с ролью "tool"
+        return await self.add_message(
+            session_id=session_id,
+            role="tool",
+            content=content,
+            tool_call_id=call_id
+        )
+    
     async def deactivate_session(
         self,
         session_id: str,

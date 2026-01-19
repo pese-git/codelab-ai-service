@@ -13,7 +13,9 @@ from app.api.v1.endpoints import router as v1_router
 from app.api.v1.routers import (
     health_router,
     sessions_router,
-    agents_router
+    agents_router,
+    messages_router,
+    events_router
 )
 from app.middleware.internal_auth import InternalAuthMiddleware
 from app.api.middleware import RateLimitMiddleware
@@ -22,6 +24,7 @@ from app.core.config import AppConfig, logger
 # Global adapter instances (initialized in lifespan)
 session_manager_adapter = None
 agent_context_manager_adapter = None
+message_orchestration_service = None
 
 
 @asynccontextmanager
@@ -102,11 +105,26 @@ async def lifespan(app: FastAPI):
                 )
                 
                 # Создать глобальные адаптеры
-                global session_manager_adapter, agent_context_manager_adapter
+                global session_manager_adapter, agent_context_manager_adapter, message_orchestration_service
                 session_manager_adapter = SessionManagerAdapter(session_service)
                 agent_context_manager_adapter = AgentContextManagerAdapter(orchestration_service)
                 
                 logger.info("✓ Manager adapters initialized")
+                
+                # Создать MessageOrchestrationService
+                from app.domain.services import MessageOrchestrationService
+                from app.services.agent_router import agent_router
+                from app.infrastructure.concurrency import session_lock_manager
+                
+                message_orchestration_service = MessageOrchestrationService(
+                    session_service=session_service,
+                    agent_service=orchestration_service,
+                    agent_router=agent_router,
+                    lock_manager=session_lock_manager,
+                    event_publisher=event_publisher.publish
+                )
+                
+                logger.info("✓ MessageOrchestrationService initialized")
                 
                 # Initialize session cleanup service
                 cleanup_service = SessionCleanupService(
@@ -260,15 +278,14 @@ app.add_middleware(
 )
 
 # Include API routers
-# Старый монолитный роутер (сохранен для совместимости)
-app.include_router(v1_router)
-
-# Новые структурированные роутеры (параллельно)
+# Новые структурированные роутеры
 app.include_router(health_router)
 app.include_router(sessions_router)
 app.include_router(agents_router)
+app.include_router(messages_router)
+app.include_router(events_router)
 
-logger.info("✓ API routers registered (old + new)")
+logger.info("✓ API routers registered")
 
 
 if __name__ == "__main__":

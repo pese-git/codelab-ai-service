@@ -11,4 +11,6 @@ from .agent_orchestration import AgentOrchestrationService
 __all__ = [
     "SessionManagementService",
     "AgentOrchestrationService",
+    "MessageOrchestrationService",
 ]
+from .message_orchestration import MessageOrchestrationService

@@ -790,9 +790,18 @@ async def get_session_metrics(session_id: str):
     
     from app.events.subscribers import session_metrics_collector
     
+    # Debug: проверим все доступные сессии
+    all_sessions = session_metrics_collector.get_all_sessions()
+    logger.debug(f"Available sessions with metrics: {all_sessions}")
+    logger.debug(f"Total sessions with metrics: {len(all_sessions)}")
+    
     metrics = session_metrics_collector.get_session_metrics(session_id)
     
     if not metrics:
+        logger.warning(
+            f"No metrics found for session {session_id}. "
+            f"Available sessions: {all_sessions}"
+        )
         return JSONResponse(
             content={"error": f"No metrics found for session {session_id}"},
             status_code=404
