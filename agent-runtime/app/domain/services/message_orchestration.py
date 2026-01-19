@@ -123,13 +123,16 @@ class MessageOrchestrationService:
         async with self._lock_manager.lock(session_id):
             # Добавить user message в сессию ПЕРЕД обработкой
             # Это гарантирует, что сообщение будет в истории для агента
-            if message:
+            # ВАЖНО: message=None означает "не добавлять user message" (для tool_result)
+            if message is not None and message != "":
                 await self._session_service.add_message(
                     session_id=session_id,
                     role="user",
                     content=message
                 )
                 logger.debug(f"User message added to session {session_id}")
+            elif message is None:
+                logger.debug(f"Skipping user message addition (message=None, продолжение после tool_result)")
             
             # Получить или создать сессию (теперь с user message)
             session = await self._session_service.get_or_create_session(session_id)
@@ -263,6 +266,12 @@ class MessageOrchestrationService:
                             session_id=session_id,
                             target_agent=target_agent,
                             reason=reason
+                        )
+                        
+                        logger.info(
+                            f"Контекст обновлен после переключения: "
+                            f"current_agent={context.current_agent.value}, "
+                            f"switch_count={context.switch_count}"
                         )
                         
                         # Уведомить о переключении
@@ -461,9 +470,15 @@ class MessageOrchestrationService:
             session = await self._session_service.get_or_create_session(session_id)
             
             # Получить контекст агента
+            # ВАЖНО: НЕ указываем initial_agent, чтобы не сбросить существующий контекст
             context = await self._agent_service.get_or_create_context(
-                session_id=session_id,
-                initial_agent=AgentType.ORCHESTRATOR
+                session_id=session_id
+            )
+            
+            logger.info(
+                f"Загружен контекст для сессии {session_id}: "
+                f"current_agent={context.current_agent.value}, "
+                f"switch_count={context.switch_count}"
             )
             
             # Добавить результат инструмента в сессию
@@ -487,17 +502,71 @@ class MessageOrchestrationService:
             # Обновить сессию после добавления tool_result
             session = await self._session_service.get_session(session_id)
             
-            # Продолжить обработку с пустым сообщением (агент увидит tool_result в истории)
+            # Получить последнее user message для передачи новому агенту при переключении
+            user_messages = session.get_messages_by_role("user")
+            last_user_message = user_messages[-1].content if user_messages else ""
+            
+            logger.debug(f"Последнее user message: {last_user_message[:50]}...")
+            
+            # ВАЖНО: Продолжить обработку с пустым сообщением
+            # НЕ добавляем user message, так как tool_result уже в истории
+            # Агент получит историю с tool_call и tool_result для продолжения
             chunk_count = 0
             async for chunk in current_agent.process(
                 session_id=session_id,
-                message="",  # Пустое сообщение, агент продолжит с tool_result
+                message=None,  # None означает "не добавлять user message"
                 context=self._context_to_dict(context),
                 session=session,
                 session_service=self._session_service
             ):
                 chunk_count += 1
                 logger.debug(f"Получен chunk #{chunk_count}: type={chunk.type}, is_final={chunk.is_final}")
+                
+                # Если агент запрашивает переключение, продолжить с новым агентом
+                if chunk.type == "switch_agent":
+                    target_agent_str = chunk.metadata.get("target_agent")
+                    target_agent = AgentType(target_agent_str)
+                    reason = chunk.metadata.get("reason", "Agent requested switch")
+                    from_agent = context.current_agent
+                    
+                    logger.info(
+                        f"Агент запросил переключение при обработке tool_result: "
+                        f"{from_agent.value} -> {target_agent.value}"
+                    )
+                    
+                    # Переключить агента
+                    context = await self._agent_service.switch_agent(
+                        session_id=session_id,
+                        target_agent=target_agent,
+                        reason=reason
+                    )
+                    
+                    # Уведомить о переключении
+                    yield StreamChunk(
+                        type="agent_switched",
+                        content=f"Switched to {target_agent.value} agent",
+                        metadata={
+                            "from_agent": from_agent.value,
+                            "to_agent": target_agent.value,
+                            "reason": reason
+                        },
+                        is_final=False
+                    )
+                    
+                    # Продолжить обработку с новым агентом и ОРИГИНАЛЬНЫМ сообщением
+                    session = await self._session_service.get_session(session_id)
+                    new_agent = self._agent_router.get_agent(target_agent)
+                    async for new_chunk in new_agent.process(
+                        session_id=session_id,
+                        message=last_user_message,  # Передаем оригинальное сообщение пользователя
+                        context=self._context_to_dict(context),
+                        session=session,
+                        session_service=self._session_service
+                    ):
+                        yield new_chunk
+                    
+                    return
+                
                 yield chunk
             
             logger.info(f"Обработка tool_result завершена, отправлено {chunk_count} chunks")

@@ -87,7 +87,7 @@ class ArchitectAgent(BaseAgent):
         
         # Delegate to LLM stream service with allowed tools
         async for chunk in stream_response(session_id, history, self.allowed_tools, session_mgr_adapter):
-            # Handle switch_mode tool call directly (don't send to IDE)
+            # Handle switch_mode tool call - DON'T add tool_result to history!
             if chunk.type == "tool_call" and chunk.tool_name == "switch_mode":
                 target_mode = chunk.arguments.get("mode", "orchestrator")
                 reason = chunk.arguments.get("reason", "Agent requested switch")
@@ -96,13 +96,8 @@ class ArchitectAgent(BaseAgent):
                     f"Architect agent requesting switch to {target_mode}: {reason}"
                 )
                 
-                # Add tool result to history before switching
-                await session_mgr_adapter.append_tool_result(
-                    session_id=session_id,
-                    call_id=chunk.call_id,
-                    tool_name="switch_mode",
-                    result=f"Switching to {target_mode} agent"
-                )
+                # ВАЖНО: НЕ добавляем tool_result в историю!
+                # Это предотвращает ошибку "No tool call found" от OpenRouter API
                 
                 # Emit switch_agent chunk
                 yield StreamChunk(
@@ -111,7 +106,8 @@ class ArchitectAgent(BaseAgent):
                     metadata={
                         "target_agent": target_mode,
                         "reason": reason
-                    }
+                    },
+                    is_final=True
                 )
                 return
             

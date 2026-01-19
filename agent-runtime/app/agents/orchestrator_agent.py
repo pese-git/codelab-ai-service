@@ -109,7 +109,10 @@ class OrchestratorAgent(BaseAgent):
             StreamChunk: Switch agent chunk with routing decision
         """
         logger.info(f"Orchestrator analyzing request for session {session_id}")
-        logger.debug(f"Message: {message[:100]}...")
+        if message:
+            logger.debug(f"Message: {message[:100]}...")
+        else:
+            logger.debug(f"Message: None (continuing after tool_result)")
         
         # Check if only Universal agent is available (single-agent mode)
         from app.services.agent_router import agent_router
