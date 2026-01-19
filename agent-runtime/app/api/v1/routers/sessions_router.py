@@ -5,7 +5,7 @@ Sessions роутер.
 """
 
 import logging
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Body
 from fastapi.responses import JSONResponse
 
 from ..schemas.session_schemas import (
@@ -35,7 +35,7 @@ router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 @router.post("", response_model=CreateSessionResponse, status_code=201)
 async def create_session(
-    request: CreateSessionRequest,
+    request: CreateSessionRequest = Body(default=CreateSessionRequest()),
     handler: CreateSessionHandler = Depends(get_create_session_handler)
 ) -> CreateSessionResponse:
     """
@@ -75,9 +75,10 @@ async def create_session(
         
         logger.info(f"Created new session: {session_dto.id}")
         
-        # Вернуть ответ
+        # Вернуть ответ в формате совместимом с Gateway
         return CreateSessionResponse(
             session_id=session_dto.id,
+            message_count=0,  # Новая сессия всегда имеет 0 сообщений
             created_at=session_dto.created_at,
             is_active=session_dto.is_active,
             current_agent="orchestrator"  # Новые сессии всегда начинают с orchestrator

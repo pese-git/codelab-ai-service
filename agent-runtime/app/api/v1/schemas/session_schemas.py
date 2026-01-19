@@ -36,6 +36,7 @@ class CreateSessionResponse(BaseModel):
     
     Атрибуты:
         session_id: ID созданной сессии
+        message_count: Количество сообщений (всегда 0 для новой сессии)
         created_at: Время создания
         is_active: Флаг активности
         current_agent: Текущий агент
@@ -43,6 +44,7 @@ class CreateSessionResponse(BaseModel):
     Пример:
         {
             "session_id": "session-123",
+            "message_count": 0,
             "created_at": "2026-01-18T21:00:00Z",
             "is_active": true,
             "current_agent": "orchestrator"
@@ -50,6 +52,7 @@ class CreateSessionResponse(BaseModel):
     """
     
     session_id: str = Field(description="ID созданной сессии")
+    message_count: int = Field(default=0, description="Количество сообщений")
     created_at: datetime = Field(description="Время создания")
     is_active: bool = Field(description="Флаг активности")
     current_agent: str = Field(description="Текущий агент")
