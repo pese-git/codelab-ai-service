@@ -2,6 +2,8 @@
 LLM Proxy Client for agent runtime.
 
 Handles communication with LLM Proxy service via REST API.
+
+UPDATED: Added CircuitBreaker to protect from cascading failures.
 """
 import logging
 from typing import Any, Dict, List, Optional
@@ -15,8 +17,18 @@ from app.services.retry_service import (
     is_retryable_http_error,
     llm_retry
 )
+from app.infrastructure.resilience import CircuitBreaker
 
 logger = logging.getLogger("agent-runtime.llm_proxy_client")
+
+# Circuit breaker для защиты от каскадных сбоев LLM Proxy
+llm_circuit_breaker = CircuitBreaker(
+    failure_threshold=5,      # Открыть после 5 ошибок подряд
+    recovery_timeout=60,      # Попытка восстановления через 60 секунд
+    expected_exception=Exception
+)
+
+logger.info("LLM Circuit Breaker initialized (threshold=5, timeout=60s)")
 
 
 class LLMProxyClient:
@@ -93,15 +105,19 @@ class LLMProxyClient:
         logger.debug(f"Request payload keys: {list(payload.keys())}")
 
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{self.api_url}/v1/chat/completions",
-                    json=payload,
-                    headers={"X-Internal-Auth": self.api_key},
-                    timeout=self.timeout,
-                )
+            # Use circuit breaker to protect from cascading failures
+            async def make_request():
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        f"{self.api_url}/v1/chat/completions",
+                        json=payload,
+                        headers={"X-Internal-Auth": self.api_key},
+                        timeout=self.timeout,
+                    )
+                    response.raise_for_status()
+                    return response
             
-            response.raise_for_status()
+            response = await llm_circuit_breaker.call(make_request)
             
             result = response.json()
             

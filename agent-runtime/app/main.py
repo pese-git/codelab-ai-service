@@ -56,6 +56,23 @@ async def lifespan(app: FastAPI):
         await init_agent_context_manager()
         logger.info("✓ Agent context manager initialized")
         
+        # Initialize session cleanup service (prevents memory leaks)
+        from app.infrastructure.cleanup import SessionCleanupService
+        from app.core.dependencies_new import get_session_management_service
+        
+        try:
+            session_service = await get_session_management_service()
+            cleanup_service = SessionCleanupService(
+                session_service=session_service,
+                cleanup_interval_hours=1,   # Очистка каждый час
+                max_age_hours=24            # Удалять сессии старше 24 часов
+            )
+            await cleanup_service.start()
+            logger.info("✓ Session cleanup service started (interval=1h, max_age=24h)")
+        except Exception as e:
+            logger.warning(f"Failed to start cleanup service: {e}")
+            cleanup_service = None
+        
         # Publish system startup event
         from app.events.event_bus import event_bus
         from app.events.base_event import BaseEvent
@@ -105,6 +122,14 @@ async def lifespan(app: FastAPI):
         logger.info("✓ System shutdown event published")
     except Exception as e:
         logger.error(f"Error publishing shutdown event: {e}")
+    
+    # Shutdown cleanup service
+    try:
+        if 'cleanup_service' in locals() and cleanup_service:
+            await cleanup_service.stop()
+            logger.info("✓ Session cleanup service stopped")
+    except Exception as e:
+        logger.error(f"Error stopping cleanup service: {e}")
     
     # Shutdown managers (flush pending writes if timer-based still active)
     try:
