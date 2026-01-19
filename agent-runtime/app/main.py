@@ -10,6 +10,11 @@ from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 
 from app.api.v1.endpoints import router as v1_router
+from app.api.v1.routers import (
+    health_router,
+    sessions_router,
+    agents_router
+)
 from app.middleware.internal_auth import InternalAuthMiddleware
 from app.api.middleware import RateLimitMiddleware
 from app.core.config import AppConfig, logger
@@ -255,7 +260,15 @@ app.add_middleware(
 )
 
 # Include API routers
+# Старый монолитный роутер (сохранен для совместимости)
 app.include_router(v1_router)
+
+# Новые структурированные роутеры (параллельно)
+app.include_router(health_router)
+app.include_router(sessions_router)
+app.include_router(agents_router)
+
+logger.info("✓ API routers registered (old + new)")
 
 
 if __name__ == "__main__":
