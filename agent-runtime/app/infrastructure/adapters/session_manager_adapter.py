@@ -218,3 +218,4 @@ class SessionManagerAdapter:
             В новой архитектуре shutdown управляется на уровне репозиториев.
         """
         logger.info("SessionManagerAdapter shutdown (no-op in new architecture)")
+

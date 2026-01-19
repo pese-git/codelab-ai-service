@@ -278,13 +278,8 @@ async def message_stream_sse(request: AgentStreamRequest):
                     f"for session {request.session_id}"
                 )
                 
-                # Add user message to history
-                if content:
-                    await async_session_mgr.append_message(
-                        request.session_id,
-                        role="user",
-                        content=content
-                    )
+                # NOTE: User message will be added inside process_message()
+                # to ensure it's in the same DB transaction
                 
                 # Process with specified agent
                 async for chunk in multi_agent_orchestrator.process_message(
@@ -311,11 +306,8 @@ async def message_stream_sse(request: AgentStreamRequest):
                     f"length={len(content)}"
                 )
                 
-                await async_session_mgr.append_message(
-                    request.session_id,
-                    role="user",
-                    content=content
-                )
+                # NOTE: User message will be added inside process_message()
+                # to ensure it's in the same DB transaction
                 
                 # Process through multi-agent system
                 async for chunk in multi_agent_orchestrator.process_message(

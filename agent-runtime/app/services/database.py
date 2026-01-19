@@ -642,7 +642,7 @@ class DatabaseService:
         )
         context = result.scalar_one_or_none()
         
-        metadata_json = json.dumps(metadata) if metadata else None
+        metadata_json = json.dumps(metadata, default=str) if metadata else None
         
         if not context:
             # Create new context

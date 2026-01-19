@@ -13,7 +13,8 @@ from app.services.llm_proxy_client import llm_proxy_client
 from app.core.config import AppConfig
 
 if TYPE_CHECKING:
-    from app.services.session_manager_async import AsyncSessionManager
+    from app.domain.entities.session import Session
+    from app.domain.services.session_management import SessionManagementService
 
 logger = logging.getLogger("agent-runtime.orchestrator_agent")
 
@@ -91,7 +92,8 @@ class OrchestratorAgent(BaseAgent):
         session_id: str,
         message: str,
         context: Dict[str, Any],
-        session_mgr: "AsyncSessionManager"
+        session: "Session",
+        session_service: "SessionManagementService"
     ) -> AsyncGenerator[StreamChunk, None]:
         """
         Analyze request using LLM and determine which agent should handle it.
@@ -100,7 +102,8 @@ class OrchestratorAgent(BaseAgent):
             session_id: Session identifier
             message: User message to analyze
             context: Agent context with history
-            session_mgr: Async session manager for session operations (not used by orchestrator)
+            session: Domain entity Session (not used by orchestrator)
+            session_service: Session management service (not used by orchestrator)
             
         Yields:
             StreamChunk: Switch agent chunk with routing decision

@@ -10,7 +10,8 @@ from app.agents.base_agent import BaseAgent, AgentType
 from app.agents.prompts.ask import ASK_PROMPT
 from app.models.schemas import StreamChunk
 from app.services.llm_stream_service import stream_response
-from app.services.session_manager_async import AsyncSessionManager
+from app.domain.entities.session import Session
+from app.domain.services.session_management import SessionManagementService
 
 logger = logging.getLogger("agent-runtime.ask_agent")
 
@@ -52,7 +53,8 @@ class AskAgent(BaseAgent):
         session_id: str,
         message: str,
         context: Dict[str, Any],
-        session_mgr: AsyncSessionManager
+        session: Session,
+        session_service: SessionManagementService
     ) -> AsyncGenerator[StreamChunk, None]:
         """
         Process message through Ask agent.
@@ -61,15 +63,21 @@ class AskAgent(BaseAgent):
             session_id: Session identifier
             message: User message to process
             context: Agent context with history
-            session_mgr: Async session manager for session operations
+            session: Domain entity Session with message history
+            session_service: Session management service for operations
             
         Yields:
             StreamChunk: Chunks for SSE streaming
         """
         logger.info(f"Ask agent processing message for session {session_id}")
         
-        # Get session history
-        history = session_mgr.get_history(session_id)
+        # Get session history from domain entity
+        history = session.get_history_for_llm()
+        
+        # DEBUG: Log history to see what we're getting
+        logger.info(f"Ask agent got history with {len(history)} messages")
+        for i, msg in enumerate(history):
+            logger.debug(f"  Message {i}: role={msg.get('role')}, content={msg.get('content', '')[:50]}...")
         
         # Update system prompt
         if history and history[0].get("role") == "system":
@@ -77,8 +85,14 @@ class AskAgent(BaseAgent):
         else:
             history.insert(0, {"role": "system", "content": self.system_prompt})
         
+        logger.debug(f"After adding system prompt, history has {len(history)} messages")
+        
+        # Create adapter for backward compatibility with llm_stream_service
+        from app.infrastructure.adapters.session_manager_adapter import SessionManagerAdapter
+        session_mgr_adapter = SessionManagerAdapter(session_service)
+        
         # Delegate to LLM stream service with allowed tools
-        async for chunk in stream_response(session_id, history, self.allowed_tools, session_mgr):
+        async for chunk in stream_response(session_id, history, self.allowed_tools, session_mgr_adapter):
             # Handle switch_mode tool call directly (don't send to IDE)
             if chunk.type == "tool_call" and chunk.tool_name == "switch_mode":
                 target_mode = chunk.arguments.get("mode", "orchestrator")
@@ -88,12 +102,13 @@ class AskAgent(BaseAgent):
                     f"Ask agent requesting switch to {target_mode}: {reason}"
                 )
                 
-                # Add tool result to history before switching
-                await session_mgr.append_tool_result(
+                # Add tool result to session
+                await session_service.add_message(
                     session_id=session_id,
-                    call_id=chunk.call_id,
-                    tool_name="switch_mode",
-                    result=f"Switching to {target_mode} agent"
+                    role="tool",
+                    content=f"Switching to {target_mode} agent",
+                    name="switch_mode",
+                    tool_call_id=chunk.call_id
                 )
                 
                 # Emit switch_agent chunk

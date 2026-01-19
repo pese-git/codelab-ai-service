@@ -121,7 +121,17 @@ class MessageOrchestrationService:
         
         # Использовать блокировку сессии для предотвращения race conditions
         async with self._lock_manager.lock(session_id):
-            # Получить или создать сессию
+            # Добавить user message в сессию ПЕРЕД обработкой
+            # Это гарантирует, что сообщение будет в истории для агента
+            if message:
+                await self._session_service.add_message(
+                    session_id=session_id,
+                    role="user",
+                    content=message
+                )
+                logger.debug(f"User message added to session {session_id}")
+            
+            # Получить или создать сессию (теперь с user message)
             session = await self._session_service.get_or_create_session(session_id)
             
             # Получить или создать контекст агента
@@ -176,17 +186,12 @@ class MessageOrchestrationService:
                     orchestrator = self._agent_router.get_agent(AgentType.ORCHESTRATOR)
                     
                     # Orchestrator проанализирует и вернет switch_agent chunk
-                    # Нужно передать session_mgr - используем адаптер
-                    from ...infrastructure.adapters.session_manager_adapter import (
-                        SessionManagerAdapter
-                    )
-                    session_mgr_adapter = SessionManagerAdapter(self._session_service)
-                    
                     async for chunk in orchestrator.process(
                         session_id=session_id,
                         message=message,
                         context=self._context_to_dict(context),
-                        session_mgr=session_mgr_adapter
+                        session=session,
+                        session_service=self._session_service
                     ):
                         if chunk.type == "switch_agent":
                             # Извлечь целевого агента из метаданных
@@ -233,18 +238,13 @@ class MessageOrchestrationService:
                     f"для сессии {session_id}"
                 )
                 
-                # Создать адаптер для session_mgr
-                from ...infrastructure.adapters.session_manager_adapter import (
-                    SessionManagerAdapter
-                )
-                session_mgr_adapter = SessionManagerAdapter(self._session_service)
-                
                 # Обработать сообщение через текущего агента
                 async for chunk in current_agent.process(
                     session_id=session_id,
                     message=message,
                     context=self._context_to_dict(context),
-                    session_mgr=session_mgr_adapter
+                    session=session,
+                    session_service=self._session_service
                 ):
                     # Проверить запросы на переключение агента от самого агента
                     if chunk.type == "switch_agent":
@@ -278,12 +278,15 @@ class MessageOrchestrationService:
                         )
                         
                         # Продолжить обработку с новым агентом
+                        # Обновить сессию после переключения
+                        session = await self._session_service.get_session(session_id)
                         new_agent = self._agent_router.get_agent(target_agent)
                         async for new_chunk in new_agent.process(
                             session_id=session_id,
                             message=message,
                             context=self._context_to_dict(context),
-                            session_mgr=session_mgr_adapter
+                            session=session,
+                            session_service=self._session_service
                         ):
                             yield new_chunk
                         
@@ -481,11 +484,8 @@ class MessageOrchestrationService:
             
             logger.debug(f"Вызываем {context.current_agent.value}.process() для продолжения")
             
-            # Создать адаптер для session_mgr
-            from ...infrastructure.adapters.session_manager_adapter import (
-                SessionManagerAdapter
-            )
-            session_mgr_adapter = SessionManagerAdapter(self._session_service)
+            # Обновить сессию после добавления tool_result
+            session = await self._session_service.get_session(session_id)
             
             # Продолжить обработку с пустым сообщением (агент увидит tool_result в истории)
             chunk_count = 0
@@ -493,7 +493,8 @@ class MessageOrchestrationService:
                 session_id=session_id,
                 message="",  # Пустое сообщение, агент продолжит с tool_result
                 context=self._context_to_dict(context),
-                session_mgr=session_mgr_adapter
+                session=session,
+                session_service=self._session_service
             ):
                 chunk_count += 1
                 logger.debug(f"Получен chunk #{chunk_count}: type={chunk.type}, is_final={chunk.is_final}")
