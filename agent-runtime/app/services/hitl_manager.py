@@ -80,13 +80,6 @@ class HITLManager:
         Returns:
             Created HITLPendingState
         """
-        # Get or create context (async)
-        context = await _get_agent_context_manager().get_or_create(session_id)
-        
-        # Initialize pending calls dict if not exists
-        if HITL_PENDING_KEY not in context.metadata:
-            context.metadata[HITL_PENDING_KEY] = {}
-        
         # Create pending state
         pending_state = HITLPendingState(
             call_id=call_id,
@@ -101,8 +94,21 @@ class HITLManager:
             session_id, call_id, tool_name, arguments, reason
         )
         
-        # Also store in context metadata for fast access
-        context.metadata[HITL_PENDING_KEY][call_id] = pending_state.model_dump()
+        # ВАЖНО: НЕ используем get_or_create(), чтобы не создавать новый контекст!
+        # Только получаем существующий контекст для кеширования (опционально)
+        context = _get_agent_context_manager().get(session_id)
+        if context:
+            # Initialize pending calls dict if not exists
+            if HITL_PENDING_KEY not in context.metadata:
+                context.metadata[HITL_PENDING_KEY] = {}
+            
+            # Store in context metadata for fast access
+            context.metadata[HITL_PENDING_KEY][call_id] = pending_state.model_dump()
+        else:
+            logger.debug(
+                f"Agent context not found for session {session_id}, "
+                f"pending approval saved only to database"
+            )
         
         logger.info(
             f"Added pending HITL approval: session={session_id}, "
@@ -251,13 +257,6 @@ class HITLManager:
         Returns:
             Created HITLAuditLog
         """
-        # Get or create context (async)
-        context = await _get_agent_context_manager().get_or_create(session_id)
-        
-        # Initialize audit logs list if not exists
-        if HITL_AUDIT_KEY not in context.metadata:
-            context.metadata[HITL_AUDIT_KEY] = []
-        
         # Create audit log entry
         audit_log = HITLAuditLog(
             session_id=session_id,
@@ -269,8 +268,21 @@ class HITLManager:
             feedback=feedback
         )
         
-        # Store in context metadata
-        context.metadata[HITL_AUDIT_KEY].append(audit_log.model_dump())
+        # ВАЖНО: НЕ используем get_or_create(), чтобы не создавать новый контекст!
+        # Только получаем существующий контекст для кеширования (опционально)
+        context = _get_agent_context_manager().get(session_id)
+        if context:
+            # Initialize audit logs list if not exists
+            if HITL_AUDIT_KEY not in context.metadata:
+                context.metadata[HITL_AUDIT_KEY] = []
+            
+            # Store in context metadata
+            context.metadata[HITL_AUDIT_KEY].append(audit_log.model_dump())
+        else:
+            logger.debug(
+                f"Agent context not found for session {session_id}, "
+                f"audit log not cached in memory"
+            )
         
         logger.info(
             f"Logged HITL decision: session={session_id}, call_id={call_id}, "
