@@ -56,19 +56,45 @@ async def lifespan(app: FastAPI):
         await init_agent_context_manager()
         logger.info("✓ Agent context manager initialized")
         
-        # Initialize session cleanup service (prevents memory leaks)
-        from app.infrastructure.cleanup import SessionCleanupService
-        from app.core.dependencies_new import get_session_management_service
+        # Initialize adapters for backward compatibility
+        from app.infrastructure.adapters import (
+            SessionManagerAdapter,
+            AgentContextManagerAdapter
+        )
+        from app.core.dependencies_new import (
+            get_session_management_service,
+            get_agent_orchestration_service
+        )
         
         try:
             session_service = await get_session_management_service()
-            cleanup_service = SessionCleanupService(
-                session_service=session_service,
-                cleanup_interval_hours=1,   # Очистка каждый час
-                max_age_hours=24            # Удалять сессии старше 24 часов
-            )
-            await cleanup_service.start()
-            logger.info("✓ Session cleanup service started (interval=1h, max_age=24h)")
+            orchestration_service = await get_agent_orchestration_service()
+            
+            # Create global adapter instances
+            global session_manager_adapter, agent_context_manager_adapter
+            session_manager_adapter = SessionManagerAdapter(session_service)
+            agent_context_manager_adapter = AgentContextManagerAdapter(orchestration_service)
+            
+            logger.info("✓ Manager adapters initialized")
+        except Exception as e:
+            logger.warning(f"Failed to initialize adapters: {e}")
+            session_manager_adapter = None
+            agent_context_manager_adapter = None
+        
+        # Initialize session cleanup service (prevents memory leaks)
+        from app.infrastructure.cleanup import SessionCleanupService
+        
+        try:
+            if session_service:
+                cleanup_service = SessionCleanupService(
+                    session_service=session_service,
+                    cleanup_interval_hours=1,   # Очистка каждый час
+                    max_age_hours=24            # Удалять сессии старше 24 часов
+                )
+                await cleanup_service.start()
+                logger.info("✓ Session cleanup service started (interval=1h, max_age=24h)")
+            else:
+                cleanup_service = None
         except Exception as e:
             logger.warning(f"Failed to start cleanup service: {e}")
             cleanup_service = None
