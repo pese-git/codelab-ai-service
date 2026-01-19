@@ -60,11 +60,11 @@ async def message_stream_sse(request: AgentStreamRequest):
             logger.info(f"SSE stream started for session: {request.session_id}")
             logger.debug(f"Message type: {request.message.get('type', 'user_message')}")
             
-            # Get async session manager
-            from app.services.session_manager_async import session_manager as async_session_mgr
+            # Get async session manager (using adapter for new architecture)
+            from app.main import session_manager_adapter as async_session_mgr
             
             if async_session_mgr is None:
-                raise RuntimeError("SessionManager not initialized")
+                raise RuntimeError("SessionManager adapter not initialized")
             
             # Get or create session (system prompt will be set by agent)
             session = await async_session_mgr.get_or_create(
