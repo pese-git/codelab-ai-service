@@ -10,7 +10,7 @@ import re
 import logging
 
 if TYPE_CHECKING:
-    from app.services.session_manager_async import AsyncSessionManager
+    from app.infrastructure.adapters import SessionManagerAdapter
     from app.domain.entities.session import Session
     from app.domain.services.session_management import SessionManagementService
 
