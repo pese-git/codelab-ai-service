@@ -1,10 +1,12 @@
 # LLM Proxy Service
 
-LLM Proxy — микросервис для унификации доступа к различным языковым моделям (LLM) через LiteLLM, реализующий защищённое API для сервисов экосистемы CodeLab.
+LLM Proxy — микросервис для унификации доступа к различным языковым моделям (LLM) через единое API, реализующий защищённое взаимодействие для сервисов экосистемы CodeLab.
 
-**Версия**: 1.0 (MVP)
-**Дата обновления**: 11 января 2026
+**Версия**: 1.0.0  
+**Дата обновления**: 20 января 2026  
 **Статус**: ✅ Production Ready
+
+---
 
 ## Основные возможности
 
@@ -22,39 +24,57 @@ LLM Proxy — микросервис для унификации доступа 
 
 ## Архитектура
 
-LLM-Proxy теперь использует LiteLLM как внешний прокси-сервис:
+LLM-Proxy использует LiteLLM как внешний прокси-сервис:
 
 ```
-Клиент → LLM-Proxy → LiteLLM Proxy → LLM Провайдеры (OpenAI, Anthropic, Azure, Gemini, vLLM, Ollama и др.)
+Клиент → LLM-Proxy → LiteLLM Proxy → LLM Провайдеры
+                                      ├── OpenAI
+                                      ├── Anthropic
+                                      ├── Ollama
+                                      ├── Azure OpenAI
+                                      ├── OpenRouter
+                                      └── и другие (100+)
 ```
 
-### Преимущества архитектуры с LiteLLM:
-- Встроенные retry, fallback, rate limiting
-- Поддержка 100+ провайдеров из коробки
-- Независимое масштабирование LiteLLM proxy
-- Упрощенная кодовая база llm-proxy
-- Централизованное управление моделями и ключами
+### Преимущества архитектуры с LiteLLM
 
-### Структура проекта:
-- `app/main.py` — точка входа, инициализация FastAPI и подключение маршрутов/слоёв/конфигов
-- `app/api/v1/endpoints.py` — маршруты API (v1, легко расширить под v2)
-- `app/models/schemas.py` — Pydantic-схемы входных и выходных данных
-- `app/services/llm_service.py` — бизнес-логика взаимодействия с LLM (stream/fake, SSE)
-- `app/services/llm_adapters/litellm_adapter.py` — адаптер для работы с LiteLLM proxy
-- `app/services/llm_adapters/fake.py` — mock-адаптер для тестирования
-- `app/middleware/internal_auth.py` — middleware с внутренней авторизацией
-- `app/core/config.py` — централизованный доступ к переменным окружения и логированию
+- ✅ Встроенные retry, fallback, rate limiting
+- ✅ Поддержка 100+ провайдеров из коробки
+- ✅ Независимое масштабирование LiteLLM proxy
+- ✅ Упрощенная кодовая база llm-proxy
+- ✅ Централизованное управление моделями и ключами
+
+### Структура проекта
+
+```
+app/
+├── main.py                          # Точка входа FastAPI
+├── api/v1/endpoints.py             # API роутеры
+├── models/schemas.py               # Pydantic схемы
+├── services/
+│   ├── llm_service.py              # Бизнес-логика LLM
+│   └── llm_adapters/
+│       ├── base.py                 # Базовый адаптер
+│       ├── litellm_adapter.py      # LiteLLM адаптер
+│       └── fake.py                 # Mock адаптер для тестов
+├── middleware/
+│   └── internal_auth.py            # Внутренняя авторизация
+└── core/
+    └── config.py                   # Конфигурация
+
+tests/                              # Тесты
+```
 
 ---
 
-## Быстрый старт (разработка)
+## Быстрый старт
 
-### 1. Запуск LiteLLM Proxy
+### 1. Запуск LiteLLM Proxy (опционально)
 
-Сначала необходимо запустить LiteLLM proxy сервер:
+Для использования с LiteLLM proxy:
 
 ```bash
-# Установка LiteLLM (если еще не установлен)
+# Установка LiteLLM
 pip install 'litellm[proxy]'
 
 # Запуск с базовой конфигурацией
@@ -77,58 +97,103 @@ model_list:
       api_key: "sk-..."
 
 general_settings:
-  master_key: "sk-1234"  # API ключ для доступа к proxy
+  master_key: "sk-1234"
 ```
 
 ### 2. Настройка переменных окружения
 
 Создайте `.env` файл на основе `.env.example`:
+
 ```bash
+# Режим работы
+LLM_PROXY__LLM_MODE=litellm          # или mock для тестирования
+
+# LiteLLM настройки
 LLM_PROXY__LITELLM_PROXY_URL=http://localhost:4000
 LLM_PROXY__LITELLM_API_KEY=sk-1234
 LLM_PROXY__DEFAULT_MODEL=gpt-3.5-turbo
-LLM_PROXY__LLM_MODE=litellm
+
+# Безопасность
+LLM_PROXY__INTERNAL_API_KEY=change-me-internal-key
+
+# Логирование
+LLM_PROXY__LOG_LEVEL=INFO
 ```
 
 ### 3. Запуск LLM-Proxy
 
+#### Через Docker Compose
+
 ```bash
-# Запуск с пересборкой через Docker Compose
+# Запуск всех сервисов
 docker compose up -d --build
 
-# Или локально для разработки
+# Просмотр логов
+docker compose logs -f llm-proxy
+```
+
+#### Локальная разработка
+
+```bash
+# Установка зависимостей
 cd llm-proxy
+uv pip install -e .
+
+# Запуск сервиса
 uv run uvicorn app.main:app --reload --port 8002
 
-# Запуск всех автотестов для сервиса llm-proxy
+# Запуск тестов
 uv run pytest --maxfail=3 --disable-warnings -v tests
 ```
 
+---
+
 ## API
+
+### Endpoints
 
 - `GET /health` — Проверка статуса сервиса
 - `GET /v1/llm/models` — Список поддерживаемых языковых моделей
-- `POST /v1/chat/completions` — Основная точка для чат-комплишнов, поддержка SSE (stream), temperature и пр.
+- `POST /v1/chat/completions` — Чат-комплишны с поддержкой SSE streaming
 
-> Все защищённые эндпоинты требуют заголовка:  
-`x-internal-auth: <LLM_PROXY__INTERNAL_API_KEY>` (см. .env)
+**Все защищённые эндпоинты требуют заголовка:**  
+`X-Internal-Auth: <LLM_PROXY__INTERNAL_API_KEY>`
 
-### Пример новых запросов
+### Примеры запросов
 
-Получить список доступных LLM-моделей:
+#### Получить список моделей
+
 ```bash
-curl -X GET \
-  'http://localhost:8002/v1/llm/models' \
-  -H 'accept: application/json' \
-  -H 'x-internal-auth: ${LLM_PROXY__INTERNAL_API_KEY}'
+curl -X GET 'http://localhost:8002/v1/llm/models' \
+  -H 'Accept: application/json' \
+  -H 'X-Internal-Auth: ${LLM_PROXY__INTERNAL_API_KEY}'
 ```
 
-Стриминговый чат-комплишн — ответ идёт в формате Server-Sent Events (SSE):
+Ответ:
+```json
+{
+  "models": [
+    {
+      "id": "gpt-3.5-turbo",
+      "provider": "openai",
+      "capabilities": ["chat", "streaming", "function_calling"]
+    },
+    {
+      "id": "gpt-4",
+      "provider": "openai",
+      "capabilities": ["chat", "streaming", "function_calling"]
+    }
+  ]
+}
+```
+
+#### Стриминговый чат-комплишн
+
 ```bash
 curl -X POST 'http://localhost:8002/v1/chat/completions' \
-  -H 'accept: application/json' \
+  -H 'Accept: application/json' \
   -H 'Content-Type: application/json' \
-  -H 'x-internal-auth: ${LLM_PROXY__INTERNAL_API_KEY}' \
+  -H 'X-Internal-Auth: ${LLM_PROXY__INTERNAL_API_KEY}' \
   -d '{
     "messages": [{"content": "Say hello!", "role": "user"}],
     "model": "gpt-4",
@@ -137,36 +202,57 @@ curl -X POST 'http://localhost:8002/v1/chat/completions' \
   }'
 ```
 
-SSE-ответ приходит порциями:
+SSE-ответ:
 ```
-data: { ... chunk ... }
-data: { ... chunk ... }
+data: {"choices": [{"delta": {"content": "Hello"}}]}
+data: {"choices": [{"delta": {"content": "!"}}]}
 data: [DONE]
 ```
 
+#### Не-стриминговый запрос
+
+```bash
+curl -X POST 'http://localhost:8002/v1/chat/completions' \
+  -H 'Content-Type: application/json' \
+  -H 'X-Internal-Auth: ${LLM_PROXY__INTERNAL_API_KEY}' \
+  -d '{
+    "messages": [{"content": "Say hello!", "role": "user"}],
+    "model": "gpt-3.5-turbo",
+    "stream": false
+  }'
+```
 
 ---
 
-## Конфигурация (через переменные окружения)
+## Конфигурация
 
-Все переменные окружения имеют префикс `LLM_PROXY__` для предотвращения конфликтов в мультисервисной среде.
+### Переменные окружения
 
-### Основные настройки:
-- `LLM_PROXY__LLM_MODE` — режим работы: `litellm` (продакшен) или `mock` (тестирование)
-- `LLM_PROXY__INTERNAL_API_KEY` — секретный приватный ключ для доступа к API (по умолчанию "change-me-internal-key")
-- `LLM_PROXY__LOG_LEVEL` — уровень логирования (`INFO`/`DEBUG`/...)
-- `LLM_PROXY__VERSION` — версия сервиса (по умолчанию "0.1.0")
+Все переменные имеют префикс `LLM_PROXY__`:
 
-### LiteLLM Proxy настройки:
-- `LLM_PROXY__LITELLM_PROXY_URL` — URL LiteLLM proxy сервера (по умолчанию http://localhost:4000)
-- `LLM_PROXY__LITELLM_API_KEY` — API-ключ для доступа к LiteLLM proxy (опционально)
-- `LLM_PROXY__DEFAULT_MODEL` — модель по умолчанию (по умолчанию gpt-3.5-turbo)
+#### Основные настройки
+
+- `LLM_PROXY__LLM_MODE` — Режим работы: `litellm` (продакшен) или `mock` (тестирование)
+- `LLM_PROXY__INTERNAL_API_KEY` — Ключ для внутренней авторизации
+- `LLM_PROXY__LOG_LEVEL` — Уровень логирования (INFO/DEBUG)
+- `LLM_PROXY__VERSION` — Версия сервиса
+
+#### LiteLLM Proxy настройки
+
+- `LLM_PROXY__LITELLM_PROXY_URL` — URL LiteLLM proxy (по умолчанию http://localhost:4000)
+- `LLM_PROXY__LITELLM_API_KEY` — API-ключ для доступа к LiteLLM proxy
+- `LLM_PROXY__DEFAULT_MODEL` — Модель по умолчанию (gpt-3.5-turbo)
+
+#### Ограничения
+
+- `LLM_PROXY__MAX_CONCURRENT_REQUESTS` — Максимум одновременных запросов
+- `LLM_PROXY__REQUEST_TIMEOUT` — Таймаут запросов (секунды)
 
 ---
 
 ## Примеры конфигурации LiteLLM
 
-### Базовая конфигурация (один провайдер)
+### Базовая конфигурация
 
 ```yaml
 # litellm_config.yaml
@@ -197,19 +283,11 @@ model_list:
       model: claude-3-haiku-20240307
       api_key: "sk-ant-..."
   
-  # Azure OpenAI
-  - model_name: azure-gpt-4
+  # Ollama (локальный)
+  - model_name: llama2
     litellm_params:
-      model: azure/gpt-4
-      api_key: "azure-key"
-      api_base: "https://resource.openai.azure.com/"
-      api_version: "2024-02-15-preview"
-  
-  # vLLM (локальный)
-  - model_name: local-llama
-    litellm_params:
-      model: openai/local-llama
-      api_base: "http://localhost:8000/v1"
+      model: ollama/llama2
+      api_base: http://ollama:11434
 
 general_settings:
   master_key: "sk-1234"
@@ -228,20 +306,9 @@ router_settings:
     tpm: 100000
 ```
 
-### Запуск с конфигурацией
+---
 
-```bash
-# Запуск LiteLLM proxy с конфигом
-litellm --config litellm_config.yaml --port 4000
-
-# Или через Docker
-docker run -p 4000:4000 \
-  -v $(pwd)/litellm_config.yaml:/app/config.yaml \
-  ghcr.io/berriai/litellm:main-latest \
-  --config /app/config.yaml --port 4000
-```
-
-### Интеграция с Ollama
+## Интеграция с Ollama
 
 Docker Compose включает сервис Ollama для запуска локальных моделей:
 
@@ -256,10 +323,9 @@ docker compose exec ollama ollama pull llama2
 docker compose exec ollama ollama list
 ```
 
-Пример конфигурации LiteLLM для работы с Ollama:
+Пример конфигурации LiteLLM для Ollama:
 
 ```yaml
-# litellm_config.yaml
 model_list:
   # Ollama модели
   - model_name: llama2
@@ -271,23 +337,14 @@ model_list:
     litellm_params:
       model: ollama/mistral
       api_base: http://ollama:11434
-  
-  # OpenAI модели
-  - model_name: gpt-3.5-turbo
-    litellm_params:
-      model: gpt-3.5-turbo
-      api_key: "sk-..."
-
-general_settings:
-  master_key: "sk-1234"
 ```
 
-После настройки можно использовать локальные модели через LLM-Proxy:
+Использование:
 
 ```bash
 curl -X POST 'http://localhost:8002/v1/chat/completions' \
   -H 'Content-Type: application/json' \
-  -H 'x-internal-auth: ${LLM_PROXY__INTERNAL_API_KEY}' \
+  -H 'X-Internal-Auth: ${LLM_PROXY__INTERNAL_API_KEY}' \
   -d '{
     "model": "llama2",
     "messages": [{"role": "user", "content": "Hello!"}]
@@ -296,26 +353,122 @@ curl -X POST 'http://localhost:8002/v1/chat/completions' \
 
 ---
 
+## Поддерживаемые провайдеры
+
+Через LiteLLM поддерживается 100+ провайдеров:
+
+- **OpenAI** - GPT-3.5, GPT-4, GPT-4 Turbo
+- **Anthropic** - Claude 3 (Haiku, Sonnet, Opus)
+- **Azure OpenAI** - Все модели OpenAI через Azure
+- **Google** - Gemini, PaLM
+- **Cohere** - Command, Command-R
+- **Ollama** - Локальные модели (Llama, Mistral, и др.)
+- **OpenRouter** - Доступ к множеству моделей
+- **DeepSeek** - DeepSeek Coder
+- **Qwen** - Qwen модели
+- И многие другие...
+
+Полный список: https://docs.litellm.ai/docs/providers
+
+---
+
 ## Расширение
 
-- Для добавления новых адаптеров LLM создайте класс в `services/llm_adapters/`
-- Для поддержки новых версий API — создайте router в `api/v2/endpoints.py`
-- Для внедрения нового способа авторизации/аудита — добавьте новый middleware в `middleware/`
-- Все настройки и логи централизованы через `core/config.py` и AppConfig
+### Добавление нового адаптера LLM
+
+1. Создайте класс в `services/llm_adapters/`
+2. Наследуйтесь от `BaseLLMAdapter`
+3. Реализуйте методы `chat_completion()` и `list_models()`
+4. Зарегистрируйте в `llm_service.py`
+
+### Добавление новой версии API
+
+1. Создайте router в `api/v2/endpoints.py`
+2. Определите новые схемы в `models/`
+3. Подключите router в `main.py`
+
+### Добавление middleware
+
+1. Создайте middleware в `middleware/`
+2. Добавьте в `main.py` через `app.add_middleware()`
 
 ---
 
 ## Тестирование
 
-Тесты структурированы по слоям, запуск:
 ```bash
+# Все тесты
 uv run pytest tests
+
+# С покрытием
+uv run pytest tests --cov=app --cov-report=html
+
+# Mock режим для тестов
+LLM_PROXY__LLM_MODE=mock uv run pytest tests
 ```
-или внутри контейнера.
 
 ---
 
-## Authors & License
+## Мониторинг
 
-© 2025 Codelab Contributors  
+### Логирование
+
+Все запросы логируются с:
+- Timestamp
+- Request ID
+- Model
+- Tokens used
+- Duration
+- Status
+
+### Метрики
+
+- Количество запросов по моделям
+- Использование токенов
+- Время ответа
+- Ошибки и таймауты
+
+---
+
+## Troubleshooting
+
+### LiteLLM proxy недоступен
+
+1. Проверьте, что LiteLLM proxy запущен
+2. Убедитесь в правильности `LITELLM_PROXY_URL`
+3. Проверьте логи LiteLLM
+
+### Ошибки аутентификации
+
+1. Проверьте `LITELLM_API_KEY`
+2. Убедитесь, что ключи провайдеров корректны
+3. Проверьте конфигурацию LiteLLM
+
+### Медленные ответы
+
+1. Проверьте производительность LiteLLM proxy
+2. Убедитесь, что провайдер отвечает быстро
+3. Проверьте сетевую задержку
+
+---
+
+## Документация
+
+- [Главный README](../README.md)
+- [LiteLLM Documentation](https://docs.litellm.ai/)
+- [Технические требования](../doc/tech-req-llm-proxy-service.md)
+
+---
+
+## Контрибьюторам
+
+- Все настройки через `core/config.py` и AppConfig
+- Бизнес-логика только в сервисах
+- Используйте адаптеры для разных провайдеров
+- Пишите тесты для новой функциональности
+- Документируйте изменения
+
+---
+
+© 2026 Codelab Contributors  
 MIT License
