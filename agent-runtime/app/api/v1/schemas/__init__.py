@@ -21,6 +21,15 @@ from .agent_schemas import (
     ListAgentsResponse
 )
 from .health_schemas import HealthResponse
+from .common import (
+    ToolCall,
+    StreamChunk,
+    SessionState,
+    AgentInfo
+)
+
+# Message is imported from domain layer
+from ....domain.entities.message import Message
 
 __all__ = [
     # Session schemas
@@ -37,4 +46,10 @@ __all__ = [
     "ListAgentsResponse",
     # Health
     "HealthResponse",
+    # Common
+    "Message",  # From domain.entities
+    "ToolCall",
+    "StreamChunk",
+    "SessionState",
+    "AgentInfo",
 ]
