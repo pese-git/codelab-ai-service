@@ -575,18 +575,30 @@ class MessageOrchestrationService:
         self,
         session_id: str,
         call_id: str,
-        decision: str
+        decision: str,
+        modified_arguments: Optional[dict] = None,
+        feedback: Optional[str] = None
     ) -> AsyncGenerator[StreamChunk, None]:
         """
         Обработать HITL (Human-in-the-Loop) решение пользователя.
         
+        Обрабатывает решение пользователя по запросу на одобрение инструмента:
+        - approve: Выполнить инструмент с оригинальными аргументами
+        - edit: Выполнить инструмент с модифицированными аргументами
+        - reject: Не выполнять инструмент, отправить feedback LLM
+        
         Args:
             session_id: ID сессии
             call_id: ID вызова инструмента
-            decision: Решение пользователя (approve/reject/modify)
+            decision: Решение пользователя (approve/edit/reject)
+            modified_arguments: Модифицированные аргументы (для edit)
+            feedback: Обратная связь пользователя (для reject)
             
         Yields:
             StreamChunk: Чанки для SSE streaming
+            
+        Raises:
+            ValueError: Если решение невалидно или pending state не найден
             
         Пример:
             >>> async for chunk in service.process_hitl_decision(
@@ -596,18 +608,105 @@ class MessageOrchestrationService:
             ... ):
             ...     print(chunk)
         """
+        import json
+        from ...models.hitl_models import HITLDecision
+        from ...services.hitl_manager import hitl_manager
+        
         logger.info(
             f"Обработка HITL решения для сессии {session_id}: "
             f"call_id={call_id}, decision={decision}"
         )
         
-        # TODO: Реализовать обработку HITL решений
-        # Пока возвращаем заглушку
-        yield StreamChunk(
-            type="error",
-            error="HITL decision processing not yet implemented",
-            is_final=True
-        )
+        async with self._lock_manager.lock(session_id):
+            # Валидация решения
+            try:
+                decision_enum = HITLDecision(decision)
+            except ValueError:
+                error_msg = f"Invalid HITL decision: {decision}"
+                logger.error(error_msg)
+                yield StreamChunk(
+                    type="error",
+                    error=error_msg,
+                    is_final=True
+                )
+                return
+            
+            # Получить pending state
+            pending_state = hitl_manager.get_pending(session_id, call_id)
+            if not pending_state:
+                error_msg = f"No pending HITL state found for call_id={call_id}"
+                logger.error(error_msg)
+                yield StreamChunk(
+                    type="error",
+                    error=error_msg,
+                    is_final=True
+                )
+                return
+            
+            # Логировать решение в audit
+            await hitl_manager.log_decision(
+                session_id=session_id,
+                call_id=call_id,
+                tool_name=pending_state.tool_name,
+                original_arguments=pending_state.arguments,
+                decision=decision_enum,
+                modified_arguments=modified_arguments,
+                feedback=feedback
+            )
+            
+            # Обработать решение
+            if decision_enum == HITLDecision.APPROVE:
+                # Выполнить инструмент с оригинальными аргументами
+                logger.info(f"HITL APPROVED: executing {pending_state.tool_name}")
+                result = {
+                    "status": "approved",
+                    "tool_name": pending_state.tool_name,
+                    "arguments": pending_state.arguments
+                }
+                
+            elif decision_enum == HITLDecision.EDIT:
+                # Выполнить инструмент с модифицированными аргументами
+                logger.info(f"HITL EDITED: executing {pending_state.tool_name} with modified args")
+                result = {
+                    "status": "approved_with_edits",
+                    "tool_name": pending_state.tool_name,
+                    "arguments": modified_arguments or pending_state.arguments
+                }
+                
+            elif decision_enum == HITLDecision.REJECT:
+                # Не выполнять, отправить feedback LLM
+                logger.info(f"HITL REJECTED: {pending_state.tool_name}, feedback={feedback}")
+                result = {
+                    "status": "rejected",
+                    "tool_name": pending_state.tool_name,
+                    "feedback": feedback or "User rejected this operation"
+                }
+            
+            # Удалить pending state
+            await hitl_manager.remove_pending(session_id, call_id)
+            
+            # Добавить результат в историю сессии
+            result_str = json.dumps(result)
+            await self._session_service.add_message(
+                session_id=session_id,
+                role="tool",
+                content=result_str,
+                name=pending_state.tool_name,
+                tool_call_id=call_id
+            )
+            
+            logger.info(
+                f"HITL результат добавлен в сессию {session_id}, "
+                f"продолжаем обработку с текущим агентом"
+            )
+            
+            # Продолжить обработку с текущим агентом (пустое сообщение)
+            # Используем process_message с message="" для продолжения после tool_result
+            async for chunk in self.process_message(
+                session_id=session_id,
+                message=""  # Пустое сообщение = продолжить после tool_result
+            ):
+                yield chunk
     
     async def reset_session(self, session_id: str) -> None:
         """

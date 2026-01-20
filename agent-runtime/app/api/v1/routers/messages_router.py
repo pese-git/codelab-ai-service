@@ -260,6 +260,8 @@ async def message_stream_sse(request: MessageStreamRequest):
         # Обработка HITL решения пользователя
         call_id = message_data.get("call_id")
         decision = message_data.get("decision")
+        modified_arguments = message_data.get("modified_arguments")
+        feedback = message_data.get("feedback")
         
         if not call_id or not decision:
             raise HTTPException(
@@ -278,7 +280,9 @@ async def message_stream_sse(request: MessageStreamRequest):
                 async for chunk in message_orchestration_service.process_hitl_decision(
                     session_id=session_id,
                     call_id=call_id,
-                    decision=decision
+                    decision=decision,
+                    modified_arguments=modified_arguments,
+                    feedback=feedback
                 ):
                     yield f"data: {chunk.model_dump_json()}\n\n"
             except Exception as e:
