@@ -9,6 +9,14 @@ from .base import Entity
 from .message import Message
 from .session import Session
 from .agent_context import AgentContext, AgentType, AgentSwitch
+from .hitl import (
+    HITLDecision,
+    HITLPolicyRule,
+    HITLPolicy,
+    HITLUserDecision,
+    HITLAuditLog,
+    HITLPendingState
+)
 
 __all__ = [
     "Entity",
@@ -17,4 +25,10 @@ __all__ = [
     "AgentContext",
     "AgentType",
     "AgentSwitch",
+    "HITLDecision",
+    "HITLPolicyRule",
+    "HITLPolicy",
+    "HITLUserDecision",
+    "HITLAuditLog",
+    "HITLPendingState",
 ]

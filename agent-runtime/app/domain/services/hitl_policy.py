@@ -5,14 +5,16 @@ Provides:
 - Policy evaluation for tool calls
 - Default policy configuration
 - Wildcard pattern matching for tool names
+
+UPDATED: Migrated to domain/services layer
 """
 import fnmatch
 import logging
 from typing import Optional, Tuple
 
-from app.models.hitl_models import HITLPolicy, HITLPolicyRule
+from app.domain.entities.hitl import HITLPolicy, HITLPolicyRule
 
-logger = logging.getLogger("agent-runtime.hitl_policy")
+logger = logging.getLogger("agent-runtime.domain.hitl_policy")
 
 
 class HITLPolicyService:

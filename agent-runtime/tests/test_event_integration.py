@@ -13,7 +13,7 @@ from app.events.event_types import EventType, EventCategory
 from app.events.agent_events import AgentSwitchedEvent
 from app.events.session_events import SessionCreatedEvent, MessageAddedEvent
 from app.events.tool_events import HITLApprovalRequestedEvent, HITLDecisionMadeEvent
-from app.models.hitl_models import HITLDecision
+from app.domain.entities.hitl import HITLDecision
 
 
 class TestMultiAgentOrchestratorEvents:
@@ -70,7 +70,7 @@ class TestHITLManagerEvents:
     @pytest.mark.asyncio
     async def test_add_pending_publishes_event(self):
         """Test that adding pending approval publishes HITLApprovalRequestedEvent."""
-        from app.services.hitl_manager import HITLManager
+        from app.domain.services.hitl_management import HITLManager
         
         # Create event bus and collector
         bus = EventBus()
@@ -108,7 +108,7 @@ class TestHITLManagerEvents:
     @pytest.mark.asyncio
     async def test_log_decision_publishes_event(self):
         """Test that logging decision publishes HITLDecisionMadeEvent."""
-        from app.services.hitl_manager import HITLManager
+        from app.domain.services.hitl_management import HITLManager
         
         # Create event bus and collector
         bus = EventBus()

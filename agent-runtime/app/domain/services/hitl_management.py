@@ -4,13 +4,13 @@ HITL Manager for managing pending tool calls and user decisions.
 Uses database as the source of truth for pending approvals.
 No longer depends on AgentContext for caching.
 
-UPDATED: Migrated to use only database persistence (no in-memory caching)
+UPDATED: Migrated to domain/services layer
 """
 import logging
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from app.models.hitl_models import (
+from app.domain.entities.hitl import (
     HITLPendingState,
     HITLUserDecision,
     HITLDecision,

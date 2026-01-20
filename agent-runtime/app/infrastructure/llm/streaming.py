@@ -19,8 +19,8 @@ from app.infrastructure.llm.tool_parser import parse_tool_calls
 if TYPE_CHECKING:
     from app.infrastructure.adapters import SessionManagerAdapter
 from app.services.tool_registry import TOOLS_SPEC
-from app.services.hitl_policy_service import hitl_policy_service
-from app.services.hitl_manager import hitl_manager
+from app.domain.services.hitl_policy import hitl_policy_service
+from app.domain.services.hitl_management import hitl_manager
 
 # Event-Driven Architecture imports
 from app.events.event_bus import event_bus
