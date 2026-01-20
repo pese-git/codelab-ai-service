@@ -56,6 +56,11 @@ async def lifespan(app: FastAPI):
         await init_db()
         logger.info("✓ Database initialized")
         
+        # Initialize multi-agent system
+        from app.agents import initialize_agents
+        initialize_agents()
+        logger.info("✓ Multi-agent system initialized")
+        
         # Управление сессиями и контекстом через адаптеры
         # Адаптеры обеспечивают обратную совместимость с новыми доменными сервисами
         # Персистентность обрабатывается доменными сервисами (SessionManagementService, AgentOrchestrationService)
@@ -106,7 +111,7 @@ async def lifespan(app: FastAPI):
                 
                 # Создать MessageOrchestrationService
                 from app.domain.services import MessageOrchestrationService
-                from app.services.agent_router import agent_router
+                from app.domain.services.agent_registry import agent_router
                 from app.infrastructure.concurrency import session_lock_manager
                 
                 message_orchestration_service = MessageOrchestrationService(
@@ -196,10 +201,7 @@ async def lifespan(app: FastAPI):
     logger.info("✓ Database closed")
 
 
-# Initialize multi-agent system
-import app.agents  # This will register all agents
-
-# Create FastAPI application
+# Create FastAPI application (agents will be initialized in lifespan)
 app = FastAPI(
     title="Agent Runtime Service",
     version=AppConfig.VERSION,

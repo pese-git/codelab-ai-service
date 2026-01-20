@@ -1,19 +1,21 @@
 """
-Agent router for multi-agent system.
+Agent registry for multi-agent system.
 
 Manages registration and routing between different agents.
+
+UPDATED: Migrated to domain/services layer, renamed to AgentRegistry
 """
 from typing import Dict, List
 import logging
 
 from app.agents.base_agent import BaseAgent, AgentType
 
-logger = logging.getLogger("agent-runtime.agent_router")
+logger = logging.getLogger("agent-runtime.domain.agent_registry")
 
 
-class AgentRouter:
+class AgentRegistry:
     """
-    Routes requests to appropriate agents.
+    Registry for managing available agents.
     
     Responsibilities:
     - Register agents
@@ -22,9 +24,9 @@ class AgentRouter:
     """
     
     def __init__(self):
-        """Initialize the agent router"""
+        """Initialize the agent registry"""
         self._agents: Dict[AgentType, BaseAgent] = {}
-        logger.info("AgentRouter initialized")
+        logger.info("AgentRegistry initialized")
     
     def register_agent(self, agent: BaseAgent) -> None:
         """
@@ -165,4 +167,7 @@ class AgentRouter:
 
 
 # Singleton instance
-agent_router = AgentRouter()
+agent_registry = AgentRegistry()
+
+# Backward compatibility alias
+agent_router = agent_registry

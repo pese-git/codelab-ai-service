@@ -15,7 +15,7 @@ import uuid
 from typing import AsyncGenerator, Optional
 from app.agents.base_agent import AgentType
 from app.models.schemas import StreamChunk
-from app.services.agent_router import agent_router
+from app.domain.services.agent_registry import agent_router
 
 # Event-Driven Architecture imports
 from app.events.event_bus import event_bus

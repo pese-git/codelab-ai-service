@@ -11,7 +11,6 @@ from app.agents.architect_agent import ArchitectAgent
 from app.agents.debug_agent import DebugAgent
 from app.agents.ask_agent import AskAgent
 from app.agents.universal_agent import UniversalAgent
-from app.services.agent_router import agent_router
 from app.core.config import AppConfig
 
 logger = logging.getLogger("agent-runtime.agents")
@@ -26,6 +25,9 @@ def initialize_agents():
     
     This function should be called once during application startup.
     """
+    # Import here to avoid circular dependency
+    from app.domain.services.agent_registry import agent_router
+    
     try:
         if AppConfig.MULTI_AGENT_MODE:
             # Multi-agent mode: register all specialized agents
@@ -58,8 +60,8 @@ def initialize_agents():
         raise
 
 
-# Automatically initialize agents when module is imported
-initialize_agents()
+# NOTE: initialize_agents() should be called explicitly from main.py
+# to avoid circular import issues. Do not call it automatically on module import.
 
 
 __all__ = [

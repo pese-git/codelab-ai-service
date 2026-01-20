@@ -115,7 +115,7 @@ class OrchestratorAgent(BaseAgent):
             logger.debug(f"Message: None (continuing after tool_result)")
         
         # Check if only Universal agent is available (single-agent mode)
-        from app.services.agent_router import agent_router
+        from app.domain.services.agent_registry import agent_router
         available_agents = agent_router.list_agents()
         
         # If only Orchestrator and Universal are registered, route to Universal

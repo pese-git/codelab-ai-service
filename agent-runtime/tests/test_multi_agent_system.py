@@ -10,7 +10,7 @@ from app.agents.coder_agent import CoderAgent
 from app.agents.architect_agent import ArchitectAgent
 from app.agents.debug_agent import DebugAgent
 from app.agents.ask_agent import AskAgent
-from app.services.agent_router import AgentRouter
+from app.domain.services.agent_registry import AgentRegistry
 from app.infrastructure.adapters import AgentContextManagerAdapter
 from app.domain.services import AgentOrchestrationService
 from app.domain.entities.agent_context import AgentContext
@@ -80,7 +80,7 @@ class TestAgentRouter:
     
     def test_agent_registration(self):
         """Test agent registration"""
-        router = AgentRouter()
+        router = AgentRegistry()
         agent = CoderAgent()
         
         router.register_agent(agent)
@@ -90,7 +90,7 @@ class TestAgentRouter:
     
     def test_get_agent(self):
         """Test getting registered agent"""
-        router = AgentRouter()
+        router = AgentRegistry()
         agent = CoderAgent()
         router.register_agent(agent)
         
@@ -101,14 +101,14 @@ class TestAgentRouter:
     
     def test_get_nonexistent_agent(self):
         """Test getting non-existent agent raises error"""
-        router = AgentRouter()
+        router = AgentRegistry()
         
         with pytest.raises(ValueError, match="not found"):
             router.get_agent(AgentType.CODER)
     
     def test_agent_info(self):
         """Test getting agent information"""
-        router = AgentRouter()
+        router = AgentRegistry()
         agent = CoderAgent()
         router.register_agent(agent)
         
