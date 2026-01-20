@@ -66,57 +66,12 @@ async def message_stream_sse(request: MessageStreamRequest):
     from ....main import message_orchestration_service
     
     if not message_orchestration_service:
-        # Fallback на старый orchestrator для обратной совместимости
-        logger.warning(
-            "MessageOrchestrationService not initialized, "
-            "falling back to legacy MultiAgentOrchestrator"
-        )
-        from ....services.multi_agent_orchestrator import multi_agent_orchestrator
-        
-        async def legacy_generate():
-            session_id = request.session_id
-            message_data = request.message
-            message_type = message_data.get("type")
-            
-            if message_type == "user_message":
-                content = message_data.get("content", "")
-                agent_type_str = message_data.get("agent_type")
-                agent_type = AgentType(agent_type_str) if agent_type_str else None
-                
-                try:
-                    async for chunk in multi_agent_orchestrator.process_message(
-                        session_id=session_id,
-                        message=content,
-                        agent_type=agent_type
-                    ):
-                        yield f"data: {chunk.model_dump_json()}\n\n"
-                except Exception as e:
-                    logger.error(f"Error in legacy orchestrator: {e}", exc_info=True)
-                    error_chunk = StreamChunk(
-                        type="error",
-                        error=str(e),
-                        is_final=True
-                    )
-                    yield f"data: {error_chunk.model_dump_json()}\n\n"
-            else:
-                error_chunk = StreamChunk(
-                    type="error",
-                    error=f"Unsupported message type: {message_type}",
-                    is_final=True
-                )
-                yield f"data: {error_chunk.model_dump_json()}\n\n"
-        
-        return StreamingResponse(
-            legacy_generate(),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "X-Accel-Buffering": "no"
-            }
+        raise HTTPException(
+            status_code=500,
+            detail="MessageOrchestrationService not initialized"
         )
     
-    # Использовать новый MessageOrchestrationService
+    # Использовать MessageOrchestrationService для всех типов сообщений
     session_id = request.session_id
     message_data = request.message
     message_type = message_data.get("type")
