@@ -9,7 +9,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 
-from app.api.v1.endpoints import router as v1_router
 from app.api.v1.routers import (
     health_router,
     sessions_router,

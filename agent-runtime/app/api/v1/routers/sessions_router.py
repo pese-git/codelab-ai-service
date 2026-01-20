@@ -237,3 +237,167 @@ async def list_sessions(
     except Exception as e:
         logger.error(f"Error listing sessions: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/{session_id}/history")
+async def get_session_history(session_id: str):
+    """
+    Получить историю сообщений для сессии.
+    
+    Этот endpoint позволяет IDE восстановить историю чата после перезапуска.
+    
+    Args:
+        session_id: ID сессии
+        
+    Returns:
+        История сессии с сообщениями и метаданными
+        
+    Raises:
+        HTTPException 404: Если сессия не найдена
+        HTTPException 500: При внутренней ошибке
+        
+    Пример запроса:
+        GET /sessions/session-123/history
+        
+    Пример ответа:
+        {
+            "session_id": "session-123",
+            "messages": [
+                {"role": "user", "content": "Hello"},
+                {"role": "assistant", "content": "Hi!"}
+            ],
+            "message_count": 2,
+            "last_activity": "2026-01-20T04:00:00Z",
+            "current_agent": "coder",
+            "agent_history": [...]
+        }
+    """
+    logger.debug(f"Getting history for session {session_id}")
+    
+    try:
+        # Получить адаптеры из глобального контекста
+        from ....main import session_manager_adapter, agent_context_manager_adapter
+        
+        if not session_manager_adapter:
+            raise HTTPException(
+                status_code=503,
+                detail="Session manager not initialized"
+            )
+        
+        # Проверить существование сессии
+        if not session_manager_adapter.exists(session_id):
+            raise HTTPException(
+                status_code=404,
+                detail=f"Session {session_id} not found"
+            )
+        
+        # Получить состояние сессии
+        session_state = session_manager_adapter.get(session_id)
+        
+        # Получить историю сообщений
+        messages = session_manager_adapter.get_history(session_id)
+        
+        # Получить информацию о текущем агенте
+        current_agent = None
+        agent_history = []
+        if agent_context_manager_adapter:
+            agent_context = agent_context_manager_adapter.get(session_id)
+            if agent_context:
+                current_agent = agent_context.current_agent
+                agent_history = agent_context.get_agent_history()
+        
+        return {
+            "session_id": session_id,
+            "messages": messages,
+            "message_count": len(messages),
+            "last_activity": session_state.last_activity.isoformat() if session_state else None,
+            "current_agent": current_agent.value if current_agent else None,
+            "agent_history": agent_history
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting session history for {session_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/{session_id}/pending-approvals")
+async def get_pending_approvals(session_id: str):
+    """
+    Получить все pending approval запросы для сессии.
+    
+    Этот endpoint используется IDE для восстановления pending approvals
+    после перезапуска или переустановки.
+    
+    Args:
+        session_id: ID сессии
+        
+    Returns:
+        Список pending approval запросов с деталями
+        
+    Raises:
+        HTTPException 404: Если сессия не найдена
+        HTTPException 500: При внутренней ошибке
+        
+    Пример запроса:
+        GET /sessions/session-123/pending-approvals
+        
+    Пример ответа:
+        {
+            "session_id": "session-123",
+            "pending_approvals": [
+                {
+                    "call_id": "call-1",
+                    "tool_name": "write_file",
+                    "arguments": {"path": "test.py", "content": "..."},
+                    "reason": "File modification requires approval",
+                    "created_at": "2026-01-20T04:00:00Z"
+                }
+            ],
+            "count": 1
+        }
+    """
+    logger.debug(f"Getting pending approvals for session {session_id}")
+    
+    try:
+        # Получить адаптер из глобального контекста
+        from ....main import session_manager_adapter
+        from ....services.hitl_manager import hitl_manager
+        
+        if not session_manager_adapter:
+            raise HTTPException(
+                status_code=503,
+                detail="Session manager not initialized"
+            )
+        
+        # Проверить существование сессии
+        if not session_manager_adapter.exists(session_id):
+            raise HTTPException(
+                status_code=404,
+                detail=f"Session {session_id} not found"
+            )
+        
+        # Получить pending approvals из HITL manager (загружает из БД)
+        pending_approvals = hitl_manager.get_all_pending(session_id)
+        
+        return {
+            "session_id": session_id,
+            "pending_approvals": [
+                {
+                    "call_id": p.call_id,
+                    "tool_name": p.tool_name,
+                    "arguments": p.arguments,
+                    "reason": p.reason,
+                    "created_at": p.created_at.isoformat() if p.created_at else None
+                }
+                for p in pending_approvals
+            ],
+            "count": len(pending_approvals)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting pending approvals for {session_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
