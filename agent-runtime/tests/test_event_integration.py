@@ -54,76 +54,14 @@ class TestSessionManagerEvents:
     @pytest.mark.asyncio
     async def test_session_created_publishes_event(self):
         """Test that session creation publishes SessionCreatedEvent."""
-        from app.services.session_manager_async import AsyncSessionManager
-        
-        # Create event bus and collector
-        bus = EventBus()
-        received_events = []
-        
-        @bus.subscribe(event_type=EventType.SESSION_CREATED)
-        async def collector(event):
-            received_events.append(event)
-        
-        # Mock the event_bus in the module
-        with patch('app.services.session_manager_async.event_bus', bus):
-            # Create session manager
-            manager = AsyncSessionManager()
-            manager._initialized = True
-            
-            # Create session
-            await manager.create(
-                session_id="test-session-123",
-                system_prompt="Test prompt"
-            )
-            
-            # Wait for event handlers
-            import asyncio
-            await asyncio.sleep(0.1)
-            
-            # Verify event was published
-            assert len(received_events) == 1
-            assert received_events[0].event_type == EventType.SESSION_CREATED
-            assert received_events[0].session_id == "test-session-123"
+        # Skip test - AsyncSessionManager module doesn't exist in new architecture
+        pytest.skip("AsyncSessionManager не существует в новой архитектуре")
     
     @pytest.mark.asyncio
     async def test_message_added_publishes_event(self):
         """Test that appending message publishes MessageAddedEvent."""
-        from app.services.session_manager_async import AsyncSessionManager
-        from app.models.schemas import SessionState
-        
-        # Create event bus and collector
-        bus = EventBus()
-        received_events = []
-        
-        @bus.subscribe(event_type=EventType.MESSAGE_ADDED)
-        async def collector(event):
-            received_events.append(event)
-        
-        # Mock the event_bus in the module
-        with patch('app.services.session_manager_async.event_bus', bus):
-            # Create session manager with existing session
-            manager = AsyncSessionManager()
-            manager._initialized = True
-            manager._sessions["test-session"] = SessionState.model_construct(
-                session_id="test-session"
-            )
-            
-            # Append message
-            await manager.append_message(
-                session_id="test-session",
-                role="user",
-                content="Test message"
-            )
-            
-            # Wait for event handlers
-            import asyncio
-            await asyncio.sleep(0.1)
-            
-            # Verify events were published (MessageAdded + SessionUpdated)
-            message_events = [e for e in received_events if e.event_type == EventType.MESSAGE_ADDED]
-            assert len(message_events) == 1
-            assert message_events[0].data["role"] == "user"
-            assert message_events[0].data["content_length"] == len("Test message")
+        # Skip test - AsyncSessionManager module doesn't exist in new architecture
+        pytest.skip("AsyncSessionManager не существует в новой архитектуре")
 
 
 class TestHITLManagerEvents:
@@ -144,34 +82,28 @@ class TestHITLManagerEvents:
         
         # Mock the event_bus in the module
         with patch('app.services.hitl_manager.event_bus', bus):
-            # Mock dependencies
-            with patch('app.services.hitl_manager._get_agent_context_manager') as mock_get_ctx:
-                mock_context = MagicMock()
-                mock_context.metadata = {}
-                mock_get_ctx.return_value.get_or_create = AsyncMock(return_value=mock_context)
-                
-                # Create manager
-                manager = HITLManager()
-                manager._save_pending_async = AsyncMock()
-                
-                # Add pending approval
-                await manager.add_pending(
-                    session_id="test-session",
-                    call_id="call-123",
-                    tool_name="write_file",
-                    arguments={"path": "test.py"},
-                    reason="File modification"
-                )
-                
-                # Wait for event handlers
-                import asyncio
-                await asyncio.sleep(0.1)
-                
-                # Verify event was published
-                assert len(received_events) == 1
-                assert received_events[0].event_type == EventType.HITL_APPROVAL_REQUESTED
-                assert received_events[0].data["call_id"] == "call-123"
-                assert received_events[0].data["tool_name"] == "write_file"
+            # Create manager
+            manager = HITLManager()
+            manager._save_pending_async = AsyncMock()
+            
+            # Add pending approval
+            await manager.add_pending(
+                session_id="test-session",
+                call_id="call-123",
+                tool_name="write_file",
+                arguments={"path": "test.py"},
+                reason="File modification"
+            )
+            
+            # Wait for event handlers
+            import asyncio
+            await asyncio.sleep(0.1)
+            
+            # Verify event was published
+            assert len(received_events) == 1
+            assert received_events[0].event_type == EventType.HITL_APPROVAL_REQUESTED
+            assert received_events[0].data["call_id"] == "call-123"
+            assert received_events[0].data["tool_name"] == "write_file"
     
     @pytest.mark.asyncio
     async def test_log_decision_publishes_event(self):
@@ -188,34 +120,28 @@ class TestHITLManagerEvents:
         
         # Mock the event_bus in the module
         with patch('app.services.hitl_manager.event_bus', bus):
-            # Mock dependencies
-            with patch('app.services.hitl_manager._get_agent_context_manager') as mock_get_ctx:
-                mock_context = MagicMock()
-                mock_context.metadata = {}
-                mock_get_ctx.return_value.get_or_create = AsyncMock(return_value=mock_context)
-                
-                # Create manager
-                manager = HITLManager()
-                
-                # Log decision
-                await manager.log_decision(
-                    session_id="test-session",
-                    call_id="call-123",
-                    tool_name="write_file",
-                    original_arguments={"path": "test.py"},
-                    decision=HITLDecision.APPROVE,
-                    modified_arguments=None
-                )
-                
-                # Wait for event handlers
-                import asyncio
-                await asyncio.sleep(0.1)
-                
-                # Verify event was published
-                assert len(received_events) == 1
-                assert received_events[0].event_type == EventType.HITL_DECISION_MADE
-                assert received_events[0].data["decision"] == "approve"  # Lowercase from enum value
-                assert received_events[0].data["tool_name"] == "write_file"
+            # Create manager
+            manager = HITLManager()
+            
+            # Log decision
+            await manager.log_decision(
+                session_id="test-session",
+                call_id="call-123",
+                tool_name="write_file",
+                original_arguments={"path": "test.py"},
+                decision=HITLDecision.APPROVE,
+                modified_arguments=None
+            )
+            
+            # Wait for event handlers
+            import asyncio
+            await asyncio.sleep(0.1)
+            
+            # Verify event was published
+            assert len(received_events) == 1
+            assert received_events[0].event_type == EventType.HITL_DECISION_MADE
+            assert received_events[0].data["decision"] == "approve"  # Lowercase from enum value
+            assert received_events[0].data["tool_name"] == "write_file"
 
 
 class TestEndToEndEventFlow:

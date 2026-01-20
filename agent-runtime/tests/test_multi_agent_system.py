@@ -11,7 +11,9 @@ from app.agents.architect_agent import ArchitectAgent
 from app.agents.debug_agent import DebugAgent
 from app.agents.ask_agent import AskAgent
 from app.services.agent_router import AgentRouter
-from app.services.agent_context_async import AgentContext, AsyncAgentContextManager
+from app.infrastructure.adapters import AgentContextManagerAdapter
+from app.domain.services import AgentOrchestrationService
+from app.domain.entities.agent_context import AgentContext
 
 
 class TestAgentInitialization:
@@ -122,46 +124,49 @@ class TestAgentContext:
     
     def test_context_creation(self):
         """Test creating agent context"""
-        context = AgentContext(session_id="test_session")
+        context = AgentContext(id="ctx-1", session_id="test_session")
         
         assert context.session_id == "test_session"
         assert context.current_agent == AgentType.ORCHESTRATOR
-        assert len(context.agent_history) == 0
+        assert len(context.switch_history) == 0
         assert context.switch_count == 0
     
     def test_agent_switch(self):
         """Test switching agents"""
-        context = AgentContext(session_id="test_session")
+        context = AgentContext(id="ctx-1", session_id="test_session")
         
-        context.switch_agent(AgentType.CODER, "Test switch")
+        context.switch_to(AgentType.CODER, "Test switch")
         
         assert context.current_agent == AgentType.CODER
         assert context.switch_count == 1
-        assert len(context.agent_history) == 1
-        assert context.agent_history[0]["from"] == "orchestrator"
-        assert context.agent_history[0]["to"] == "coder"
-        assert context.agent_history[0]["reason"] == "Test switch"
+        assert len(context.switch_history) == 1
+        history = context.get_switch_history()
+        assert history[0]["from"] == "orchestrator"
+        assert history[0]["to"] == "coder"
+        assert history[0]["reason"] == "Test switch"
     
     def test_multiple_switches(self):
         """Test multiple agent switches"""
-        context = AgentContext(session_id="test_session")
+        context = AgentContext(id="ctx-1", session_id="test_session")
         
-        context.switch_agent(AgentType.CODER, "First switch")
-        context.switch_agent(AgentType.DEBUG, "Second switch")
-        context.switch_agent(AgentType.ASK, "Third switch")
+        context.switch_to(AgentType.CODER, "First switch")
+        context.switch_to(AgentType.DEBUG, "Second switch")
+        context.switch_to(AgentType.ASK, "Third switch")
         
         assert context.current_agent == AgentType.ASK
         assert context.switch_count == 3
-        assert len(context.agent_history) == 3
+        assert len(context.switch_history) == 3
     
     def test_same_agent_switch_skipped(self):
-        """Test switching to same agent is skipped"""
-        context = AgentContext(session_id="test_session")
+        """Test switching to same agent raises error"""
+        from app.core.errors import AgentSwitchError
+        context = AgentContext(id="ctx-1", session_id="test_session")
         
-        context.switch_agent(AgentType.ORCHESTRATOR, "Same agent")
+        with pytest.raises(AgentSwitchError):
+            context.switch_to(AgentType.ORCHESTRATOR, "Same agent")
         
         assert context.switch_count == 0
-        assert len(context.agent_history) == 0
+        assert len(context.switch_history) == 0
 
 
 class TestAgentContextManager:
@@ -170,8 +175,16 @@ class TestAgentContextManager:
     @pytest.mark.asyncio
     async def test_get_or_create(self):
         """Test getting or creating context"""
-        manager = AsyncAgentContextManager()
-        await manager.initialize()
+        from unittest.mock import AsyncMock
+        
+        # Create mock repository
+        mock_repo = AsyncMock()
+        mock_repo.find_by_session_id = AsyncMock(return_value=None)
+        mock_repo.save = AsyncMock()
+        
+        # Create service and adapter
+        service = AgentOrchestrationService(repository=mock_repo, event_publisher=AsyncMock())
+        manager = AgentContextManagerAdapter(service)
         
         context = await manager.get_or_create("session_1")
         
@@ -181,8 +194,26 @@ class TestAgentContextManager:
     @pytest.mark.asyncio
     async def test_get_existing_context(self):
         """Test getting existing context"""
-        manager = AsyncAgentContextManager()
-        await manager.initialize()
+        from unittest.mock import AsyncMock
+        from app.domain.entities.agent_context import AgentType
+        
+        # Create existing context
+        existing_context = AgentContext(
+            id="ctx-existing",
+            session_id="test-session",
+            current_agent=AgentType.ORCHESTRATOR,
+            switch_history=[],
+            switch_count=0
+        )
+        
+        # Create mock repository
+        mock_repo = AsyncMock()
+        mock_repo.find_by_session_id = AsyncMock(return_value=existing_context)
+        mock_repo.save = AsyncMock()
+        
+        # Create service and adapter
+        service = AgentOrchestrationService(repository=mock_repo, event_publisher=AsyncMock())
+        manager = AgentContextManagerAdapter(service)
         
         context1 = await manager.get_or_create("session_1")
         context2 = await manager.get_or_create("session_1")
@@ -192,8 +223,15 @@ class TestAgentContextManager:
     @pytest.mark.asyncio
     async def test_delete_context(self):
         """Test deleting context"""
-        manager = AsyncAgentContextManager()
-        await manager.initialize()
+        from unittest.mock import AsyncMock
+        
+        # Create mock repository
+        mock_repo = AsyncMock()
+        mock_repo.delete_by_session_id = AsyncMock(return_value=True)
+        
+        # Create service and adapter
+        service = AgentOrchestrationService(repository=mock_repo, event_publisher=AsyncMock())
+        manager = AgentContextManagerAdapter(service)
         
         await manager.get_or_create("session_1")
         assert manager.exists("session_1")
@@ -206,8 +244,15 @@ class TestAgentContextManager:
     @pytest.mark.asyncio
     async def test_session_count(self):
         """Test session count"""
-        manager = AsyncAgentContextManager()
-        await manager.initialize()
+        from unittest.mock import AsyncMock
+        
+        # Create mock repository
+        mock_repo = AsyncMock()
+        mock_repo.count = AsyncMock(return_value=0)
+        
+        # Create service and adapter
+        service = AgentOrchestrationService(repository=mock_repo, event_publisher=AsyncMock())
+        manager = AgentContextManagerAdapter(service)
         
         await manager.get_or_create("session_1")
         await manager.get_or_create("session_2")

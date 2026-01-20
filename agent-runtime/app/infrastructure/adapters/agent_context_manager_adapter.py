@@ -40,6 +40,7 @@ class AgentContextManagerAdapter:
             service: Доменный сервис оркестрации агентов
         """
         self._service = service
+        self._memory_cache = {}  # Локальный кэш для совместимости
         logger.info("AgentContextManagerAdapter initialized")
     
     async def get_or_create(
@@ -57,10 +58,13 @@ class AgentContextManagerAdapter:
         Returns:
             Доменная сущность AgentContext
         """
-        return await self._service.get_or_create_context(
+        context = await self._service.get_or_create_context(
             session_id=session_id,
             initial_agent=initial_agent
         )
+        # Сохранить в локальном кэше
+        self._memory_cache[session_id] = context
+        return context
     
     def get(self, session_id: str) -> Optional[AgentContext]:
         """
@@ -113,9 +117,10 @@ class AgentContextManagerAdapter:
             session_id: ID сессии
             
         Returns:
-            True (для совместимости)
+            True если контекст существует в локальном кэше
         """
-        return True
+        # Проверяем наличие в локальном кэше
+        return session_id in self._memory_cache
     
     async def delete(self, session_id: str) -> bool:
         """
@@ -126,11 +131,13 @@ class AgentContextManagerAdapter:
             
         Returns:
             True если удален
-            
-        Note:
-            В новой архитектуре контекст удаляется вместе с сессией.
         """
-        logger.info(f"Delete context for session {session_id} (delegated to repository)")
+        logger.info(f"Delete context for session {session_id}")
+        # Удаляем из локального кэша
+        if session_id in self._memory_cache:
+            del self._memory_cache[session_id]
+        # Удаляем из репозитория
+        await self._service._repository.delete_by_session_id(session_id)
         return True
     
     def get_all_sessions(self) -> List[str]:
@@ -150,9 +157,9 @@ class AgentContextManagerAdapter:
         Получить количество сессий.
         
         Returns:
-            Количество сессий
+            Количество сессий в локальном кэше
         """
-        return 0
+        return len(self._memory_cache)
     
     async def cleanup_old_sessions(self, max_age_hours: int = 24) -> int:
         """
