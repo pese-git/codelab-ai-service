@@ -261,6 +261,39 @@ class MessageOrchestrationService:
                             f"{from_agent.value} -> {target_agent.value}"
                         )
                         
+                        # ВАЖНО: Добавить tool_result для switch_mode в историю
+                        # Это предотвращает ошибку "No tool output found" от LLM провайдера
+                        # Получаем call_id из последнего assistant message с tool_calls
+                        session = await self._session_service.get_session(session_id)
+                        history = session.get_history_for_llm()
+                        
+                        # Найти последний tool_call для switch_mode
+                        switch_call_id = None
+                        for msg in reversed(history):
+                            if msg.get("role") == "assistant" and msg.get("tool_calls"):
+                                for tc in msg["tool_calls"]:
+                                    if tc.get("function", {}).get("name") == "switch_mode":
+                                        switch_call_id = tc.get("id")
+                                        break
+                                if switch_call_id:
+                                    break
+                        
+                        if switch_call_id:
+                            logger.debug(
+                                f"Добавляем tool_result для switch_mode (call_id={switch_call_id})"
+                            )
+                            await self._session_service.add_tool_result(
+                                session_id=session_id,
+                                call_id=switch_call_id,
+                                result=f"Switched to {target_agent.value} agent",
+                                error=None
+                            )
+                        else:
+                            logger.warning(
+                                "Не найден call_id для switch_mode tool_call, "
+                                "tool_result не добавлен"
+                            )
+                        
                         # Переключить агента
                         context = await self._agent_service.switch_agent(
                             session_id=session_id,
@@ -287,7 +320,7 @@ class MessageOrchestrationService:
                         )
                         
                         # Продолжить обработку с новым агентом
-                        # Обновить сессию после переключения
+                        # Обновить сессию после переключения и добавления tool_result
                         session = await self._session_service.get_session(session_id)
                         new_agent = self._agent_router.get_agent(target_agent)
                         async for new_chunk in new_agent.process(
@@ -534,6 +567,39 @@ class MessageOrchestrationService:
                         f"{from_agent.value} -> {target_agent.value}"
                     )
                     
+                    # ВАЖНО: Добавить tool_result для switch_mode в историю
+                    # Это предотвращает ошибку "No tool output found" от LLM провайдера
+                    # Получаем обновленную сессию
+                    session = await self._session_service.get_session(session_id)
+                    history = session.get_history_for_llm()
+                    
+                    # Найти последний tool_call для switch_mode
+                    switch_call_id = None
+                    for msg in reversed(history):
+                        if msg.get("role") == "assistant" and msg.get("tool_calls"):
+                            for tc in msg["tool_calls"]:
+                                if tc.get("function", {}).get("name") == "switch_mode":
+                                    switch_call_id = tc.get("id")
+                                    break
+                            if switch_call_id:
+                                break
+                    
+                    if switch_call_id:
+                        logger.debug(
+                            f"Добавляем tool_result для switch_mode (call_id={switch_call_id})"
+                        )
+                        await self._session_service.add_tool_result(
+                            session_id=session_id,
+                            call_id=switch_call_id,
+                            result=f"Switched to {target_agent.value} agent",
+                            error=None
+                        )
+                    else:
+                        logger.warning(
+                            "Не найден call_id для switch_mode tool_call, "
+                            "tool_result не добавлен"
+                        )
+                    
                     # Переключить агента
                     context = await self._agent_service.switch_agent(
                         session_id=session_id,
@@ -554,6 +620,7 @@ class MessageOrchestrationService:
                     )
                     
                     # Продолжить обработку с новым агентом и ОРИГИНАЛЬНЫМ сообщением
+                    # Обновить сессию после добавления tool_result
                     session = await self._session_service.get_session(session_id)
                     new_agent = self._agent_router.get_agent(target_agent)
                     async for new_chunk in new_agent.process(
