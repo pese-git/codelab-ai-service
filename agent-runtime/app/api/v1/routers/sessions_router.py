@@ -379,7 +379,7 @@ async def get_pending_approvals(session_id: str):
     try:
         # Получить адаптер из глобального контекста
         from ....main import session_manager_adapter
-        from ....services.hitl_manager import hitl_manager
+        from ....domain.services.hitl_management import hitl_manager
         
         if not session_manager_adapter:
             raise HTTPException(

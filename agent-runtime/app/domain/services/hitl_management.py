@@ -161,6 +161,7 @@ class HITLManager:
                     tool_name=approval['tool_name'],
                     arguments=approval['arguments'],
                     reason=approval.get('reason'),
+                    created_at=approval['created_at'],
                     timeout_seconds=300  # Default
                 )
                 for approval in pending_approvals

@@ -677,7 +677,7 @@ class MessageOrchestrationService:
         """
         import json
         from ...models.hitl_models import HITLDecision
-        from ...services.hitl_manager import hitl_manager
+        from .hitl_management import hitl_manager
         
         logger.info(
             f"Обработка HITL решения для сессии {session_id}: "
