@@ -3,17 +3,21 @@ LLM streaming service for agent runtime.
 
 Handles streaming responses from LLM, including tool calls and assistant messages.
 Integrates with HITL (Human-in-the-Loop) for tool approval workflow.
+
+UPDATED: Migrated to use SessionManagerAdapter instead of AsyncSessionManager
 """
 import json
 import logging
 import time
-from typing import AsyncGenerator, Dict, List, Optional, Tuple
+from typing import AsyncGenerator, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 from app.core.config import AppConfig
 from app.models.schemas import StreamChunk
 from app.services.llm_proxy_client import llm_proxy_client
-from app.services.session_manager_async import AsyncSessionManager
 from app.services.tool_parser import parse_tool_calls
+
+if TYPE_CHECKING:
+    from app.infrastructure.adapters import SessionManagerAdapter
 from app.services.tool_registry import TOOLS_SPEC
 from app.services.hitl_policy_service import hitl_policy_service
 from app.services.hitl_manager import hitl_manager
@@ -37,7 +41,7 @@ async def stream_response(
     session_id: str,
     history: List[dict],
     allowed_tools: Optional[List[str]] = None,
-    session_mgr: Optional[AsyncSessionManager] = None,
+    session_mgr: Optional["SessionManagerAdapter"] = None,
     correlation_id: Optional[str] = None
 ) -> AsyncGenerator[StreamChunk, None]:
     """
@@ -50,18 +54,18 @@ async def stream_response(
         session_id: Session identifier
         history: Message history for LLM
         allowed_tools: List of tool names allowed for this agent (None = all tools)
-        session_mgr: Async session manager (optional, uses global if None)
+        session_mgr: Session manager adapter (optional, uses global if None)
         correlation_id: Correlation ID for event tracing (optional)
         
     Yields:
         StreamChunk: Chunks for SSE streaming (assistant_message, tool_call, or error)
     """
-    # Get session manager from global if not provided
+    # Get session manager adapter from global if not provided
     if session_mgr is None:
-        from app.services.session_manager_async import session_manager as global_mgr
+        from app.main import session_manager_adapter as global_mgr
         session_mgr = global_mgr
         if session_mgr is None:
-            raise RuntimeError("SessionManager not initialized")
+            raise RuntimeError("SessionManager adapter not initialized")
     
     try:
         logger.info(
@@ -238,26 +242,12 @@ async def stream_response(
             # Tool result may arrive before background writer runs (5s delay)
             # Without immediate persistence, LLM won't find the tool_call in history
             
-            # Check if session_mgr has the new method for tool_calls
-            if hasattr(session_mgr, 'append_assistant_with_tool_calls'):
-                # New architecture (adapter) - use dedicated method
-                await session_mgr.append_assistant_with_tool_calls(
-                    session_id=session_id,
-                    tool_calls=assistant_msg["tool_calls"]
-                )
-                logger.debug(f"Assistant message with tool_call persisted via adapter")
-            else:
-                # Old AsyncSessionManager - use direct access to state
-                session_state = session_mgr.get(session_id)
-                if session_state:
-                    session_state.messages.append(assistant_msg)
-                    if hasattr(session_mgr, '_persist_immediately'):
-                        await session_mgr._persist_immediately(session_id)
-                        logger.debug(f"Assistant message with tool_call persisted immediately to DB")
-                else:
-                    logger.warning(
-                        f"Session {session_id} not found - tool_call may not persist correctly"
-                    )
+            # Use adapter's dedicated method for tool_calls (persists immediately)
+            await session_mgr.append_assistant_with_tool_calls(
+                session_id=session_id,
+                tool_calls=assistant_msg["tool_calls"]
+            )
+            logger.debug(f"Assistant message with tool_call persisted immediately via adapter")
             
             # Send tool_call chunk
             chunk = StreamChunk(

@@ -5,7 +5,9 @@ Manages agent switching, context preservation, and message routing.
 
 Uses Event-Driven Architecture for agent switching and context management.
 
-UPDATED: Added SessionLockManager to prevent race conditions.
+UPDATED:
+- Added SessionLockManager to prevent race conditions
+- Migrated to use adapters instead of direct manager imports
 """
 import logging
 import time
@@ -14,8 +16,6 @@ from typing import AsyncGenerator, Optional
 from app.agents.base_agent import AgentType
 from app.models.schemas import StreamChunk
 from app.services.agent_router import agent_router
-from app.services.agent_context_async import agent_context_manager
-from app.services.session_manager_async import session_manager
 
 # Event-Driven Architecture imports
 from app.events.event_bus import event_bus
