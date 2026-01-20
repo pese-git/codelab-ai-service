@@ -101,8 +101,8 @@ services:
       context: ./gateway
       dockerfile: Dockerfile
     # Убираем внешний порт - доступ только через nginx
-    expose:
-      - "${GATEWAY_PORT}"
+    ports:
+      - "${GATEWAY_PORT}:${GATEWAY_PORT}"
     environment:
       - ENVIRONMENT=${ENVIRONMENT}
       - PORT=${GATEWAY_PORT}
@@ -183,9 +183,9 @@ services:
       - LLM_PROXY__INTERNAL_API_KEY=${LLM_PROXY__INTERNAL_API_KEY}
       - LLM_PROXY__MAX_CONCURRENT_REQUESTS=${LLM_PROXY__MAX_CONCURRENT_REQUESTS}
       - LLM_PROXY__REQUEST_TIMEOUT=${LLM_PROXY__REQUEST_TIMEOUT}
-    depends_on:
-      litellm-proxy:
-        condition: service_healthy
+    #depends_on:
+    #  litellm-proxy:
+    #    condition: service_healthy
     networks:
       - codelab-network
     healthcheck:
@@ -195,52 +195,52 @@ services:
       retries: ${HEALTHCHECK_RETRIES}
       start_period: ${HEALTHCHECK_START_PERIOD}
 
-  litellm-proxy:
-    image: ghcr.io/berriai/litellm:main-latest
-    # Внутренний сервис - доступ только внутри Docker сети
-    expose:
-      - "4000"
-    volumes:
-      - ./litellm_config.yaml:/app/config.yaml
-    environment:
-      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - AZURE_API_KEY=${AZURE_API_KEY}
-      - AZURE_API_BASE=${AZURE_API_BASE}
-      - AZURE_API_VERSION=${AZURE_API_VERSION}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - OLLAMA_API_BASE=http://ollama:11434
-    command: ["--config", "/app/config.yaml", "--port", "4000", "--detailed_debug"]
-    depends_on:
-      ollama:
-        condition: service_healthy
-    networks:
-      - codelab-network
-    healthcheck:
-      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/').read()"]
-      interval: ${HEALTHCHECK_INTERVAL}
-      timeout: ${HEALTHCHECK_TIMEOUT}
-      retries: ${HEALTHCHECK_RETRIES}
-      start_period: ${HEALTHCHECK_START_PERIOD}
-
-  ollama:
-    image: ollama/ollama:latest
-    # Внутренний сервис - доступ только внутри Docker сети
-    expose:
-      - "11434"
-    volumes:
-      - ollama-data:/root/.ollama
-    environment:
-      - OLLAMA_HOST=0.0.0.0:11434
-    networks:
-      - codelab-network
-    healthcheck:
-      test: ["CMD", "ollama", "list"]
-      interval: ${HEALTHCHECK_INTERVAL}
-      timeout: ${HEALTHCHECK_TIMEOUT}
-      retries: ${HEALTHCHECK_RETRIES}
-      start_period: 30s
+#  litellm-proxy:
+#    image: ghcr.io/berriai/litellm:main-latest
+#    # Внутренний сервис - доступ только внутри Docker сети
+#    expose:
+#      - "4000"
+#    volumes:
+#      - ./litellm_config.yaml:/app/config.yaml
+#    environment:
+#      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+#      - OPENAI_API_KEY=${OPENAI_API_KEY}
+#      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+#      - AZURE_API_KEY=${AZURE_API_KEY}
+#      - AZURE_API_BASE=${AZURE_API_BASE}
+#      - AZURE_API_VERSION=${AZURE_API_VERSION}
+#      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+#      - OLLAMA_API_BASE=http://ollama:11434
+#    command: ["--config", "/app/config.yaml", "--port", "4000", "--detailed_debug"]
+#    depends_on:
+#      ollama:
+#        condition: service_healthy
+#    networks:
+#      - codelab-network
+#    healthcheck:
+#      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/').read()"]
+#      interval: ${HEALTHCHECK_INTERVAL}
+#      timeout: ${HEALTHCHECK_TIMEOUT}
+#      retries: ${HEALTHCHECK_RETRIES}
+#      start_period: ${HEALTHCHECK_START_PERIOD}
+#
+#  ollama:
+#    image: ollama/ollama:latest
+#    # Внутренний сервис - доступ только внутри Docker сети
+#    expose:
+#      - "11434"
+#    volumes:
+#      - ollama-data:/root/.ollama
+#    environment:
+#      - OLLAMA_HOST=0.0.0.0:11434
+#    networks:
+#      - codelab-network
+#    healthcheck:
+#      test: ["CMD", "ollama", "list"]
+#      interval: ${HEALTHCHECK_INTERVAL}
+#      timeout: ${HEALTHCHECK_TIMEOUT}
+#      retries: ${HEALTHCHECK_RETRIES}
+#      start_period: 30s
 
 #  vllm:
 #    image: vllm-cpu:latest

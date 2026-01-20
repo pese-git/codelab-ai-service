@@ -1,14 +1,14 @@
 """
 HITL Manager for managing pending tool calls and user decisions.
 
-Integrates with AgentContext to store pending states and provides
-methods for adding, retrieving, and resolving HITL approvals.
+Uses database as the source of truth for pending approvals.
+No longer depends on AgentContext for caching.
 
-Now with async database persistence for approval requests.
+UPDATED: Migrated to use only database persistence (no in-memory caching)
 """
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional, TYPE_CHECKING
+from typing import Dict, List, Optional
 
 from app.models.hitl_models import (
     HITLPendingState,
@@ -25,21 +25,7 @@ from app.events.tool_events import (
     HITLDecisionMadeEvent
 )
 
-# Lazy import to avoid circular dependency
-if TYPE_CHECKING:
-    from app.services.agent_context_async import AsyncAgentContextManager
-
 logger = logging.getLogger("agent-runtime.hitl_manager")
-
-# Key for storing HITL pending calls in AgentContext.metadata
-HITL_PENDING_KEY = "hitl_pending_calls"
-HITL_AUDIT_KEY = "hitl_audit_logs"
-
-
-def _get_agent_context_manager():
-    """Lazy import to avoid circular dependency"""
-    from app.services.agent_context_async import agent_context_manager
-    return agent_context_manager
 
 
 class HITLManager:
@@ -89,26 +75,13 @@ class HITLManager:
             timeout_seconds=timeout_seconds
         )
         
-        # Store in database (source of truth for persistence)
+        # Store in database (source of truth)
         await self._save_pending_async(
             session_id, call_id, tool_name, arguments, reason
         )
         
-        # ВАЖНО: НЕ используем get_or_create(), чтобы не создавать новый контекст!
-        # Только получаем существующий контекст для кеширования (опционально)
-        context = _get_agent_context_manager().get(session_id)
-        if context:
-            # Initialize pending calls dict if not exists
-            if HITL_PENDING_KEY not in context.metadata:
-                context.metadata[HITL_PENDING_KEY] = {}
-            
-            # Store in context metadata for fast access
-            context.metadata[HITL_PENDING_KEY][call_id] = pending_state.model_dump()
-        else:
-            logger.debug(
-                f"Agent context not found for session {session_id}, "
-                f"pending approval saved only to database"
-            )
+        # Note: No longer caching in AgentContext.metadata
+        # Database is the single source of truth for pending approvals
         
         logger.info(
             f"Added pending HITL approval: session={session_id}, "
@@ -129,9 +102,9 @@ class HITLManager:
         
         return pending_state
     
-    def get_pending(self, session_id: str, call_id: str) -> Optional[HITLPendingState]:
+    async def get_pending(self, session_id: str, call_id: str) -> Optional[HITLPendingState]:
         """
-        Get pending HITL state for a tool call.
+        Get pending HITL state for a tool call from database.
         
         Args:
             session_id: Session identifier
@@ -140,24 +113,37 @@ class HITLManager:
         Returns:
             HITLPendingState if found, None otherwise
         """
-        context = _get_agent_context_manager().get(session_id)
-        if not context:
-            logger.warning(f"Session not found: {session_id}")
-            return None
+        # Load from database
+        async for db in get_db():
+            from sqlalchemy import select
+            from app.services.database import PendingApproval
+            
+            result = await db.execute(
+                select(PendingApproval).where(
+                    PendingApproval.call_id == call_id,
+                    PendingApproval.session_id == session_id,
+                    PendingApproval.status == 'pending'
+                )
+            )
+            approval = result.scalar_one_or_none()
+            
+            if not approval:
+                logger.debug(f"No pending HITL state for call_id={call_id}")
+                return None
+            
+            return HITLPendingState(
+                call_id=approval.call_id,
+                tool_name=approval.tool_name,
+                arguments=approval.arguments,
+                reason=approval.reason,
+                timeout_seconds=300  # Default
+            )
         
-        pending_calls = context.metadata.get(HITL_PENDING_KEY, {})
-        pending_data = pending_calls.get(call_id)
-        
-        if not pending_data:
-            logger.debug(f"No pending HITL state for call_id={call_id}")
-            return None
-        
-        return HITLPendingState(**pending_data)
+        return None
     
-    def get_all_pending(self, session_id: str) -> List[HITLPendingState]:
+    async def get_all_pending(self, session_id: str) -> List[HITLPendingState]:
         """
-        Get all pending HITL states for a session.
-        Loads from database (source of truth).
+        Get all pending HITL states for a session from database.
         
         Args:
             session_id: Session identifier
@@ -165,13 +151,22 @@ class HITLManager:
         Returns:
             List of HITLPendingState objects
         """
-        # Fallback to in-memory state (database load is async, not suitable here)
-        context = _get_agent_context_manager().get(session_id)
-        if not context:
-            return []
+        # Load from database
+        async for db in get_db():
+            pending_approvals = await self.db_service.get_pending_approvals(db, session_id)
+            
+            return [
+                HITLPendingState(
+                    call_id=approval['call_id'],
+                    tool_name=approval['tool_name'],
+                    arguments=approval['arguments'],
+                    reason=approval.get('reason'),
+                    timeout_seconds=300  # Default
+                )
+                for approval in pending_approvals
+            ]
         
-        pending_calls = context.metadata.get(HITL_PENDING_KEY, {})
-        return [HITLPendingState(**data) for data in pending_calls.values()]
+        return []
     
     async def remove_pending(self, session_id: str, call_id: str) -> bool:
         """
@@ -186,22 +181,16 @@ class HITLManager:
             True if removed, False if not found
         """
         # Remove from database
-        await self._delete_pending_async(call_id)
+        removed = await self._delete_pending_async(call_id)
         
-        # Remove from context metadata
-        context = _get_agent_context_manager().get(session_id)
-        if context:
-            pending_calls = context.metadata.get(HITL_PENDING_KEY, {})
-            if call_id in pending_calls:
-                del pending_calls[call_id]
-                logger.info(f"Removed pending HITL state: call_id={call_id}")
-                return True
+        if removed:
+            logger.info(f"Removed pending HITL state: call_id={call_id}")
         
-        return False
+        return removed
     
-    def cleanup_expired(self, session_id: str) -> int:
+    async def cleanup_expired(self, session_id: str) -> int:
         """
-        Clean up expired pending HITL states.
+        Clean up expired pending HITL states from database.
         
         Args:
             session_id: Session identifier
@@ -209,28 +198,22 @@ class HITLManager:
         Returns:
             Number of expired states removed
         """
-        context = _get_agent_context_manager().get(session_id)
-        if not context:
-            return 0
+        # Load all pending from database
+        pending_states = await self.get_all_pending(session_id)
         
-        pending_calls = context.metadata.get(HITL_PENDING_KEY, {})
-        expired_ids = []
-        
-        for call_id, pending_data in pending_calls.items():
-            pending_state = HITLPendingState(**pending_data)
+        expired_count = 0
+        for pending_state in pending_states:
             if pending_state.is_expired():
-                expired_ids.append(call_id)
+                await self._delete_pending_async(pending_state.call_id)
+                expired_count += 1
         
-        for call_id in expired_ids:
-            del pending_calls[call_id]
-        
-        if expired_ids:
+        if expired_count > 0:
             logger.info(
-                f"Cleaned up {len(expired_ids)} expired HITL states "
+                f"Cleaned up {expired_count} expired HITL states "
                 f"for session {session_id}"
             )
         
-        return len(expired_ids)
+        return expired_count
     
     async def log_decision(
         self,
@@ -268,21 +251,8 @@ class HITLManager:
             feedback=feedback
         )
         
-        # ВАЖНО: НЕ используем get_or_create(), чтобы не создавать новый контекст!
-        # Только получаем существующий контекст для кеширования (опционально)
-        context = _get_agent_context_manager().get(session_id)
-        if context:
-            # Initialize audit logs list if not exists
-            if HITL_AUDIT_KEY not in context.metadata:
-                context.metadata[HITL_AUDIT_KEY] = []
-            
-            # Store in context metadata
-            context.metadata[HITL_AUDIT_KEY].append(audit_log.model_dump())
-        else:
-            logger.debug(
-                f"Agent context not found for session {session_id}, "
-                f"audit log not cached in memory"
-            )
+        # Note: Audit logs are now only logged via events, not stored in memory
+        # For persistent audit trail, use event-driven audit logger
         
         logger.info(
             f"Logged HITL decision: session={session_id}, call_id={call_id}, "
@@ -307,18 +277,21 @@ class HITLManager:
         """
         Get all audit logs for a session.
         
+        Note: Audit logs are now tracked via event-driven audit logger,
+              not stored in memory. This method returns empty list.
+              Use audit logger events for persistent audit trail.
+        
         Args:
             session_id: Session identifier
             
         Returns:
-            List of HITLAuditLog objects
+            Empty list (audit logs tracked via events)
         """
-        context = _get_agent_context_manager().get(session_id)
-        if not context:
-            return []
-        
-        audit_logs_data = context.metadata.get(HITL_AUDIT_KEY, [])
-        return [HITLAuditLog(**data) for data in audit_logs_data]
+        logger.debug(
+            f"get_audit_logs called for {session_id} - "
+            f"audit logs tracked via event-driven audit logger"
+        )
+        return []
     
     def has_pending(self, session_id: str, call_id: str) -> bool:
         """
@@ -357,14 +330,15 @@ class HITLManager:
         except Exception as e:
             logger.error(f"Failed to save pending approval to database: {e}", exc_info=True)
     
-    async def _delete_pending_async(self, call_id: str):
+    async def _delete_pending_async(self, call_id: str) -> bool:
         """Async helper to delete pending approval from database"""
         try:
             async for db in get_db():
-                await self.db_service.delete_pending_approval(db, call_id)
-                break
+                result = await self.db_service.delete_pending_approval(db, call_id)
+                return result
         except Exception as e:
             logger.error(f"Failed to delete pending approval from database: {e}", exc_info=True)
+            return False
 
 
 # Singleton instance for global use

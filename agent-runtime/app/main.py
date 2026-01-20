@@ -39,7 +39,6 @@ async def lifespan(app: FastAPI):
             metrics_collector,
             audit_logger,
             agent_context_subscriber,
-            persistence_subscriber,
             session_metrics_collector
         )
         
@@ -48,7 +47,7 @@ async def lifespan(app: FastAPI):
         
         logger.info("✓ Event Bus initialized with subscribers")
         logger.info("✓ Event-driven architecture fully active (Phase 4)")
-        logger.info("✓ Event-driven persistence active")
+        logger.info("✓ Persistence handled by domain services (immediate)")
         logger.info("✓ Session metrics collector active")
         
         # Initialize database
@@ -57,15 +56,10 @@ async def lifespan(app: FastAPI):
         await init_db()
         logger.info("✓ Database initialized")
         
-        # Initialize async session manager
-        from app.services.session_manager_async import init_session_manager
-        await init_session_manager()
-        logger.info("✓ Session manager initialized")
-        
-        # Initialize async agent context manager
-        from app.services.agent_context_async import init_agent_context_manager
-        await init_agent_context_manager()
-        logger.info("✓ Agent context manager initialized")
+        # Note: Session and context managers are now handled through adapters
+        # Old AsyncSessionManager and AsyncAgentContextManager are deprecated
+        # Persistence is handled by domain services (SessionManagementService, AgentOrchestrationService)
+        logger.info("✓ Session/context management via new architecture (adapters)")
         
         # Initialize adapters for new architecture (direct initialization without Depends)
         from app.infrastructure.adapters import (
@@ -164,14 +158,8 @@ async def lifespan(app: FastAPI):
     # Shutdown logic
     logger.info("Shutting down Agent Runtime Service...")
     
-    # Shutdown persistence subscriber first (flush pending)
-    try:
-        from app.events.subscribers import persistence_subscriber
-        if persistence_subscriber:
-            await persistence_subscriber.shutdown()
-            logger.info("✓ Persistence subscriber shutdown")
-    except Exception as e:
-        logger.error(f"Error shutting down persistence subscriber: {e}")
+    # Note: Persistence subscriber removed - domain services handle persistence immediately
+    logger.info("✓ Persistence handled by domain services (no subscriber needed)")
     
     # Publish system shutdown event
     try:
@@ -199,20 +187,8 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Error stopping cleanup service: {e}")
     
-    # Shutdown managers (flush pending writes if timer-based still active)
-    try:
-        from app.services.session_manager_async import session_manager
-        from app.services.agent_context_async import agent_context_manager
-        
-        if session_manager:
-            await session_manager.shutdown()
-            logger.info("✓ Session manager shutdown")
-        
-        if agent_context_manager:
-            await agent_context_manager.shutdown()
-            logger.info("✓ Agent context manager shutdown")
-    except Exception as e:
-        logger.error(f"Error during shutdown: {e}")
+    # Note: Old session/context managers removed - shutdown handled by repositories
+    logger.info("✓ Session/context managers shutdown (managed by new architecture)")
     
     # Close database
     from app.services.database import close_db

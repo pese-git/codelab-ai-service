@@ -395,7 +395,7 @@ async def get_pending_approvals(session_id: str):
             )
         
         # Получить pending approvals из HITL manager (загружает из БД)
-        pending_approvals = hitl_manager.get_all_pending(session_id)
+        pending_approvals = await hitl_manager.get_all_pending(session_id)
         
         return {
             "session_id": session_id,
