@@ -231,7 +231,7 @@ class SessionMetricsCollector:
         self._session_metrics[event.session_id].add_request(metrics)
         
         logger.warning(
-            f"Session {event.session_id} failed request recorded: {event.error}"
+            f"Session {event.session_id} failed request recorded: {error}"
         )
     
     def get_session_metrics(self, session_id: str) -> Optional[SessionMetrics]:

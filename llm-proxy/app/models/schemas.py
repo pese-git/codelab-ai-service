@@ -8,7 +8,7 @@ class ChatMessage(BaseModel):
     model_config = {"extra": "allow"}  # Allow extra fields to pass through
     
     role: str  # 'system', 'user', 'assistant', 'function', 'tool'
-    content: Optional[str]
+    content: Optional[str] = None  # Default to None to allow tool_calls without content
     name: Optional[str] = None
     function_call: Optional[dict] = None  # For function/tool replies
     tool_calls: Optional[List[dict]] = None  # For assistant messages with tool calls
