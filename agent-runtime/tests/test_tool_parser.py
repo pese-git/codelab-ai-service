@@ -4,7 +4,7 @@ Unit tests for ToolParser.
 import pytest
 import json
 
-from app.services.tool_parser import (
+from app.infrastructure.llm.tool_parser import (
     OpenAIToolCallParser,
     parse_tool_calls
 )

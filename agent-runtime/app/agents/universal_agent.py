@@ -7,7 +7,7 @@ from typing import AsyncGenerator, Dict, Any
 from app.agents.base_agent import BaseAgent, AgentType
 from app.agents.prompts.universal import UNIVERSAL_SYSTEM_PROMPT
 from app.models.schemas import StreamChunk
-from app.services.llm_stream_service import stream_response
+from app.infrastructure.llm.streaming import stream_response
 from app.domain.entities.session import Session
 from app.domain.services.session_management import SessionManagementService
 

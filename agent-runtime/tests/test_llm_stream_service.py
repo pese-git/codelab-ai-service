@@ -5,7 +5,7 @@ import pytest
 import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.services.llm_stream_service import stream_response
+from app.infrastructure.llm.streaming import stream_response
 from app.infrastructure.adapters import SessionManagerAdapter
 from app.models.schemas import StreamChunk, ToolCall
 

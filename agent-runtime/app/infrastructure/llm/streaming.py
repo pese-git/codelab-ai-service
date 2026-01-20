@@ -4,7 +4,7 @@ LLM streaming service for agent runtime.
 Handles streaming responses from LLM, including tool calls and assistant messages.
 Integrates with HITL (Human-in-the-Loop) for tool approval workflow.
 
-UPDATED: Migrated to use SessionManagerAdapter instead of AsyncSessionManager
+UPDATED: Migrated to infrastructure/llm layer
 """
 import json
 import logging
@@ -13,8 +13,8 @@ from typing import AsyncGenerator, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 from app.core.config import AppConfig
 from app.models.schemas import StreamChunk
-from app.services.llm_proxy_client import llm_proxy_client
-from app.services.tool_parser import parse_tool_calls
+from app.infrastructure.llm.client import llm_proxy_client
+from app.infrastructure.llm.tool_parser import parse_tool_calls
 
 if TYPE_CHECKING:
     from app.infrastructure.adapters import SessionManagerAdapter

@@ -1,7 +1,8 @@
 """
-Retry механизм для Event Handlers.
+Retry механизм для Event Handlers и HTTP calls.
 
 Автоматически повторяет failed event handlers с экспоненциальной задержкой.
+Поддерживает определение retryable HTTP ошибок.
 """
 
 import asyncio
@@ -9,7 +10,38 @@ import logging
 from typing import Callable, Any
 from functools import wraps
 
+import httpx
+
 logger = logging.getLogger("agent-runtime.infrastructure.retry_handler")
+
+
+# ==================== HTTP Error Detection ====================
+
+def is_retryable_http_error(exception: Exception) -> bool:
+    """
+    Determine if an HTTP error is retryable.
+    
+    Args:
+        exception: Exception to check
+        
+    Returns:
+        True if the error is retryable, False otherwise
+    """
+    if isinstance(exception, httpx.TimeoutException):
+        return True
+    
+    if isinstance(exception, httpx.HTTPStatusError):
+        # Retry on rate limit, service unavailable, gateway timeout
+        status_code = exception.response.status_code
+        return status_code in [429, 503, 504]
+    
+    if isinstance(exception, httpx.ConnectError):
+        return True
+    
+    if isinstance(exception, httpx.ReadTimeout):
+        return True
+    
+    return False
 
 
 class RetryHandler:

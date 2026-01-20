@@ -9,7 +9,7 @@ from typing import AsyncGenerator, Dict, Any, TYPE_CHECKING
 from app.agents.base_agent import BaseAgent, AgentType
 from app.agents.prompts.orchestrator import ORCHESTRATOR_PROMPT
 from app.models.schemas import StreamChunk
-from app.services.llm_proxy_client import llm_proxy_client
+from app.infrastructure.llm.client import llm_proxy_client
 from app.core.config import AppConfig
 
 if TYPE_CHECKING:

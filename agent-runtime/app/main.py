@@ -16,7 +16,7 @@ from app.api.v1.routers import (
     messages_router,
     events_router
 )
-from app.middleware.internal_auth import InternalAuthMiddleware
+from app.api.middleware.internal_auth import InternalAuthMiddleware
 from app.api.middleware import RateLimitMiddleware
 from app.core.config import AppConfig, logger
 
