@@ -136,6 +136,7 @@ class HITLManager:
                 tool_name=approval.tool_name,
                 arguments=approval.arguments,
                 reason=approval.reason,
+                created_at=approval.created_at,
                 timeout_seconds=300  # Default
             )
         

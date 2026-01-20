@@ -699,7 +699,7 @@ class MessageOrchestrationService:
                 return
             
             # Получить pending state
-            pending_state = hitl_manager.get_pending(session_id, call_id)
+            pending_state = await hitl_manager.get_pending(session_id, call_id)
             if not pending_state:
                 error_msg = f"No pending HITL state found for call_id={call_id}"
                 logger.error(error_msg)
