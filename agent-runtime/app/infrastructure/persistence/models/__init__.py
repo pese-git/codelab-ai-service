@@ -5,21 +5,16 @@ SQLAlchemy модели для персистентности.
 Модели используются только в Infrastructure Layer.
 """
 
-# Импортируем существующие модели из старого модуля для обратной совместимости
-from ....services.database import (
-    SessionModel,
-    MessageModel,
-    AgentContextModel,
-    AgentSwitchModel,
-    PendingApproval,
-    Base
-)
+from .base import Base
+from .session import SessionModel, MessageModel
+from .agent_context import AgentContextModel, AgentSwitchModel
+from .hitl import PendingApproval
 
 __all__ = [
+    "Base",
     "SessionModel",
     "MessageModel",
     "AgentContextModel",
     "AgentSwitchModel",
     "PendingApproval",
-    "Base",
 ]
