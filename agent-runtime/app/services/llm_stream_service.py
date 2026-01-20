@@ -234,16 +234,30 @@ async def stream_response(
             )
             
             # Append assistant message with tool_call to session
-            # Note: We need to add the message directly to preserve tool_calls structure
-            # which is not supported by append_message() method
-            session_state = session_mgr.get(session_id)
-            if session_state:
-                session_state.messages.append(assistant_msg)
-                # CRITICAL: Persist IMMEDIATELY for tool_calls!
-                # Tool result may arrive before background writer runs (5s delay)
-                # Without immediate persistence, LLM won't find the tool_call in history
-                await session_mgr._persist_immediately(session_id)
-                logger.debug(f"Assistant message with tool_call persisted immediately to DB")
+            # CRITICAL: Must persist IMMEDIATELY for tool_calls!
+            # Tool result may arrive before background writer runs (5s delay)
+            # Without immediate persistence, LLM won't find the tool_call in history
+            
+            # Check if session_mgr has the new method for tool_calls
+            if hasattr(session_mgr, 'append_assistant_with_tool_calls'):
+                # New architecture (adapter) - use dedicated method
+                await session_mgr.append_assistant_with_tool_calls(
+                    session_id=session_id,
+                    tool_calls=assistant_msg["tool_calls"]
+                )
+                logger.debug(f"Assistant message with tool_call persisted via adapter")
+            else:
+                # Old AsyncSessionManager - use direct access to state
+                session_state = session_mgr.get(session_id)
+                if session_state:
+                    session_state.messages.append(assistant_msg)
+                    if hasattr(session_mgr, '_persist_immediately'):
+                        await session_mgr._persist_immediately(session_id)
+                        logger.debug(f"Assistant message with tool_call persisted immediately to DB")
+                else:
+                    logger.warning(
+                        f"Session {session_id} not found - tool_call may not persist correctly"
+                    )
             
             # Send tool_call chunk
             chunk = StreamChunk(

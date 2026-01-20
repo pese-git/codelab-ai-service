@@ -169,6 +169,42 @@ class SessionManagerAdapter:
             tool_call_id=call_id
         )
     
+    async def append_assistant_with_tool_calls(
+        self,
+        session_id: str,
+        tool_calls: list
+    ) -> None:
+        """
+        Добавить assistant message с tool_calls.
+        
+        Используется для сохранения tool_call перед отправкой в Gateway.
+        ВАЖНО: Сохраняется немедленно в БД для корректной обработки tool_result.
+        
+        Args:
+            session_id: ID сессии
+            tool_calls: Список вызовов инструментов
+            
+        Пример:
+            >>> await adapter.append_assistant_with_tool_calls(
+            ...     session_id="session-123",
+            ...     tool_calls=[{
+            ...         "id": "call-456",
+            ...         "type": "function",
+            ...         "function": {"name": "read_file", "arguments": "..."}
+            ...     }]
+            ... )
+        """
+        await self._service.add_message(
+            session_id=session_id,
+            role="assistant",
+            content="",  # Пустой content для tool_calls
+            tool_calls=tool_calls
+        )
+        logger.debug(
+            f"Assistant message with {len(tool_calls)} tool_calls "
+            f"added to session {session_id}"
+        )
+    
     def get_history(self, session_id: str) -> List[Dict[str, Any]]:
         """
         Получить историю сообщений (синхронный метод для совместимости).
