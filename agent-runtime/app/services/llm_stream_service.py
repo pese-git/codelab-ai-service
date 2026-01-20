@@ -239,8 +239,11 @@ async def stream_response(
             session_state = session_mgr.get(session_id)
             if session_state:
                 session_state.messages.append(assistant_msg)
-                # Mark session for persistence
-                await session_mgr._schedule_persist(session_id)
+                # CRITICAL: Persist IMMEDIATELY for tool_calls!
+                # Tool result may arrive before background writer runs (5s delay)
+                # Without immediate persistence, LLM won't find the tool_call in history
+                await session_mgr._persist_immediately(session_id)
+                logger.debug(f"Assistant message with tool_call persisted immediately to DB")
             
             # Send tool_call chunk
             chunk = StreamChunk(
