@@ -240,7 +240,10 @@ async def list_sessions(
 
 
 @router.get("/{session_id}/history")
-async def get_session_history(session_id: str):
+async def get_session_history(
+    session_id: str,
+    handler: GetSessionHandler = Depends(get_get_session_handler)
+):
     """
     Получить историю сообщений для сессии.
     
@@ -248,6 +251,7 @@ async def get_session_history(session_id: str):
     
     Args:
         session_id: ID сессии
+        handler: Query handler (инжектируется)
         
     Returns:
         История сессии с сообщениями и метаданными
@@ -275,42 +279,54 @@ async def get_session_history(session_id: str):
     logger.debug(f"Getting history for session {session_id}")
     
     try:
-        # Получить адаптеры из глобального контекста
-        from ....main import session_manager_adapter, agent_context_manager_adapter
+        # Использовать GetSessionHandler для загрузки сессии с сообщениями из БД
+        query = GetSessionQuery(
+            session_id=session_id,
+            include_messages=True  # Загрузить сообщения
+        )
         
-        if not session_manager_adapter:
-            raise HTTPException(
-                status_code=503,
-                detail="Session manager not initialized"
-            )
+        session_dto = await handler.handle(query)
         
-        # Проверить существование сессии
-        if not session_manager_adapter.exists(session_id):
+        if not session_dto:
             raise HTTPException(
                 status_code=404,
                 detail=f"Session {session_id} not found"
             )
         
-        # Получить состояние сессии
-        session_state = session_manager_adapter.get(session_id)
+        # Преобразовать сообщения в формат для LLM API
+        messages = []
+        if session_dto.messages:
+            for msg in session_dto.messages:
+                message_dict = {
+                    "role": msg.role,
+                    "content": msg.content
+                }
+                if msg.name:
+                    message_dict["name"] = msg.name
+                if msg.tool_call_id:
+                    message_dict["tool_call_id"] = msg.tool_call_id
+                if msg.tool_calls:
+                    message_dict["tool_calls"] = msg.tool_calls
+                messages.append(message_dict)
         
-        # Получить историю сообщений
-        messages = session_manager_adapter.get_history(session_id)
-        
-        # Получить информацию о текущем агенте
+        # Получить информацию о текущем агенте из agent_context_manager_adapter
         current_agent = None
         agent_history = []
-        if agent_context_manager_adapter:
-            agent_context = agent_context_manager_adapter.get(session_id)
-            if agent_context:
-                current_agent = agent_context.current_agent
-                agent_history = agent_context.get_agent_history()
+        try:
+            from ....main import agent_context_manager_adapter
+            if agent_context_manager_adapter:
+                agent_context = agent_context_manager_adapter.get(session_id)
+                if agent_context:
+                    current_agent = agent_context.current_agent
+                    agent_history = agent_context.get_agent_history()
+        except Exception as e:
+            logger.warning(f"Could not load agent context for {session_id}: {e}")
         
         return {
             "session_id": session_id,
             "messages": messages,
-            "message_count": len(messages),
-            "last_activity": session_state.last_activity.isoformat() if session_state else None,
+            "message_count": session_dto.message_count,
+            "last_activity": session_dto.last_activity.isoformat(),
             "current_agent": current_agent.value if current_agent else None,
             "agent_history": agent_history
         }
