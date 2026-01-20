@@ -13,7 +13,7 @@ from sqlalchemy import select, func, delete
 from ....domain.repositories.session_repository import SessionRepository
 from ....domain.entities.session import Session
 from ....core.errors import RepositoryError
-from ..models import SessionModel
+from ..models import SessionModel, MessageModel
 from ..mappers.session_mapper import SessionMapper
 
 logger = logging.getLogger("agent-runtime.infrastructure.session_repository")
@@ -151,6 +151,18 @@ class SessionRepositoryImpl(SessionRepository):
                     self._db,
                     load_messages=False  # Не загружать сообщения для списка
                 )
+                
+                # Загрузить количество сообщений отдельным запросом
+                message_count_result = await self._db.execute(
+                    select(func.count())
+                    .select_from(MessageModel)
+                    .where(MessageModel.session_db_id == model.id)
+                )
+                message_count = message_count_result.scalar() or 0
+                
+                # Установить количество сообщений в метаданные для использования в DTO
+                session.metadata['_message_count'] = message_count
+                
                 sessions.append(session)
             
             return sessions
@@ -282,6 +294,18 @@ class SessionRepositoryImpl(SessionRepository):
                     self._db,
                     load_messages=False
                 )
+                
+                # Загрузить количество сообщений отдельным запросом
+                message_count_result = await self._db.execute(
+                    select(func.count())
+                    .select_from(MessageModel)
+                    .where(MessageModel.session_db_id == model.id)
+                )
+                message_count = message_count_result.scalar() or 0
+                
+                # Установить количество сообщений в метаданные для использования в DTO
+                session.metadata['_message_count'] = message_count
+                
                 sessions.append(session)
             
             return sessions

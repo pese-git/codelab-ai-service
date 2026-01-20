@@ -142,9 +142,17 @@ class Session(Entity):
         """
         Получить количество сообщений в сессии.
         
+        Если сообщения не загружены (например, при получении списка сессий),
+        использует кэшированное значение из метаданных.
+        
         Returns:
             Количество сообщений
         """
+        # Если есть кэшированное значение в метаданных, используем его
+        if '_message_count' in self.metadata:
+            return self.metadata['_message_count']
+        
+        # Иначе считаем из загруженных сообщений
         return len(self.messages)
     
     def get_recent_messages(self, limit: int = 10) -> List[Message]:
