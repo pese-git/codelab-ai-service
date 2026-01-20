@@ -20,7 +20,7 @@ from app.middleware.internal_auth import InternalAuthMiddleware
 from app.api.middleware import RateLimitMiddleware
 from app.core.config import AppConfig, logger
 
-# Global adapter instances (initialized in lifespan)
+# Глобальные экземпляры адаптеров (инициализируются в lifespan)
 session_manager_adapter = None
 agent_context_manager_adapter = None
 message_orchestration_service = None
@@ -56,12 +56,12 @@ async def lifespan(app: FastAPI):
         await init_db()
         logger.info("✓ Database initialized")
         
-        # Note: Session and context managers are now handled through adapters
-        # Old AsyncSessionManager and AsyncAgentContextManager are deprecated
-        # Persistence is handled by domain services (SessionManagementService, AgentOrchestrationService)
+        # Управление сессиями и контекстом через адаптеры
+        # Адаптеры обеспечивают обратную совместимость с новыми доменными сервисами
+        # Персистентность обрабатывается доменными сервисами (SessionManagementService, AgentOrchestrationService)
         logger.info("✓ Session/context management via new architecture (adapters)")
         
-        # Initialize adapters for new architecture (direct initialization without Depends)
+        # Инициализация адаптеров для новой архитектуры (прямая инициализация без Depends)
         from app.infrastructure.adapters import (
             SessionManagerAdapter,
             AgentContextManagerAdapter,
@@ -158,7 +158,7 @@ async def lifespan(app: FastAPI):
     # Shutdown logic
     logger.info("Shutting down Agent Runtime Service...")
     
-    # Note: Persistence subscriber removed - domain services handle persistence immediately
+    # Персистентность обрабатывается доменными сервисами напрямую (подписчик не нужен)
     logger.info("✓ Persistence handled by domain services (no subscriber needed)")
     
     # Publish system shutdown event
@@ -187,7 +187,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Error stopping cleanup service: {e}")
     
-    # Note: Old session/context managers removed - shutdown handled by repositories
+    # Shutdown обрабатывается репозиториями в новой архитектуре
     logger.info("✓ Session/context managers shutdown (managed by new architecture)")
     
     # Close database

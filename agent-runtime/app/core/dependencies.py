@@ -1,8 +1,9 @@
 """
-FastAPI dependencies for agent runtime service.
+FastAPI dependencies для agent runtime service.
 
-UPDATED: Removed deprecated AsyncSessionManager and AsyncAgentContextManager dependencies.
-         Use adapters from main.py or new architecture services instead.
+Для управления сессиями и контекстом используйте:
+- Адаптеры из main.py (глобальные экземпляры)
+- Или доменные сервисы напрямую через dependencies_new.py
 """
 
 from typing import Annotated
@@ -19,11 +20,7 @@ DBSession = Annotated[AsyncSession, Depends(get_db)]
 DBService = Annotated[DatabaseService, Depends(get_database_service)]
 
 
-# Note: Old AsyncSessionManager and AsyncAgentContextManager dependencies removed.
-#
-# For session/context management, use:
-# - SessionManagerAdapter from app.main (global instance)
-# - AgentContextManagerAdapter from app.main (global instance)
-# - Or inject domain services directly via dependencies_new.py
-#
-# Migration completed: 20 January 2026
+# Для управления сессиями и контекстом используйте:
+# - SessionManagerAdapter из app.main (глобальный экземпляр)
+# - AgentContextManagerAdapter из app.main (глобальный экземпляр)
+# - Или доменные сервисы напрямую через dependencies_new.py
