@@ -22,7 +22,7 @@ from ....application.queries import (
     ListSessionsHandler
 )
 from ....core.errors import SessionNotFoundError, SessionAlreadyExistsError
-from ....core.dependencies_new import (
+from ....core.dependencies import (
     get_create_session_handler,
     get_get_session_handler,
     get_list_sessions_handler

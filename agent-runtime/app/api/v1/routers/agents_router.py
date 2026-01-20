@@ -17,7 +17,7 @@ from ....application.commands import SwitchAgentCommand, SwitchAgentHandler
 from ....application.queries import GetAgentContextQuery, GetAgentContextHandler
 from ....domain.services.agent_registry import agent_router
 from ....core.errors import AgentSwitchError
-from ....core.dependencies_new import (
+from ....core.dependencies import (
     get_switch_agent_handler,
     get_get_agent_context_handler
 )
