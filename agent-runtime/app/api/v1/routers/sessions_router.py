@@ -60,7 +60,7 @@ async def create_session(
         
     Пример ответа:
         {
-            "session_id": "session-123",
+            "id": "session-123",
             "created_at": "2026-01-18T21:00:00Z",
             "is_active": true,
             "current_agent": "orchestrator"
@@ -77,7 +77,7 @@ async def create_session(
         
         # Вернуть ответ в формате совместимом с Gateway
         return CreateSessionResponse(
-            session_id=session_dto.id,
+            id=session_dto.id,
             message_count=0,  # Новая сессия всегда имеет 0 сообщений
             created_at=session_dto.created_at,
             is_active=session_dto.is_active,
