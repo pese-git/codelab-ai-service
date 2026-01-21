@@ -499,6 +499,17 @@ class MessageOrchestrationService:
         )
         
         async with self._lock_manager.lock(session_id):
+            # Проверить, есть ли pending approval для этого call_id
+            # Если да и error содержит rejection - удалить pending approval
+            if error and ("Операция отклонена" in error or "User rejected" in error):
+                from .hitl_management import hitl_manager
+                pending = await hitl_manager.get_pending(session_id, call_id)
+                if pending:
+                    logger.info(
+                        f"Removing pending approval due to rejection error: {call_id}"
+                    )
+                    await hitl_manager.remove_pending(session_id, call_id)
+            
             # Получить сессию
             session = await self._session_service.get_or_create_session(session_id)
             
