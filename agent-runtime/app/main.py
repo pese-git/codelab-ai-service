@@ -66,78 +66,83 @@ async def lifespan(app: FastAPI):
         # Персистентность обрабатывается доменными сервисами (SessionManagementService, AgentOrchestrationService)
         logger.info("✓ Session/context management via new architecture (adapters)")
         
-        # Инициализация адаптеров для новой архитектуры (прямая инициализация без Depends)
+        # Инициализация адаптеров для новой архитектуры
+        # ВАЖНО: Не используем database session при startup, так как адаптеры
+        # будут использоваться с request-scoped сессиями через dependency injection
         from app.infrastructure.adapters import (
             SessionManagerAdapter,
-            AgentContextManagerAdapter,
-            EventPublisherAdapter
+            AgentContextManagerAdapter
         )
         from app.domain.services import (
             SessionManagementService,
             AgentOrchestrationService
         )
-        from app.infrastructure.persistence.repositories import (
-            SessionRepositoryImpl,
-            AgentContextRepositoryImpl
-        )
         from app.infrastructure.cleanup import SessionCleanupService
+        from app.core.dependencies import get_event_publisher
         from app.services.database import get_db
         
         try:
-            # Создать репозитории напрямую (без Depends)
-            async for db in get_db():
-                session_repo = SessionRepositoryImpl(db)
-                context_repo = AgentContextRepositoryImpl(db)
-                
-                # Создать event publisher
-                event_publisher = EventPublisherAdapter()
-                
-                # Создать доменные сервисы
-                session_service = SessionManagementService(
-                    repository=session_repo,
+            # Получить singleton event publisher
+            event_publisher = get_event_publisher()
+            
+            # ПРИМЕЧАНИЕ: Мы НЕ создаем репозитории и сервисы здесь,
+            # так как они требуют database session, которая должна быть request-scoped.
+            # Вместо этого, глобальные адаптеры будут None, и мы будем использовать
+            # dependency injection в роутерах для получения сервисов с правильной сессией.
+            
+            # Установить глобальные адаптеры в None (будут использоваться через DI)
+            global session_manager_adapter, agent_context_manager_adapter, message_orchestration_service
+            session_manager_adapter = None
+            agent_context_manager_adapter = None
+            message_orchestration_service = None
+            
+            logger.info("✓ Manager adapters will be initialized per-request via dependency injection")
+            
+            # Initialize session cleanup service
+            # Cleanup service создает свои собственные database sessions по мере необходимости
+            from app.infrastructure.persistence.repositories import SessionRepositoryImpl
+            from app.infrastructure.persistence.database import async_session_maker
+            
+            # Создаем cleanup service с фабрикой для создания сессий
+            # Он будет создавать свои собственные сессии при каждом запуске cleanup
+            async def get_cleanup_session_service():
+                """Фабрика для создания session service с новой DB сессией"""
+                async with async_session_maker() as db:
+                    cleanup_repo = SessionRepositoryImpl(db)
+                    return SessionManagementService(
+                        repository=cleanup_repo,
+                        event_publisher=event_publisher.publish
+                    )
+            
+            # Создаем временную сессию только для инициализации cleanup service
+            db_gen = get_db()
+            db = await db_gen.__anext__()
+            try:
+                cleanup_repo = SessionRepositoryImpl(db)
+                cleanup_session_service = SessionManagementService(
+                    repository=cleanup_repo,
                     event_publisher=event_publisher.publish
                 )
-                orchestration_service = AgentOrchestrationService(
-                    repository=context_repo,
-                    event_publisher=event_publisher.publish
-                )
                 
-                # Создать глобальные адаптеры
-                global session_manager_adapter, agent_context_manager_adapter, message_orchestration_service
-                session_manager_adapter = SessionManagerAdapter(session_service)
-                agent_context_manager_adapter = AgentContextManagerAdapter(orchestration_service)
-                
-                logger.info("✓ Manager adapters initialized")
-                
-                # Создать MessageOrchestrationService
-                from app.domain.services import MessageOrchestrationService
-                from app.domain.services.agent_registry import agent_router
-                from app.infrastructure.concurrency import session_lock_manager
-                
-                message_orchestration_service = MessageOrchestrationService(
-                    session_service=session_service,
-                    agent_service=orchestration_service,
-                    agent_router=agent_router,
-                    lock_manager=session_lock_manager,
-                    event_publisher=event_publisher.publish
-                )
-                
-                logger.info("✓ MessageOrchestrationService initialized")
-                
-                # Initialize session cleanup service
                 cleanup_service = SessionCleanupService(
-                    session_service=session_service,
+                    session_service=cleanup_session_service,
                     cleanup_interval_hours=1,
                     max_age_hours=24
                 )
                 await cleanup_service.start()
                 logger.info("✓ Session cleanup service started")
+            finally:
+                # Правильно закрываем генератор сессии
+                try:
+                    await db_gen.aclose()
+                except Exception:
+                    pass
                 
-                break  # Выйти из цикла после первой сессии
         except Exception as e:
-            logger.error(f"Failed to initialize adapters: {e}", exc_info=True)
+            logger.error(f"Failed to initialize services: {e}", exc_info=True)
             session_manager_adapter = None
             agent_context_manager_adapter = None
+            message_orchestration_service = None
             cleanup_service = None
         
         # Publish system startup event

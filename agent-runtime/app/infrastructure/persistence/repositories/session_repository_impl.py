@@ -69,10 +69,9 @@ class SessionRepositoryImpl(SessionRepository):
         """
         try:
             await self._mapper.to_model(entity, self._db)
-            await self._db.commit()
+            await self._db.flush()  # Flush changes within transaction, don't commit
             logger.debug(f"Saved session {entity.id}")
         except Exception as e:
-            await self._db.rollback()
             logger.error(f"Error saving session {entity.id}: {e}", exc_info=True)
             raise RepositoryError(
                 operation="save",
@@ -104,12 +103,11 @@ class SessionRepositoryImpl(SessionRepository):
             model.deleted_at = datetime.now(timezone.utc)
             model.is_active = False
             
-            await self._db.commit()
+            await self._db.flush()  # Flush changes within transaction, don't commit
             logger.info(f"Soft deleted session {id}")
             return True
             
         except Exception as e:
-            await self._db.rollback()
             logger.error(f"Error deleting session {id}: {e}", exc_info=True)
             raise RepositoryError(
                 operation="delete",
@@ -403,7 +401,7 @@ class SessionRepositoryImpl(SessionRepository):
                 model.deleted_at = datetime.now(timezone.utc)
                 count += 1
             
-            await self._db.commit()
+            await self._db.flush()  # Flush changes within transaction, don't commit
             
             if count > 0:
                 logger.info(
@@ -414,7 +412,6 @@ class SessionRepositoryImpl(SessionRepository):
             return count
             
         except Exception as e:
-            await self._db.rollback()
             logger.error(f"Error cleaning up old sessions: {e}")
             raise RepositoryError(
                 operation="cleanup_old",

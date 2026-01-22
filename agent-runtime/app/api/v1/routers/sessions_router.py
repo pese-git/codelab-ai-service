@@ -25,7 +25,9 @@ from ....core.errors import SessionNotFoundError, SessionAlreadyExistsError
 from ....core.dependencies import (
     get_create_session_handler,
     get_get_session_handler,
-    get_list_sessions_handler
+    get_list_sessions_handler,
+    get_session_manager_adapter,
+    get_agent_context_manager_adapter
 )
 
 logger = logging.getLogger("agent-runtime.api.sessions")
@@ -242,7 +244,8 @@ async def list_sessions(
 @router.get("/{session_id}/history")
 async def get_session_history(
     session_id: str,
-    handler: GetSessionHandler = Depends(get_get_session_handler)
+    handler: GetSessionHandler = Depends(get_get_session_handler),
+    agent_context_manager_adapter=Depends(get_agent_context_manager_adapter)
 ):
     """
     Получить историю сообщений для сессии.
@@ -313,12 +316,10 @@ async def get_session_history(
         current_agent = None
         agent_history = []
         try:
-            from ....main import agent_context_manager_adapter
-            if agent_context_manager_adapter:
-                agent_context = agent_context_manager_adapter.get(session_id)
-                if agent_context:
-                    current_agent = agent_context.current_agent
-                    agent_history = agent_context.get_agent_history()
+            agent_context = agent_context_manager_adapter.get(session_id)
+            if agent_context:
+                current_agent = agent_context.current_agent
+                agent_history = agent_context.get_agent_history()
         except Exception as e:
             logger.warning(f"Could not load agent context for {session_id}: {e}")
         
@@ -339,7 +340,10 @@ async def get_session_history(
 
 
 @router.get("/{session_id}/pending-approvals")
-async def get_pending_approvals(session_id: str):
+async def get_pending_approvals(
+    session_id: str,
+    session_manager_adapter=Depends(get_session_manager_adapter)
+):
     """
     Получить все pending approval запросы для сессии.
     
@@ -377,15 +381,8 @@ async def get_pending_approvals(session_id: str):
     logger.debug(f"Getting pending approvals for session {session_id}")
     
     try:
-        # Получить адаптер из глобального контекста
-        from ....main import session_manager_adapter
+        # Получить HITL manager
         from ....domain.services.hitl_management import hitl_manager
-        
-        if not session_manager_adapter:
-            raise HTTPException(
-                status_code=503,
-                detail="Session manager not initialized"
-            )
         
         # Проверить существование сессии
         if not session_manager_adapter.exists(session_id):

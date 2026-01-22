@@ -9,7 +9,7 @@ Provides dependency injection for:
 """
 
 import logging
-from typing import Annotated, AsyncGenerator
+from typing import Annotated, AsyncGenerator, Optional
 
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -91,14 +91,21 @@ async def get_agent_context_repository(
 
 # ==================== Event Publisher Dependencies ====================
 
-async def get_event_publisher() -> EventPublisherAdapter:
+# Singleton instance of EventPublisherAdapter
+_event_publisher_adapter: Optional[EventPublisherAdapter] = None
+
+
+def get_event_publisher() -> EventPublisherAdapter:
     """
-    Получить адаптер для публикации событий.
+    Получить адаптер для публикации событий (singleton).
     
     Returns:
         EventPublisherAdapter: Адаптер для публикации доменных событий
     """
-    return EventPublisherAdapter()
+    global _event_publisher_adapter
+    if _event_publisher_adapter is None:
+        _event_publisher_adapter = EventPublisherAdapter()
+    return _event_publisher_adapter
 
 
 # ==================== Domain Service Dependencies ====================
@@ -139,6 +146,67 @@ async def get_agent_orchestration_service(
     """
     return AgentOrchestrationService(
         repository=repository,
+        event_publisher=event_publisher.publish
+    )
+
+
+async def get_session_manager_adapter(
+    session_service: SessionManagementService = Depends(get_session_management_service)
+):
+    """
+    Получить адаптер для управления сессиями.
+    
+    Args:
+        session_service: Сервис управления сессиями (инжектируется)
+        
+    Returns:
+        SessionManagerAdapter: Адаптер для управления сессиями
+    """
+    from ..infrastructure.adapters import SessionManagerAdapter
+    return SessionManagerAdapter(session_service)
+
+
+async def get_agent_context_manager_adapter(
+    agent_service: AgentOrchestrationService = Depends(get_agent_orchestration_service)
+):
+    """
+    Получить адаптер для управления контекстом агентов.
+    
+    Args:
+        agent_service: Сервис оркестрации агентов (инжектируется)
+        
+    Returns:
+        AgentContextManagerAdapter: Адаптер для управления контекстом
+    """
+    from ..infrastructure.adapters import AgentContextManagerAdapter
+    return AgentContextManagerAdapter(agent_service)
+
+
+async def get_message_orchestration_service(
+    session_service: SessionManagementService = Depends(get_session_management_service),
+    agent_service: AgentOrchestrationService = Depends(get_agent_orchestration_service),
+    event_publisher: EventPublisherAdapter = Depends(get_event_publisher)
+):
+    """
+    Получить доменный сервис оркестрации сообщений.
+    
+    Args:
+        session_service: Сервис управления сессиями (инжектируется)
+        agent_service: Сервис оркестрации агентов (инжектируется)
+        event_publisher: Адаптер для публикации событий (инжектируется)
+        
+    Returns:
+        MessageOrchestrationService: Доменный сервис
+    """
+    from ..domain.services import MessageOrchestrationService
+    from ..domain.services.agent_registry import agent_router
+    from ..infrastructure.concurrency import session_lock_manager
+    
+    return MessageOrchestrationService(
+        session_service=session_service,
+        agent_service=agent_service,
+        agent_router=agent_router,
+        lock_manager=session_lock_manager,
         event_publisher=event_publisher.publish
     )
 

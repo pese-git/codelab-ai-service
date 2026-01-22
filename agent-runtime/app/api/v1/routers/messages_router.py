@@ -6,13 +6,14 @@ Messages роутер.
 """
 
 import logging
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from typing import Optional
 
 from ..schemas.message_schemas import MessageStreamRequest
 from ....models.schemas import StreamChunk
 from ....agents.base_agent import AgentType
+from ....core.dependencies import get_message_orchestration_service
 
 logger = logging.getLogger("agent-runtime.api.messages")
 
@@ -20,7 +21,10 @@ router = APIRouter(prefix="/agent/message", tags=["messages"])
 
 
 @router.post("/stream")
-async def message_stream_sse(request: MessageStreamRequest):
+async def message_stream_sse(
+    request: MessageStreamRequest,
+    message_orchestration_service=Depends(get_message_orchestration_service)
+):
     """
     SSE streaming endpoint для обработки сообщений.
     
@@ -62,15 +66,6 @@ async def message_stream_sse(request: MessageStreamRequest):
         
         data: {"type":"done","is_final":true}
     """
-    # Получить MessageOrchestrationService из глобального контекста
-    from ....main import message_orchestration_service
-    
-    if not message_orchestration_service:
-        raise HTTPException(
-            status_code=500,
-            detail="MessageOrchestrationService not initialized"
-        )
-    
     # Использовать MessageOrchestrationService для всех типов сообщений
     session_id = request.session_id
     message_data = request.message

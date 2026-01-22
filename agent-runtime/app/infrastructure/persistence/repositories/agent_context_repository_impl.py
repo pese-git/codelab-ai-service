@@ -86,10 +86,9 @@ class AgentContextRepositoryImpl(AgentContextRepository):
         """
         try:
             await self._mapper.to_model(entity, self._db)
-            await self._db.commit()
+            await self._db.flush()  # Flush changes within transaction, don't commit
             logger.debug(f"Saved agent context {entity.id}")
         except Exception as e:
-            await self._db.rollback()
             logger.error(f"Error saving context {entity.id}: {e}", exc_info=True)
             raise RepositoryError(
                 operation="save",
@@ -118,12 +117,11 @@ class AgentContextRepositoryImpl(AgentContextRepository):
                 return False
             
             await self._db.delete(model)
-            await self._db.commit()
+            await self._db.flush()  # Flush changes within transaction, don't commit
             logger.info(f"Deleted agent context {id}")
             return True
             
         except Exception as e:
-            await self._db.rollback()
             logger.error(f"Error deleting context {id}: {e}")
             raise RepositoryError(
                 operation="delete",
