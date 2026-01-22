@@ -8,6 +8,7 @@
 import asyncio
 import logging
 from datetime import datetime, timezone
+from typing import Callable, Awaitable
 
 from ...domain.services.session_management import SessionManagementService
 
@@ -22,14 +23,18 @@ class SessionCleanupService:
     неактивных сессий старше указанного возраста.
     
     Атрибуты:
-        _session_service: Доменный сервис управления сессиями
+        _session_service_factory: Фабрика для создания session service с новой DB сессией
         _cleanup_interval_hours: Интервал между очистками (часы)
         _max_age_hours: Максимальный возраст сессии (часы)
         _task: Фоновая задача
     
     Пример:
+        >>> async def create_session_service():
+        ...     async with async_session_maker() as db:
+        ...         repo = SessionRepositoryImpl(db)
+        ...         return SessionManagementService(repo, event_publisher)
         >>> cleanup_service = SessionCleanupService(
-        ...     session_service=session_service,
+        ...     session_service_factory=create_session_service,
         ...     cleanup_interval_hours=1,
         ...     max_age_hours=24
         ... )
@@ -38,7 +43,7 @@ class SessionCleanupService:
     
     def __init__(
         self,
-        session_service: SessionManagementService,
+        session_service_factory: Callable[[], Awaitable[SessionManagementService]],
         cleanup_interval_hours: int = 1,
         max_age_hours: int = 24
     ):
@@ -46,11 +51,11 @@ class SessionCleanupService:
         Инициализация сервиса очистки.
         
         Args:
-            session_service: Доменный сервис управления сессиями
+            session_service_factory: Async фабрика для создания session service
             cleanup_interval_hours: Интервал между очистками (часы)
             max_age_hours: Максимальный возраст сессии (часы)
         """
-        self._session_service = session_service
+        self._session_service_factory = session_service_factory
         self._cleanup_interval = cleanup_interval_hours
         self._max_age = max_age_hours
         self._task: asyncio.Task | None = None
@@ -126,15 +131,18 @@ class SessionCleanupService:
         """
         Выполнить очистку старых сессий.
         
-        Вызывает доменный сервис для очистки.
+        Создает новый session service через фабрику и вызывает cleanup.
         """
         try:
             logger.info(
                 f"Starting cleanup of sessions older than {self._max_age} hours"
             )
             
+            # Создать новый session service с fresh DB session
+            session_service = await self._session_service_factory()
+            
             # Очистить через доменный сервис
-            count = await self._session_service.cleanup_old_sessions(
+            count = await session_service.cleanup_old_sessions(
                 max_age_hours=self._max_age
             )
             

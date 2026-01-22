@@ -98,15 +98,13 @@ async def lifespan(app: FastAPI):
             
             logger.info("✓ Manager adapters will be initialized per-request via dependency injection")
             
-            # Initialize session cleanup service
-            # Cleanup service создает свои собственные database sessions по мере необходимости
+            # Initialize session cleanup service with factory pattern
             from app.infrastructure.persistence.repositories import SessionRepositoryImpl
             from app.infrastructure.persistence.database import async_session_maker
             
-            # Создаем cleanup service с фабрикой для создания сессий
-            # Он будет создавать свои собственные сессии при каждом запуске cleanup
-            async def get_cleanup_session_service():
-                """Фабрика для создания session service с новой DB сессией"""
+            # Фабрика для создания session service с новой DB сессией
+            async def create_cleanup_session_service():
+                """Factory to create session service with fresh DB session"""
                 async with async_session_maker() as db:
                     cleanup_repo = SessionRepositoryImpl(db)
                     return SessionManagementService(
@@ -114,29 +112,14 @@ async def lifespan(app: FastAPI):
                         event_publisher=event_publisher.publish
                     )
             
-            # Создаем временную сессию только для инициализации cleanup service
-            db_gen = get_db()
-            db = await db_gen.__anext__()
-            try:
-                cleanup_repo = SessionRepositoryImpl(db)
-                cleanup_session_service = SessionManagementService(
-                    repository=cleanup_repo,
-                    event_publisher=event_publisher.publish
-                )
-                
-                cleanup_service = SessionCleanupService(
-                    session_service=cleanup_session_service,
-                    cleanup_interval_hours=1,
-                    max_age_hours=24
-                )
-                await cleanup_service.start()
-                logger.info("✓ Session cleanup service started")
-            finally:
-                # Правильно закрываем генератор сессии
-                try:
-                    await db_gen.aclose()
-                except Exception:
-                    pass
+            # Создаем cleanup service с фабрикой
+            cleanup_service = SessionCleanupService(
+                session_service_factory=create_cleanup_session_service,
+                cleanup_interval_hours=1,
+                max_age_hours=24
+            )
+            await cleanup_service.start()
+            logger.info("✓ Session cleanup service started")
                 
         except Exception as e:
             logger.error(f"Failed to initialize services: {e}", exc_info=True)
