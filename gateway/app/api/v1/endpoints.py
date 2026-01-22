@@ -598,7 +598,15 @@ async def websocket_endpoint(
                         logger.info(f"[{session_id}] Agent streaming completed successfully")
                         
                 except httpx.HTTPStatusError as e:
-                    logger.error(f"[{session_id}] Agent HTTP error: {e.response.status_code}, {e.response.text}")
+                    # Для streaming response нужно прочитать содержимое перед доступом к .text
+                    try:
+                        error_body = await e.response.aread()
+                        error_text = error_body.decode('utf-8')
+                        logger.error(f"[{session_id}] Agent HTTP error: {e.response.status_code}, {error_text}")
+                    except Exception as read_err:
+                        logger.error(f"[{session_id}] Agent HTTP error: {e.response.status_code}, failed to read response: {read_err}")
+                        error_text = "Unable to read error response"
+                    
                     err = WSErrorResponse.model_construct(
                         type="error", content=f"Agent error: {e.response.status_code}"
                     )

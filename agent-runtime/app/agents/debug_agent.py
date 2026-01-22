@@ -9,8 +9,9 @@ from typing import AsyncGenerator, Dict, Any
 from app.agents.base_agent import BaseAgent, AgentType
 from app.agents.prompts.debug import DEBUG_PROMPT
 from app.models.schemas import StreamChunk
-from app.services.llm_stream_service import stream_response
-from app.services.session_manager_async import AsyncSessionManager
+from app.infrastructure.llm.streaming import stream_response
+from app.domain.entities.session import Session
+from app.domain.services.session_management import SessionManagementService
 
 logger = logging.getLogger("agent-runtime.debug_agent")
 
@@ -53,7 +54,8 @@ class DebugAgent(BaseAgent):
         session_id: str,
         message: str,
         context: Dict[str, Any],
-        session_mgr: AsyncSessionManager
+        session: Session,
+        session_service: SessionManagementService
     ) -> AsyncGenerator[StreamChunk, None]:
         """
         Process message through Debug agent.
@@ -62,15 +64,16 @@ class DebugAgent(BaseAgent):
             session_id: Session identifier
             message: User message to process
             context: Agent context with history
-            session_mgr: Async session manager for session operations
+            session: Domain entity Session with message history
+            session_service: Session management service for operations
             
         Yields:
             StreamChunk: Chunks for SSE streaming
         """
         logger.info(f"Debug agent processing message for session {session_id}")
         
-        # Get session history
-        history = session_mgr.get_history(session_id)
+        # Get session history from domain entity
+        history = session.get_history_for_llm()
         
         # Update system prompt
         if history and history[0].get("role") == "system":
@@ -78,9 +81,13 @@ class DebugAgent(BaseAgent):
         else:
             history.insert(0, {"role": "system", "content": self.system_prompt})
         
+        # Create adapter for backward compatibility with llm_stream_service
+        from app.infrastructure.adapters.session_manager_adapter import SessionManagerAdapter
+        session_mgr_adapter = SessionManagerAdapter(session_service)
+        
         # Delegate to LLM stream service with allowed tools
-        async for chunk in stream_response(session_id, history, self.allowed_tools, session_mgr):
-            # Handle switch_mode tool call directly (don't send to IDE)
+        async for chunk in stream_response(session_id, history, self.allowed_tools, session_mgr_adapter):
+            # Handle switch_mode tool call - DON'T add tool_result to history!
             if chunk.type == "tool_call" and chunk.tool_name == "switch_mode":
                 target_mode = chunk.arguments.get("mode", "orchestrator")
                 reason = chunk.arguments.get("reason", "Agent requested switch")
@@ -89,13 +96,8 @@ class DebugAgent(BaseAgent):
                     f"Debug agent requesting switch to {target_mode}: {reason}"
                 )
                 
-                # Add tool result to history before switching
-                await session_mgr.append_tool_result(
-                    session_id=session_id,
-                    call_id=chunk.call_id,
-                    tool_name="switch_mode",
-                    result=f"Switching to {target_mode} agent"
-                )
+                # ВАЖНО: НЕ добавляем tool_result в историю!
+                # Это предотвращает ошибку "No tool call found" от OpenRouter API
                 
                 # Emit switch_agent chunk
                 yield StreamChunk(
@@ -104,7 +106,8 @@ class DebugAgent(BaseAgent):
                     metadata={
                         "target_agent": target_mode,
                         "reason": reason
-                    }
+                    },
+                    is_final=True
                 )
                 return
             

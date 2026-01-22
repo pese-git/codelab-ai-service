@@ -10,7 +10,9 @@ import re
 import logging
 
 if TYPE_CHECKING:
-    from app.services.session_manager_async import AsyncSessionManager
+    from app.infrastructure.adapters import SessionManagerAdapter
+    from app.domain.entities.session import Session
+    from app.domain.services.session_management import SessionManagementService
 
 logger = logging.getLogger("agent-runtime.base_agent")
 
@@ -69,7 +71,8 @@ class BaseAgent(ABC):
         session_id: str,
         message: str,
         context: Dict[str, Any],
-        session_mgr: "AsyncSessionManager"
+        session: "Session",
+        session_service: "SessionManagementService"
     ) -> AsyncGenerator:
         """
         Process a message through this agent.
@@ -78,7 +81,8 @@ class BaseAgent(ABC):
             session_id: Session identifier
             message: User message to process
             context: Agent context with history and metadata
-            session_mgr: Async session manager for session operations
+            session: Domain entity Session with message history
+            session_service: Session management service for operations
             
         Yields:
             StreamChunk: Chunks for SSE streaming

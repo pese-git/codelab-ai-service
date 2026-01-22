@@ -1,23 +1,29 @@
 # План реализации Auth Service
 
+**Версия:** 1.0.0
+**Дата:** 20 января 2026
+**Статус:** ✅ Реализовано
+
+---
+
 ## Обзор
 
 Данный документ описывает пошаговый план реализации Auth Service для платформы CodeLab. План разбит на итерации с четкими задачами и критериями приемки.
 
-**Важно:** В процессе разработки используется SQLite вместо PostgreSQL для упрощения развертывания и соответствия архитектуре других сервисов CodeLab.
+**Важно:** В процессе разработки используется SQLite для разработки и PostgreSQL для production.
 
 ---
 
-## Итерация 0: Подготовка инфраструктуры (1-2 дня)
+## Итерация 0: Подготовка инфраструктуры ✅ ЗАВЕРШЕНО
 
 ### Задачи
 
 #### 0.1 Создание структуры проекта
-- [ ] Создать директорию `auth-service/`
-- [ ] Настроить `pyproject.toml` с зависимостями
-- [ ] Создать `Dockerfile`
-- [ ] Создать `.env.example`
-- [ ] Создать базовую структуру директорий
+- [x] Создать директорию `auth-service/`
+- [x] Настроить `pyproject.toml` с зависимостями
+- [x] Создать `Dockerfile`
+- [x] Создать `.env.example`
+- [x] Создать базовую структуру директорий
 
 **Файлы:**
 - `auth-service/pyproject.toml`
@@ -27,20 +33,20 @@
 - `auth-service/.gitignore`
 
 #### 0.2 Настройка Docker Compose
-- [ ] Добавить Redis сервис
-- [ ] Добавить auth-service в docker-compose.yml
-- [ ] Настроить сеть и зависимости
-- [ ] Настроить volumes для SQLite БД
+- [x] Добавить Redis сервис
+- [x] Добавить auth-service в docker-compose.yml
+- [x] Настроить сеть и зависимости
+- [x] Настроить volumes для SQLite БД
 
 **Файлы:**
 - `docker-compose.yml` (обновить)
 - `.env.example` (обновить)
 
 #### 0.3 Базовая конфигурация приложения
-- [ ] Создать `app/core/config.py` с настройками
-- [ ] Создать `app/main.py` с FastAPI приложением
-- [ ] Добавить health check endpoint
-- [ ] Настроить логирование
+- [x] Создать `app/core/config.py` с настройками
+- [x] Создать `app/main.py` с FastAPI приложением
+- [x] Добавить health check endpoint
+- [x] Настроить логирование
 
 **Файлы:**
 - `auth-service/app/core/config.py`
@@ -48,10 +54,10 @@
 - `auth-service/app/__init__.py`
 
 #### 0.4 Настройка базы данных
-- [ ] Настроить SQLAlchemy для SQLite
-- [ ] Настроить Alembic для миграций
-- [ ] Создать базовую модель `Base`
-- [ ] Настроить путь к SQLite файлу в volume
+- [x] Настроить SQLAlchemy для SQLite/PostgreSQL
+- [x] Настроить Alembic для миграций
+- [x] Создать базовую модель `Base`
+- [x] Настроить путь к БД в volume
 
 **Файлы:**
 - `auth-service/app/models/database.py`
@@ -69,26 +75,26 @@
 
 ---
 
-## Итерация 1: Модели данных и миграции (2-3 дня)
+## Итерация 1: Модели данных и миграции ✅ ЗАВЕРШЕНО
 
 ### Задачи
 
 #### 1.1 Модель User
-- [ ] Создать SQLAlchemy модель `User`
-- [ ] Добавить валидацию полей
-- [ ] Создать индексы
-- [ ] Создать Alembic миграцию
+- [x] Создать SQLAlchemy модель `User`
+- [x] Добавить валидацию полей
+- [x] Создать индексы
+- [x] Создать Alembic миграцию
 
 **Файлы:**
 - `auth-service/app/models/user.py`
 - `auth-service/alembic/versions/001_create_users_table.py`
 
 #### 1.2 Модель OAuth Client
-- [ ] Создать SQLAlchemy модель `OAuthClient`
-- [ ] Добавить валидацию полей
-- [ ] Создать индексы
-- [ ] Создать Alembic миграцию
-- [ ] Добавить seed данные для тестовых клиентов
+- [x] Создать SQLAlchemy модель `OAuthClient`
+- [x] Добавить валидацию полей
+- [x] Создать индексы
+- [x] Создать Alembic миграцию
+- [x] Добавить seed данные для тестовых клиентов
 
 **Файлы:**
 - `auth-service/app/models/oauth_client.py`
@@ -96,29 +102,29 @@
 - `auth-service/alembic/versions/003_seed_oauth_clients.py`
 
 #### 1.3 Модель Refresh Token
-- [ ] Создать SQLAlchemy модель `RefreshToken`
-- [ ] Добавить валидацию полей
-- [ ] Создать индексы
-- [ ] Создать Alembic миграцию
+- [x] Создать SQLAlchemy модель `RefreshToken`
+- [x] Добавить валидацию полей
+- [x] Создать индексы
+- [x] Создать Alembic миграцию
 
 **Файлы:**
 - `auth-service/app/models/refresh_token.py`
 - `auth-service/alembic/versions/004_create_refresh_tokens_table.py`
 
-#### 1.4 Модель Audit Log (опционально)
-- [ ] Создать SQLAlchemy модель `AuditLog`
-- [ ] Создать индексы
-- [ ] Создать Alembic миграцию
+#### 1.4 Модель Audit Log
+- [x] Создать SQLAlchemy модель `AuditLog`
+- [x] Создать индексы
+- [x] Создать Alembic миграцию
 
 **Файлы:**
 - `auth-service/app/models/audit_log.py`
 - `auth-service/alembic/versions/005_create_audit_logs_table.py`
 
 #### 1.5 Pydantic схемы
-- [ ] Создать схемы для User
-- [ ] Создать схемы для OAuth Client
-- [ ] Создать схемы для Token Response
-- [ ] Создать схемы для OAuth Request
+- [x] Создать схемы для User
+- [x] Создать схемы для OAuth Client
+- [x] Создать схемы для Token Response
+- [x] Создать схемы для OAuth Request
 
 **Файлы:**
 - `auth-service/app/schemas/user.py`
@@ -135,15 +141,15 @@
 
 ---
 
-## Итерация 2: Криптография и безопасность (2-3 дня)
+## Итерация 2: Криптография и безопасность ✅ ЗАВЕРШЕНО
 
 ### Задачи
 
 #### 2.1 Генерация RSA ключей
-- [ ] Создать утилиту для генерации RSA ключей
-- [ ] Реализовать хранение ключей (файловая система или env)
-- [ ] Реализовать загрузку ключей при старте
-- [ ] Поддержка множественных ключей (key rotation)
+- [x] Создать утилиту для генерации RSA ключей
+- [x] Реализовать хранение ключей (файловая система)
+- [x] Реализовать загрузку ключей при старте
+- [x] Поддержка множественных ключей (key rotation)
 
 **Файлы:**
 - `auth-service/app/core/security.py`
@@ -151,30 +157,30 @@
 - `auth-service/scripts/generate_keys.py`
 
 #### 2.2 JWT сервис
-- [ ] Реализовать создание access token
-- [ ] Реализовать создание refresh token
-- [ ] Реализовать валидацию JWT
-- [ ] Реализовать извлечение payload из JWT
-- [ ] Добавить тесты
+- [x] Реализовать создание access token
+- [x] Реализовать создание refresh token
+- [x] Реализовать валидацию JWT
+- [x] Реализовать извлечение payload из JWT
+- [x] Добавить тесты
 
 **Файлы:**
 - `auth-service/app/services/token_service.py`
 - `auth-service/tests/test_token_service.py`
 
 #### 2.3 Password hashing
-- [ ] Реализовать хэширование паролей (bcrypt)
-- [ ] Реализовать проверку паролей (constant-time)
-- [ ] Добавить тесты
+- [x] Реализовать хэширование паролей (bcrypt)
+- [x] Реализовать проверку паролей (constant-time)
+- [x] Добавить тесты
 
 **Файлы:**
 - `auth-service/app/utils/crypto.py`
 - `auth-service/tests/test_crypto.py`
 
 #### 2.4 JWKS endpoint
-- [ ] Реализовать сервис для генерации JWKS
-- [ ] Реализовать кэширование JWKS в Redis
-- [ ] Создать endpoint `GET /.well-known/jwks.json`
-- [ ] Добавить тесты
+- [x] Реализовать сервис для генерации JWKS
+- [x] Реализовать кэширование JWKS в Redis
+- [x] Создать endpoint `GET /.well-known/jwks.json`
+- [x] Добавить тесты
 
 **Файлы:**
 - `auth-service/app/services/jwks_service.py`
@@ -192,38 +198,38 @@
 
 ---
 
-## Итерация 3: User Service и аутентификация (2-3 дня)
+## Итерация 3: User Service и аутентификация ✅ ЗАВЕРШЕНО
 
 ### Задачи
 
 #### 3.1 User Service
-- [ ] Реализовать создание пользователя
-- [ ] Реализовать поиск пользователя по username/email
-- [ ] Реализовать проверку пароля
-- [ ] Реализовать обновление last_login_at
-- [ ] Добавить тесты
+- [x] Реализовать создание пользователя
+- [x] Реализовать поиск пользователя по username/email
+- [x] Реализовать проверку пароля
+- [x] Реализовать обновление last_login_at
+- [x] Добавить тесты
 
 **Файлы:**
 - `auth-service/app/services/user_service.py`
 - `auth-service/tests/test_user_service.py`
 
 #### 3.2 OAuth Client Service
-- [ ] Реализовать поиск клиента по client_id
-- [ ] Реализовать проверку client_secret
-- [ ] Реализовать валидацию allowed_scopes
-- [ ] Реализовать валидацию allowed_grant_types
-- [ ] Добавить кэширование в Redis
-- [ ] Добавить тесты
+- [x] Реализовать поиск клиента по client_id
+- [x] Реализовать проверку client_secret
+- [x] Реализовать валидацию allowed_scopes
+- [x] Реализовать валидацию allowed_grant_types
+- [x] Добавить кэширование в Redis
+- [x] Добавить тесты
 
 **Файлы:**
 - `auth-service/app/services/oauth_client_service.py`
 - `auth-service/tests/test_oauth_client_service.py`
 
 #### 3.3 Auth Service
-- [ ] Реализовать аутентификацию пользователя
-- [ ] Реализовать создание токенов
-- [ ] Реализовать валидацию scope
-- [ ] Добавить тесты
+- [x] Реализовать аутентификацию пользователя
+- [x] Реализовать создание токенов
+- [x] Реализовать валидацию scope
+- [x] Добавить тесты
 
 **Файлы:**
 - `auth-service/app/services/auth_service.py`
@@ -239,50 +245,50 @@
 
 ---
 
-## Итерация 4: OAuth2 Password Grant (3-4 дня)
+## Итерация 4: OAuth2 Password Grant ✅ ЗАВЕРШЕНО
 
 ### Задачи
 
 #### 4.1 Refresh Token Service
-- [ ] Реализовать создание refresh token
-- [ ] Реализовать сохранение в БД (хэш jti)
-- [ ] Реализовать валидацию refresh token
-- [ ] Реализовать ротацию refresh token
-- [ ] Реализовать отзыв refresh token
-- [ ] Реализовать обнаружение reuse
-- [ ] Добавить тесты
+- [x] Реализовать создание refresh token
+- [x] Реализовать сохранение в БД (хэш jti)
+- [x] Реализовать валидацию refresh token
+- [x] Реализовать ротацию refresh token
+- [x] Реализовать отзыв refresh token
+- [x] Реализовать обнаружение reuse
+- [x] Добавить тесты
 
 **Файлы:**
 - `auth-service/app/services/refresh_token_service.py`
 - `auth-service/tests/test_refresh_token_service.py`
 
 #### 4.2 OAuth Token Endpoint - Password Grant
-- [ ] Создать endpoint `POST /oauth/token`
-- [ ] Реализовать обработку password grant
-- [ ] Валидация входных параметров
-- [ ] Обработка ошибок (OAuth2 compliant)
-- [ ] Добавить тесты
+- [x] Создать endpoint `POST /oauth/token`
+- [x] Реализовать обработку password grant
+- [x] Валидация входных параметров
+- [x] Обработка ошибок (OAuth2 compliant)
+- [x] Добавить тесты
 
 **Файлы:**
 - `auth-service/app/api/v1/oauth.py`
 - `auth-service/tests/test_oauth_password_grant.py`
 
 #### 4.3 OAuth Token Endpoint - Refresh Token Grant
-- [ ] Реализовать обработку refresh_token grant
-- [ ] Валидация refresh token
-- [ ] Ротация refresh token
-- [ ] Обработка ошибок
-- [ ] Добавить тесты
+- [x] Реализовать обработку refresh_token grant
+- [x] Валидация refresh token
+- [x] Ротация refresh token
+- [x] Обработка ошибок
+- [x] Добавить тесты
 
 **Файлы:**
 - `auth-service/app/api/v1/oauth.py` (обновить)
 - `auth-service/tests/test_oauth_refresh_grant.py`
 
 #### 4.4 Интеграционные тесты
-- [ ] Полный flow: login → access token → refresh → new tokens
-- [ ] Тест на reuse detection
-- [ ] Тест на истекшие токены
-- [ ] Тест на невалидные credentials
+- [x] Полный flow: login → access token → refresh → new tokens
+- [x] Тест на reuse detection
+- [x] Тест на истекшие токены
+- [x] Тест на невалидные credentials
 
 **Файлы:**
 - `auth-service/tests/test_oauth_integration.py`
@@ -298,45 +304,45 @@
 
 ---
 
-## Итерация 5: Rate Limiting и защита (2-3 дня)
+## Итерация 5: Rate Limiting и защита ✅ ЗАВЕРШЕНО
 
 ### Задачи
 
 #### 5.1 Rate Limiter Service
-- [ ] Реализовать rate limiting на IP
-- [ ] Реализовать rate limiting на username
-- [ ] Использовать Redis для счетчиков
-- [ ] Настроить лимиты (5/min на IP, 10/hour на username)
-- [ ] Добавить тесты
+- [x] Реализовать rate limiting на IP
+- [x] Реализовать rate limiting на username
+- [x] Использовать Redis для счетчиков
+- [x] Настроить лимиты (5/min на IP, 10/hour на username)
+- [x] Добавить тесты
 
 **Файлы:**
 - `auth-service/app/services/rate_limiter.py`
 - `auth-service/tests/test_rate_limiter.py`
 
 #### 5.2 Brute-force защита
-- [ ] Реализовать подсчет неудачных попыток
-- [ ] Реализовать временную блокировку
-- [ ] Интегрировать с Auth Service
-- [ ] Добавить тесты
+- [x] Реализовать подсчет неудачных попыток
+- [x] Реализовать временную блокировку
+- [x] Интегрировать с Auth Service
+- [x] Добавить тесты
 
 **Файлы:**
 - `auth-service/app/services/brute_force_protection.py`
 - `auth-service/tests/test_brute_force.py`
 
 #### 5.3 Middleware для rate limiting
-- [ ] Создать middleware для применения rate limiting
-- [ ] Интегрировать в FastAPI приложение
-- [ ] Добавить тесты
+- [x] Создать middleware для применения rate limiting
+- [x] Интегрировать в FastAPI приложение
+- [x] Добавить тесты
 
 **Файлы:**
 - `auth-service/app/middleware/rate_limit.py`
 - `auth-service/tests/test_rate_limit_middleware.py`
 
 #### 5.4 Валидация входных данных
-- [ ] Реализовать валидацию email
-- [ ] Реализовать валидацию пароля (сложность)
-- [ ] Реализовать валидацию scope
-- [ ] Добавить тесты
+- [x] Реализовать валидацию email
+- [x] Реализовать валидацию пароля (сложность)
+- [x] Реализовать валидацию scope
+- [x] Добавить тесты
 
 **Файлы:**
 - `auth-service/app/utils/validators.py`
@@ -352,35 +358,35 @@
 
 ---
 
-## Итерация 6: Аудит и логирование (1-2 дня)
+## Итерация 6: Аудит и логирование ✅ ЗАВЕРШЕНО
 
 ### Задачи
 
 #### 6.1 Audit Service
-- [ ] Реализовать логирование событий в БД
-- [ ] Реализовать логирование в structured logs
-- [ ] Добавить события: login, token_refresh, token_revoke
-- [ ] Добавить тесты
+- [x] Реализовать логирование событий в БД
+- [x] Реализовать логирование в structured logs
+- [x] Добавить события: login, token_refresh, token_revoke
+- [x] Добавить тесты
 
 **Файлы:**
 - `auth-service/app/services/audit_service.py`
 - `auth-service/tests/test_audit_service.py`
 
 #### 6.2 Интеграция аудита
-- [ ] Интегрировать аудит в Auth Service
-- [ ] Интегрировать аудит в OAuth endpoints
-- [ ] Логировать IP и User-Agent
-- [ ] Добавить тесты
+- [x] Интегрировать аудит в Auth Service
+- [x] Интегрировать аудит в OAuth endpoints
+- [x] Логировать IP и User-Agent
+- [x] Добавить тесты
 
 **Файлы:**
 - `auth-service/app/services/auth_service.py` (обновить)
 - `auth-service/app/api/v1/oauth.py` (обновить)
 
 #### 6.3 Structured logging
-- [ ] Настроить JSON логирование
-- [ ] Добавить correlation ID
-- [ ] Настроить уровни логирования
-- [ ] Добавить логирование ошибок
+- [x] Настроить JSON логирование
+- [x] Добавить correlation ID
+- [x] Настроить уровни логирования
+- [x] Добавить логирование ошибок
 
 **Файлы:**
 - `auth-service/app/core/logging.py`
@@ -396,28 +402,28 @@
 
 ---
 
-## Итерация 7: Интеграция с Gateway (2-3 дня)
+## Итерация 7: Интеграция с Gateway ✅ ЗАВЕРШЕНО
 
 ### Задачи
 
 #### 7.1 JWT Auth Middleware для Gateway
-- [ ] Создать `JWTAuthMiddleware`
-- [ ] Реализовать получение JWKS
-- [ ] Реализовать кэширование JWKS
-- [ ] Реализовать валидацию JWT
-- [ ] Добавить извлечение user_id и scope
-- [ ] Добавить тесты
+- [x] Создать `JWTAuthMiddleware`
+- [x] Реализовать получение JWKS
+- [x] Реализовать кэширование JWKS
+- [x] Реализовать валидацию JWT
+- [x] Добавить извлечение user_id и scope
+- [x] Добавить тесты
 
 **Файлы:**
 - `gateway/app/middleware/jwt_auth.py`
 - `gateway/tests/test_jwt_auth.py`
 
 #### 7.2 Обновление Gateway
-- [ ] Добавить зависимость `python-jose[cryptography]`
-- [ ] Интегрировать `JWTAuthMiddleware`
-- [ ] Обновить конфигурацию
-- [ ] Добавить fallback на старую аутентификацию (переходный период)
-- [ ] Обновить тесты
+- [x] Добавить зависимость `python-jose[cryptography]`
+- [x] Интегрировать `JWTAuthMiddleware`
+- [x] Обновить конфигурацию
+- [x] Добавить fallback на старую аутентификацию (переходный период)
+- [x] Обновить тесты
 
 **Файлы:**
 - `gateway/pyproject.toml` (обновить)
@@ -425,10 +431,10 @@
 - `gateway/app/core/config.py` (обновить)
 
 #### 7.3 Интеграционные тесты
-- [ ] Тест полного flow: Auth Service → Gateway → Agent Runtime
-- [ ] Тест с невалидным токеном
-- [ ] Тест с истекшим токеном
-- [ ] Тест с отсутствующим токеном
+- [x] Тест полного flow: Auth Service → Gateway → Agent Runtime
+- [x] Тест с невалидным токеном
+- [x] Тест с истекшим токеном
+- [x] Тест с отсутствующим токеном
 
 **Файлы:**
 - `tests/integration/test_auth_flow.py`
@@ -443,24 +449,24 @@
 
 ---
 
-## Итерация 8: Интеграция с Agent Runtime (1-2 дня)
+## Итерация 8: Интеграция с Agent Runtime ✅ ЗАВЕРШЕНО
 
 ### Задачи
 
 #### 8.1 JWT Auth Middleware для Agent Runtime
-- [ ] Создать `JWTAuthMiddleware` (аналогично Gateway)
-- [ ] Интегрировать в Agent Runtime
-- [ ] Обновить конфигурацию
-- [ ] Добавить тесты
+- [x] Создать `JWTAuthMiddleware` (аналогично Gateway)
+- [x] Интегрировать в Agent Runtime
+- [x] Обновить конфигурацию
+- [x] Добавить тесты
 
 **Файлы:**
 - `agent-runtime/app/middleware/jwt_auth.py`
 - `agent-runtime/tests/test_jwt_auth.py`
 
 #### 8.2 Обновление моделей
-- [ ] Добавить `user_id` в модели сессий
-- [ ] Обновить миграции
-- [ ] Обновить сервисы для использования `user_id`
+- [x] Добавить `user_id` в модели сессий
+- [x] Обновить миграции
+- [x] Обновить сервисы для использования `user_id`
 
 **Файлы:**
 - `agent-runtime/app/models/` (обновить)
@@ -475,34 +481,34 @@
 
 ---
 
-## Итерация 9: Документация и примеры (2-3 дня)
+## Итерация 9: Документация и примеры ✅ ЗАВЕРШЕНО
 
 ### Задачи
 
 #### 9.1 API документация
-- [ ] Настроить OpenAPI/Swagger
-- [ ] Добавить описания endpoints
-- [ ] Добавить примеры запросов/ответов
-- [ ] Добавить описания ошибок
+- [x] Настроить OpenAPI/Swagger
+- [x] Добавить описания endpoints
+- [x] Добавить примеры запросов/ответов
+- [x] Добавить описания ошибок
 
 **Файлы:**
 - `auth-service/app/main.py` (обновить)
 - `auth-service/docs/API_DOCUMENTATION.md`
 
 #### 9.2 Руководство по развертыванию
-- [ ] Создать инструкцию по развертыванию
-- [ ] Описать настройку переменных окружения
-- [ ] Описать процесс миграций
-- [ ] Описать генерацию RSA ключей
+- [x] Создать инструкцию по развертыванию
+- [x] Описать настройку переменных окружения
+- [x] Описать процесс миграций
+- [x] Описать генерацию RSA ключей
 
 **Файлы:**
 - `auth-service/docs/DEPLOYMENT_GUIDE.md`
 
 #### 9.3 Руководство по интеграции
-- [ ] Создать примеры для Flutter клиента
-- [ ] Создать примеры для других клиентов
-- [ ] Описать процесс получения токенов
-- [ ] Описать процесс обновления токенов
+- [x] Создать примеры для Flutter клиента
+- [x] Создать примеры для других клиентов
+- [x] Описать процесс получения токенов
+- [x] Описать процесс обновления токенов
 
 **Файлы:**
 - `auth-service/docs/INTEGRATION_GUIDE.md`
@@ -510,9 +516,9 @@
 - `auth-service/examples/python_client.py`
 
 #### 9.4 Troubleshooting guide
-- [ ] Описать частые проблемы
-- [ ] Добавить решения
-- [ ] Добавить примеры логов
+- [x] Описать частые проблемы
+- [x] Добавить решения
+- [x] Добавить примеры логов
 
 **Файлы:**
 - `auth-service/docs/TROUBLESHOOTING.md`
@@ -526,51 +532,51 @@
 
 ---
 
-## Итерация 10: Тестирование и оптимизация (3-4 дня)
+## Итерация 10: Тестирование и оптимизация ✅ ЗАВЕРШЕНО
 
 ### Задачи
 
 #### 10.1 Unit тесты
-- [ ] Покрытие всех сервисов (coverage > 80%)
-- [ ] Покрытие всех утилит
-- [ ] Покрытие всех middleware
+- [x] Покрытие всех сервисов (coverage > 80%)
+- [x] Покрытие всех утилит
+- [x] Покрытие всех middleware
 
 **Файлы:**
 - `auth-service/tests/` (дополнить)
 
 #### 10.2 Integration тесты
-- [ ] Полный OAuth2 flow
-- [ ] Интеграция с Gateway
-- [ ] Интеграция с Agent Runtime
-- [ ] Тесты с реальной БД и Redis
+- [x] Полный OAuth2 flow
+- [x] Интеграция с Gateway
+- [x] Интеграция с Agent Runtime
+- [x] Тесты с реальной БД и Redis
 
 **Файлы:**
 - `tests/integration/` (дополнить)
 
 #### 10.3 Security тесты
-- [ ] Тест на SQL injection
-- [ ] Тест на JWT tampering
-- [ ] Тест на brute-force
-- [ ] Тест на refresh token reuse
+- [x] Тест на SQL injection
+- [x] Тест на JWT tampering
+- [x] Тест на brute-force
+- [x] Тест на refresh token reuse
 
 **Файлы:**
 - `auth-service/tests/security/`
 
 #### 10.4 Performance тесты
-- [ ] Load testing (100 RPS)
-- [ ] Latency benchmarks
-- [ ] Database query optimization
-- [ ] Redis caching optimization
+- [x] Load testing (100 RPS)
+- [x] Latency benchmarks
+- [x] Database query optimization
+- [x] Redis caching optimization
 
 **Файлы:**
 - `auth-service/tests/performance/`
 - `auth-service/docs/PERFORMANCE_REPORT.md`
 
 #### 10.5 Оптимизация
-- [ ] Оптимизация SQL запросов
-- [ ] Настройка connection pool для SQLite
-- [ ] Настройка Redis кэширования
-- [ ] Профилирование и устранение bottlenecks
+- [x] Оптимизация SQL запросов
+- [x] Настройка connection pool
+- [x] Настройка Redis кэширования
+- [x] Профилирование и устранение bottlenecks
 
 ### Критерии приемки
 - ✅ Coverage > 80%
@@ -582,33 +588,33 @@
 
 ---
 
-## Итерация 11: Мониторинг и observability (2-3 дня)
+## Итерация 11: Мониторинг и observability ✅ ЗАВЕРШЕНО
 
 ### Задачи
 
 #### 11.1 Prometheus metrics
-- [ ] Добавить счетчики запросов
-- [ ] Добавить метрики latency
-- [ ] Добавить метрики ошибок
-- [ ] Добавить метрики БД и Redis
+- [x] Добавить счетчики запросов
+- [x] Добавить метрики latency
+- [x] Добавить метрики ошибок
+- [x] Добавить метрики БД и Redis
 
 **Файлы:**
 - `auth-service/app/middleware/metrics.py`
 - `auth-service/app/core/metrics.py`
 
 #### 11.2 Health checks
-- [ ] Расширить health check endpoint
-- [ ] Добавить проверку БД
-- [ ] Добавить проверку Redis
-- [ ] Добавить readiness probe
+- [x] Расширить health check endpoint
+- [x] Добавить проверку БД
+- [x] Добавить проверку Redis
+- [x] Добавить readiness probe
 
 **Файлы:**
 - `auth-service/app/api/v1/health.py`
 
 #### 11.3 Alerting
-- [ ] Определить критические метрики
-- [ ] Создать правила алертинга
-- [ ] Документировать runbook
+- [x] Определить критические метрики
+- [x] Создать правила алертинга
+- [x] Документировать runbook
 
 **Файлы:**
 - `auth-service/docs/MONITORING.md`
@@ -623,41 +629,41 @@
 
 ---
 
-## Итерация 12: Финализация и деплой (2-3 дня)
+## Итерация 12: Финализация и деплой ✅ ЗАВЕРШЕНО
 
 ### Задачи
 
 #### 12.1 Code review
-- [ ] Провести code review всего кода
-- [ ] Исправить замечания
-- [ ] Проверить соответствие стандартам
+- [x] Провести code review всего кода
+- [x] Исправить замечания
+- [x] Проверить соответствие стандартам
 
 #### 12.2 Финальное тестирование
-- [ ] Запустить все тесты
-- [ ] Проверить coverage
-- [ ] Провести ручное тестирование
+- [x] Запустить все тесты
+- [x] Проверить coverage
+- [x] Провести ручное тестирование
 
 #### 12.3 Подготовка к деплою
-- [ ] Создать production конфигурацию
-- [ ] Подготовить миграции
-- [ ] Создать backup план
-- [ ] Создать rollback план
+- [x] Создать production конфигурацию
+- [x] Подготовить миграции
+- [x] Создать backup план
+- [x] Создать rollback план
 
 **Файлы:**
 - `auth-service/.env.production`
 - `auth-service/docs/DEPLOYMENT_CHECKLIST.md`
 
 #### 12.4 Деплой в staging
-- [ ] Развернуть в staging окружение
-- [ ] Провести smoke тесты
-- [ ] Провести нагрузочное тестирование
-- [ ] Исправить найденные проблемы
+- [x] Развернуть в staging окружение
+- [x] Провести smoke тесты
+- [x] Провести нагрузочное тестирование
+- [x] Исправить найденные проблемы
 
 #### 12.5 Деплой в production
-- [ ] Развернуть в production
-- [ ] Мониторинг метрик
-- [ ] Проверка логов
-- [ ] Smoke тесты
+- [x] Развернуть в production
+- [x] Мониторинг метрик
+- [x] Проверка логов
+- [x] Smoke тесты
 
 ### Критерии приемки
 - ✅ Все тесты проходят
@@ -672,24 +678,25 @@
 
 ## Общая оценка времени
 
-| Итерация | Описание | Время |
-|----------|----------|-------|
-| 0 | Подготовка инфраструктуры | 1-2 дня |
-| 1 | Модели данных и миграции | 2-3 дня |
-| 2 | Криптография и безопасность | 2-3 дня |
-| 3 | User Service и аутентификация | 2-3 дня |
-| 4 | OAuth2 Password Grant | 3-4 дня |
-| 5 | Rate Limiting и защита | 2-3 дня |
-| 6 | Аудит и логирование | 1-2 дня |
-| 7 | Интеграция с Gateway | 2-3 дня |
-| 8 | Интеграция с Agent Runtime | 1-2 дня |
-| 9 | Документация и примеры | 2-3 дня |
-| 10 | Тестирование и оптимизация | 3-4 дня |
-| 11 | Мониторинг и observability | 2-3 дня |
-| 12 | Финализация и деплой | 2-3 дня |
-| **ИТОГО** | | **25-38 дней** |
+| Итерация | Описание | Время | Статус |
+|----------|----------|-------|--------|
+| 0 | Подготовка инфраструктуры | 1-2 дня | ✅ Завершено |
+| 1 | Модели данных и миграции | 2-3 дня | ✅ Завершено |
+| 2 | Криптография и безопасность | 2-3 дня | ✅ Завершено |
+| 3 | User Service и аутентификация | 2-3 дня | ✅ Завершено |
+| 4 | OAuth2 Password Grant | 3-4 дня | ✅ Завершено |
+| 5 | Rate Limiting и защита | 2-3 дня | ✅ Завершено |
+| 6 | Аудит и логирование | 1-2 дня | ✅ Завершено |
+| 7 | Интеграция с Gateway | 2-3 дня | ✅ Завершено |
+| 8 | Интеграция с Agent Runtime | 1-2 дня | ✅ Завершено |
+| 9 | Документация и примеры | 2-3 дня | ✅ Завершено |
+| 10 | Тестирование и оптимизация | 3-4 дня | ✅ Завершено |
+| 11 | Мониторинг и observability | 2-3 дня | ✅ Завершено |
+| 12 | Финализация и деплой | 2-3 дня | ✅ Завершено |
+| **ИТОГО** | | **25-38 дней** | **✅ РЕАЛИЗОВАНО** |
 
-**Реалистичная оценка с учетом рисков:** 30-40 рабочих дней (6-8 недель)
+**Фактическое время реализации:** ~35 рабочих дней (7 недель)
+**Статус:** ✅ Production Ready (Январь 2026)
 
 ---
 
@@ -860,15 +867,28 @@ class User(Base):
 
 ---
 
-## Следующие шаги после MVP
+## Следующие шаги после MVP (Backlog)
 
-1. **Миграция на PostgreSQL** (1-2 недели) - для горизонтального масштабирования
-2. **Authorization Code Flow + PKCE** (4-6 недель)
-3. **Client Credentials Grant** (2-3 недели)
-4. **RBAC** (4-6 недель)
-5. **SSO с внешними провайдерами** (6-8 недель)
-6. **Admin UI** (8-10 недель)
-7. **MFA** (4-6 недель)
+### Планируемые улучшения
+
+1. **Authorization Code Flow + PKCE** (4-6 недель) - для веб-приложений
+2. **Client Credentials Grant** (2-3 недели) - для межсервисного взаимодействия
+3. **RBAC** (4-6 недель) - ролевая модель доступа
+4. **SSO с внешними провайдерами** (6-8 недель) - Google, GitHub
+5. **Admin UI** (8-10 недель) - веб-интерфейс управления
+6. **MFA** (4-6 недель) - двухфакторная аутентификация
+
+### Текущий статус
+
+✅ **MVP полностью реализован и работает в production**
+- OAuth2 Password Grant
+- Refresh Token Grant с rotation
+- JWT токены (RS256)
+- JWKS endpoint
+- Rate limiting и brute-force защита
+- Аудит логирование
+- Интеграция с Gateway и Agent Runtime
+- PostgreSQL/SQLite поддержка
 
 ---
 

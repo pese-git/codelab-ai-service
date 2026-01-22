@@ -7,8 +7,9 @@ from typing import AsyncGenerator, Dict, Any
 from app.agents.base_agent import BaseAgent, AgentType
 from app.agents.prompts.universal import UNIVERSAL_SYSTEM_PROMPT
 from app.models.schemas import StreamChunk
-from app.services.llm_stream_service import stream_response
-from app.services.session_manager_async import AsyncSessionManager
+from app.infrastructure.llm.streaming import stream_response
+from app.domain.entities.session import Session
+from app.domain.services.session_management import SessionManagementService
 
 logger = logging.getLogger("agent-runtime.universal_agent")
 
@@ -50,7 +51,8 @@ class UniversalAgent(BaseAgent):
         session_id: str,
         message: str,
         context: Dict[str, Any],
-        session_mgr: AsyncSessionManager
+        session: Session,
+        session_service: SessionManagementService
     ) -> AsyncGenerator[StreamChunk, None]:
         """
         Process message through Universal agent.
@@ -59,7 +61,8 @@ class UniversalAgent(BaseAgent):
             session_id: Session identifier
             message: User message to process
             context: Agent context with history
-            session_mgr: Async session manager for session operations
+            session: Domain entity Session with message history
+            session_service: Session management service for operations
             
         Yields:
             StreamChunk: Chunks for SSE streaming
@@ -67,8 +70,8 @@ class UniversalAgent(BaseAgent):
         logger.info(f"Universal agent processing message for session {session_id}")
         logger.debug(f"Single-agent mode: handling all tasks without delegation")
         
-        # Get session history
-        history = session_mgr.get_history(session_id)
+        # Get session history from domain entity
+        history = session.get_history_for_llm()
         
         # Update system prompt
         if history and history[0].get("role") == "system":
@@ -76,8 +79,12 @@ class UniversalAgent(BaseAgent):
         else:
             history.insert(0, {"role": "system", "content": self.system_prompt})
         
+        # Create adapter for backward compatibility with llm_stream_service
+        from app.infrastructure.adapters.session_manager_adapter import SessionManagerAdapter
+        session_mgr_adapter = SessionManagerAdapter(session_service)
+        
         # Delegate to LLM stream service with all tools
-        async for chunk in stream_response(session_id, history, self.allowed_tools, session_mgr):
+        async for chunk in stream_response(session_id, history, self.allowed_tools, session_mgr_adapter):
             # Validate tool usage (should always pass since all tools are allowed)
             if chunk.type == "tool_call":
                 if not self.can_use_tool(chunk.tool_name):

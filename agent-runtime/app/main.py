@@ -9,9 +9,21 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 
-from app.api.v1.endpoints import router as v1_router
-from app.middleware.internal_auth import InternalAuthMiddleware
+from app.api.v1.routers import (
+    health_router,
+    sessions_router,
+    agents_router,
+    messages_router,
+    events_router
+)
+from app.api.middleware.internal_auth import InternalAuthMiddleware
+from app.api.middleware import RateLimitMiddleware
 from app.core.config import AppConfig, logger
+
+# Глобальные экземпляры адаптеров (инициализируются в lifespan)
+session_manager_adapter = None
+agent_context_manager_adapter = None
+message_orchestration_service = None
 
 
 @asynccontextmanager
@@ -27,7 +39,6 @@ async def lifespan(app: FastAPI):
             metrics_collector,
             audit_logger,
             agent_context_subscriber,
-            persistence_subscriber,
             session_metrics_collector
         )
         
@@ -36,7 +47,7 @@ async def lifespan(app: FastAPI):
         
         logger.info("✓ Event Bus initialized with subscribers")
         logger.info("✓ Event-driven architecture fully active (Phase 4)")
-        logger.info("✓ Event-driven persistence active")
+        logger.info("✓ Persistence handled by domain services (immediate)")
         logger.info("✓ Session metrics collector active")
         
         # Initialize database
@@ -45,15 +56,80 @@ async def lifespan(app: FastAPI):
         await init_db()
         logger.info("✓ Database initialized")
         
-        # Initialize async session manager
-        from app.services.session_manager_async import init_session_manager
-        await init_session_manager()
-        logger.info("✓ Session manager initialized")
+        # Initialize multi-agent system
+        from app.agents import initialize_agents
+        initialize_agents()
+        logger.info("✓ Multi-agent system initialized")
         
-        # Initialize async agent context manager
-        from app.services.agent_context_async import init_agent_context_manager
-        await init_agent_context_manager()
-        logger.info("✓ Agent context manager initialized")
+        # Управление сессиями и контекстом через адаптеры
+        # Адаптеры обеспечивают обратную совместимость с новыми доменными сервисами
+        # Персистентность обрабатывается доменными сервисами (SessionManagementService, AgentOrchestrationService)
+        logger.info("✓ Session/context management via new architecture (adapters)")
+        
+        # Инициализация адаптеров для новой архитектуры
+        # ВАЖНО: Не используем database session при startup, так как адаптеры
+        # будут использоваться с request-scoped сессиями через dependency injection
+        from app.infrastructure.adapters import (
+            SessionManagerAdapter,
+            AgentContextManagerAdapter
+        )
+        from app.domain.services import (
+            SessionManagementService,
+            AgentOrchestrationService
+        )
+        from app.infrastructure.cleanup import SessionCleanupService
+        from app.core.dependencies import get_event_publisher
+        from app.services.database import get_db
+        
+        try:
+            # Получить singleton event publisher
+            event_publisher = get_event_publisher()
+            
+            # ПРИМЕЧАНИЕ: Мы НЕ создаем репозитории и сервисы здесь,
+            # так как они требуют database session, которая должна быть request-scoped.
+            # Вместо этого, глобальные адаптеры будут None, и мы будем использовать
+            # dependency injection в роутерах для получения сервисов с правильной сессией.
+            
+            # Установить глобальные адаптеры в None (будут использоваться через DI)
+            global session_manager_adapter, agent_context_manager_adapter, message_orchestration_service
+            session_manager_adapter = None
+            agent_context_manager_adapter = None
+            message_orchestration_service = None
+            
+            logger.info("✓ Manager adapters will be initialized per-request via dependency injection")
+            
+            # Initialize session cleanup service with factory pattern
+            from app.infrastructure.persistence.repositories import SessionRepositoryImpl
+            from app.infrastructure.persistence.database import async_session_maker
+            from contextlib import asynccontextmanager
+            
+            # Фабрика-контекстный менеджер для создания session service с новой DB сессией
+            @asynccontextmanager
+            async def create_cleanup_session_service():
+                """Async context manager factory to create session service with fresh DB session"""
+                async with async_session_maker() as db:
+                    cleanup_repo = SessionRepositoryImpl(db)
+                    service = SessionManagementService(
+                        repository=cleanup_repo,
+                        event_publisher=event_publisher.publish
+                    )
+                    yield service
+            
+            # Создаем cleanup service с фабрикой
+            cleanup_service = SessionCleanupService(
+                session_service_factory=create_cleanup_session_service,
+                cleanup_interval_hours=1,
+                max_age_hours=24
+            )
+            await cleanup_service.start()
+            logger.info("✓ Session cleanup service started")
+                
+        except Exception as e:
+            logger.error(f"Failed to initialize services: {e}", exc_info=True)
+            session_manager_adapter = None
+            agent_context_manager_adapter = None
+            message_orchestration_service = None
+            cleanup_service = None
         
         # Publish system startup event
         from app.events.event_bus import event_bus
@@ -78,14 +154,8 @@ async def lifespan(app: FastAPI):
     # Shutdown logic
     logger.info("Shutting down Agent Runtime Service...")
     
-    # Shutdown persistence subscriber first (flush pending)
-    try:
-        from app.events.subscribers import persistence_subscriber
-        if persistence_subscriber:
-            await persistence_subscriber.shutdown()
-            logger.info("✓ Persistence subscriber shutdown")
-    except Exception as e:
-        logger.error(f"Error shutting down persistence subscriber: {e}")
+    # Персистентность обрабатывается доменными сервисами напрямую (подписчик не нужен)
+    logger.info("✓ Persistence handled by domain services (no subscriber needed)")
     
     # Publish system shutdown event
     try:
@@ -105,20 +175,16 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Error publishing shutdown event: {e}")
     
-    # Shutdown managers (flush pending writes if timer-based still active)
+    # Shutdown cleanup service
     try:
-        from app.services.session_manager_async import session_manager
-        from app.services.agent_context_async import agent_context_manager
-        
-        if session_manager:
-            await session_manager.shutdown()
-            logger.info("✓ Session manager shutdown")
-        
-        if agent_context_manager:
-            await agent_context_manager.shutdown()
-            logger.info("✓ Agent context manager shutdown")
+        if 'cleanup_service' in locals() and cleanup_service:
+            await cleanup_service.stop()
+            logger.info("✓ Session cleanup service stopped")
     except Exception as e:
-        logger.error(f"Error during shutdown: {e}")
+        logger.error(f"Error stopping cleanup service: {e}")
+    
+    # Shutdown обрабатывается репозиториями в новой архитектуре
+    logger.info("✓ Session/context managers shutdown (managed by new architecture)")
     
     # Close database
     from app.services.database import close_db
@@ -126,10 +192,7 @@ async def lifespan(app: FastAPI):
     logger.info("✓ Database closed")
 
 
-# Initialize multi-agent system
-import app.agents  # This will register all agents
-
-# Create FastAPI application
+# Create FastAPI application (agents will be initialized in lifespan)
 app = FastAPI(
     title="Agent Runtime Service",
     version=AppConfig.VERSION,
@@ -176,8 +239,21 @@ app.openapi = custom_openapi  # type: ignore[assignment]
 # Add middleware
 app.add_middleware(InternalAuthMiddleware)
 
+# Add rate limiting middleware (60 requests per minute per client)
+app.add_middleware(
+    RateLimitMiddleware,
+    requests_per_minute=60
+)
+
 # Include API routers
-app.include_router(v1_router)
+# Новые структурированные роутеры
+app.include_router(health_router)
+app.include_router(sessions_router)
+app.include_router(agents_router)
+app.include_router(messages_router)
+app.include_router(events_router)
+
+logger.info("✓ API routers registered")
 
 
 if __name__ == "__main__":

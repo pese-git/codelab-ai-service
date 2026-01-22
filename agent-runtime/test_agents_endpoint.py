@@ -37,7 +37,7 @@ async def test_agents_endpoint():
     from app.main import app
     
     # Import after app is created to ensure initialization
-    from app.services.agent_router import agent_router
+    from app.domain.services.agent_registry import agent_router
     
     # Check registered agents in router
     registered_agents = agent_router.list_agents()

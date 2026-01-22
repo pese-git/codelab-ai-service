@@ -48,10 +48,8 @@ async def mock_database():
     mock_db_service.load_agent_context = AsyncMock(return_value=None)
     mock_db_service.save_agent_context = AsyncMock()
     
+    # Note: Old session_manager_async and agent_context_async removed
+    # Only patch database module
     with patch("app.services.database.get_db", mock_get_db):
-        with patch("app.services.session_manager_async.get_db", mock_get_db):
-            with patch("app.services.agent_context_async.get_db", mock_get_db):
-                with patch("app.services.database.get_database_service", return_value=mock_db_service):
-                    with patch("app.services.session_manager_async.get_database_service", return_value=mock_db_service):
-                        with patch("app.services.agent_context_async.get_database_service", return_value=mock_db_service):
-                            yield mock_db
+        with patch("app.services.database.get_database_service", return_value=mock_db_service):
+            yield mock_db

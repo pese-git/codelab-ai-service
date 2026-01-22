@@ -7,7 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.testclient import TestClient
 
-from app.middleware.internal_auth import InternalAuthMiddleware
+from app.api.middleware.internal_auth import InternalAuthMiddleware
 
 
 @pytest.fixture
@@ -115,7 +115,7 @@ def test_all_public_paths():
             return endpoint
         make_endpoint(path)
     
-    with patch("app.middleware.internal_auth.AppConfig.INTERNAL_API_KEY", "test-key"):
+    with patch("app.api.middleware.internal_auth.AppConfig.INTERNAL_API_KEY", "test-key"):
         app.add_middleware(InternalAuthMiddleware)
         client = TestClient(app)
         
@@ -138,7 +138,7 @@ async def test_middleware_dispatch_calls_next():
     # Mock call_next
     call_next = AsyncMock(return_value=JSONResponse({"success": True}))
     
-    with patch("app.middleware.internal_auth.AppConfig.INTERNAL_API_KEY", "test-key"):
+    with patch("app.api.middleware.internal_auth.AppConfig.INTERNAL_API_KEY", "test-key"):
         response = await middleware.dispatch(request, call_next)
     
     # Verify call_next was called
@@ -177,7 +177,7 @@ async def test_middleware_dispatch_invalid_auth():
     # Mock call_next (should not be called)
     call_next = AsyncMock()
     
-    with patch("app.middleware.internal_auth.AppConfig.INTERNAL_API_KEY", "test-key"):
+    with patch("app.api.middleware.internal_auth.AppConfig.INTERNAL_API_KEY", "test-key"):
         response = await middleware.dispatch(request, call_next)
     
     # Verify call_next was NOT called
@@ -200,7 +200,7 @@ async def test_middleware_dispatch_none_auth_header():
     
     call_next = AsyncMock()
     
-    with patch("app.middleware.internal_auth.AppConfig.INTERNAL_API_KEY", "test-key"):
+    with patch("app.api.middleware.internal_auth.AppConfig.INTERNAL_API_KEY", "test-key"):
         response = await middleware.dispatch(request, call_next)
     
     # Should return 401
@@ -224,7 +224,7 @@ def test_middleware_with_different_api_keys():
         async def test_endpoint():
             return {"ok": True}
         
-        with patch("app.middleware.internal_auth.AppConfig.INTERNAL_API_KEY", test_key):
+        with patch("app.api.middleware.internal_auth.AppConfig.INTERNAL_API_KEY", test_key):
             app.add_middleware(InternalAuthMiddleware)
             client = TestClient(app)
             
@@ -283,7 +283,7 @@ def test_middleware_with_post_request():
     async def protected_post():
         return {"created": True}
     
-    with patch("app.middleware.internal_auth.AppConfig.INTERNAL_API_KEY", "test-key"):
+    with patch("app.api.middleware.internal_auth.AppConfig.INTERNAL_API_KEY", "test-key"):
         app.add_middleware(InternalAuthMiddleware)
         client = TestClient(app)
         

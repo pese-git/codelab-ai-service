@@ -5,8 +5,8 @@ import pytest
 import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.services.llm_stream_service import stream_response
-from app.services.session_manager_async import AsyncSessionManager
+from app.infrastructure.llm.streaming import stream_response
+from app.infrastructure.adapters import SessionManagerAdapter
 from app.models.schemas import StreamChunk, ToolCall
 
 
@@ -19,9 +19,10 @@ def mock_llm_proxy_client():
 
 @pytest_asyncio.fixture
 async def mock_session_manager():
-    """Mock async session manager"""
-    mock = AsyncMock(spec=AsyncSessionManager)
-    mock.get = MagicMock()
+    """Mock session manager adapter"""
+    mock = AsyncMock(spec=SessionManagerAdapter)
+    mock.append_message = AsyncMock()
+    mock.append_assistant_with_tool_calls = AsyncMock()
     mock.append_message = AsyncMock()
     mock.append_tool_result = AsyncMock()
     mock._schedule_persist = AsyncMock()
@@ -139,12 +140,12 @@ async def test_stream_response_tool_call(
     assert chunks[0].requires_approval is False
     assert chunks[0].is_final is True
     
-    # Verify assistant message with tool_call was added to session
-    assert len(mock_session.messages) == 1
-    assistant_msg = mock_session.messages[0]
-    assert assistant_msg["role"] == "assistant"
-    assert assistant_msg["content"] is None
-    assert len(assistant_msg["tool_calls"]) == 1
+    # Verify append_assistant_with_tool_calls was called (not direct message append)
+    mock_session_manager.append_assistant_with_tool_calls.assert_awaited_once()
+    call_args = mock_session_manager.append_assistant_with_tool_calls.call_args
+    assert call_args[1]["session_id"] == session_id
+    assert len(call_args[1]["tool_calls"]) == 1
+    assert call_args[1]["tool_calls"][0]["id"] == "call_123"
 
 
 @pytest.mark.asyncio

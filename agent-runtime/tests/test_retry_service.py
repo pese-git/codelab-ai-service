@@ -209,7 +209,7 @@ class TestLLMProxyClientRetry:
     @pytest.mark.asyncio
     async def test_llm_client_retries_on_timeout(self):
         """LLM client should retry on timeout."""
-        from app.services.llm_proxy_client import LLMProxyClient
+        from app.infrastructure.llm.client import LLMProxyClient
         
         client = LLMProxyClient()
         
@@ -239,7 +239,7 @@ class TestLLMProxyClientRetry:
     @pytest.mark.asyncio
     async def test_llm_client_fails_on_non_retryable(self):
         """LLM client should not retry on non-retryable errors."""
-        from app.services.llm_proxy_client import LLMProxyClient
+        from app.infrastructure.llm.client import LLMProxyClient
         
         client = LLMProxyClient()
         
