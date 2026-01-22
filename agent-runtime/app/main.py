@@ -101,16 +101,19 @@ async def lifespan(app: FastAPI):
             # Initialize session cleanup service with factory pattern
             from app.infrastructure.persistence.repositories import SessionRepositoryImpl
             from app.infrastructure.persistence.database import async_session_maker
+            from contextlib import asynccontextmanager
             
-            # Фабрика для создания session service с новой DB сессией
+            # Фабрика-контекстный менеджер для создания session service с новой DB сессией
+            @asynccontextmanager
             async def create_cleanup_session_service():
-                """Factory to create session service with fresh DB session"""
+                """Async context manager factory to create session service with fresh DB session"""
                 async with async_session_maker() as db:
                     cleanup_repo = SessionRepositoryImpl(db)
-                    return SessionManagementService(
+                    service = SessionManagementService(
                         repository=cleanup_repo,
                         event_publisher=event_publisher.publish
                     )
+                    yield service
             
             # Создаем cleanup service с фабрикой
             cleanup_service = SessionCleanupService(
