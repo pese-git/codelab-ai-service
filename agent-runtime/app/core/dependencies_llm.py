@@ -15,7 +15,6 @@ from ..domain.services.llm_response_processor import LLMResponseProcessor
 from ..domain.services.tool_filter_service import ToolFilterService
 from ..domain.services.tool_registry import ToolRegistry
 from ..domain.services.hitl_policy import hitl_policy_service
-from ..domain.services.hitl_management import hitl_manager
 from ..domain.services.session_management import SessionManagementService
 from ..application.handlers.stream_llm_response_handler import StreamLLMResponseHandler
 from .dependencies import get_session_management_service
@@ -100,20 +99,6 @@ def get_llm_response_processor() -> LLMResponseProcessor:
     return LLMResponseProcessor(hitl_policy=hitl_policy_service)
 
 
-def get_hitl_manager():
-    """
-    Получить HITL менеджер (DEPRECATED).
-    
-    DEPRECATED: Используйте get_hitl_service() из dependencies.py
-    Оставлено для обратной совместимости.
-    
-    Returns:
-        HITLManager: Менеджер для управления HITL состоянием
-    """
-    # Используем существующий глобальный менеджер (deprecated)
-    return hitl_manager
-
-
 # ==================== Application Handler Dependencies ====================
 
 async def get_stream_llm_response_handler(
@@ -121,11 +106,13 @@ async def get_stream_llm_response_handler(
     tool_filter: ToolFilterService = Depends(get_tool_filter_service),
     response_processor: LLMResponseProcessor = Depends(get_llm_response_processor),
     event_publisher: LLMEventPublisher = Depends(get_llm_event_publisher),
-    session_service: SessionManagementService = Depends(get_session_management_service),
-    hitl_service = Depends(lambda: __import__('app.core.dependencies', fromlist=['get_hitl_service']).get_hitl_service)
+    session_service: SessionManagementService = Depends(get_session_management_service)
 ) -> StreamLLMResponseHandler:
     """
     Получить handler для стриминга LLM ответов.
+    
+    Note: HITLService инжектируется через get_message_orchestration_service,
+    так как StreamLLMResponseHandler создается там вручную.
     
     Args:
         llm_client: LLM клиент (инжектируется)
@@ -133,14 +120,16 @@ async def get_stream_llm_response_handler(
         response_processor: Процессор ответов (инжектируется)
         event_publisher: Event publisher (инжектируется)
         session_service: Сервис управления сессиями (инжектируется)
-        hitl_service: HITL сервис (инжектируется)
         
     Returns:
         StreamLLMResponseHandler: Handler для стриминга
+        
+    Note: Эта функция не используется напрямую, так как StreamLLMResponseHandler
+    создается в get_message_orchestration_service с правильными зависимостями.
     """
-    # Получить hitl_service из dependencies.py (избегаем циклического импорта)
-    from .dependencies import get_hitl_service as get_hitl_svc
-    hitl_svc = await get_hitl_svc()
+    # Получить hitl_service из dependencies.py
+    from .dependencies import get_hitl_service
+    hitl_svc = await get_hitl_service()
     
     return StreamLLMResponseHandler(
         llm_client=llm_client,
