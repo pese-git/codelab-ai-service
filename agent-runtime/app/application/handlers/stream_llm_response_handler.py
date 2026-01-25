@@ -17,7 +17,7 @@ from typing import AsyncGenerator, List, Dict, Optional, Any
 from ...domain.services.llm_response_processor import LLMResponseProcessor
 from ...domain.services.tool_filter_service import ToolFilterService
 from ...domain.services.session_management import SessionManagementService
-from ...domain.services.hitl_management import HITLManager
+from ...domain.services.hitl_service import HITLService
 from ...domain.entities.llm_response import ProcessedResponse
 from ...infrastructure.llm.llm_client import LLMClient
 from ...infrastructure.events.llm_event_publisher import LLMEventPublisher
@@ -49,7 +49,7 @@ class StreamLLMResponseHandler:
         _response_processor: Сервис обработки ответов
         _event_publisher: Publisher для событий
         _session_service: Сервис управления сессиями
-        _hitl_manager: Менеджер HITL
+        _hitl_service: Сервис HITL
     
     Пример:
         >>> handler = StreamLLMResponseHandler(
@@ -58,7 +58,7 @@ class StreamLLMResponseHandler:
         ...     response_processor=response_processor,
         ...     event_publisher=event_publisher,
         ...     session_service=session_service,
-        ...     hitl_manager=hitl_manager
+        ...     hitl_service=hitl_service
         ... )
         >>> async for chunk in handler.handle(
         ...     session_id="session-1",
@@ -75,7 +75,7 @@ class StreamLLMResponseHandler:
         response_processor: LLMResponseProcessor,
         event_publisher: LLMEventPublisher,
         session_service: SessionManagementService,
-        hitl_manager: HITLManager
+        hitl_service: HITLService
     ):
         """
         Инициализация handler.
@@ -86,14 +86,14 @@ class StreamLLMResponseHandler:
             response_processor: Сервис обработки ответов
             event_publisher: Publisher для событий
             session_service: Сервис управления сессиями
-            hitl_manager: Менеджер HITL
+            hitl_service: Сервис HITL
         """
         self._llm_client = llm_client
         self._tool_filter = tool_filter
         self._response_processor = response_processor
         self._event_publisher = event_publisher
         self._session_service = session_service
-        self._hitl_manager = hitl_manager
+        self._hitl_service = hitl_service
         
         logger.info("StreamLLMResponseHandler initialized")
     
@@ -284,7 +284,7 @@ class StreamLLMResponseHandler:
         
         # 3. HITL: Сохранение pending approval (если требуется)
         if processed.requires_approval:
-            await self._hitl_manager.add_pending(
+            await self._hitl_service.add_pending(
                 session_id=session_id,
                 call_id=tool_call.id,
                 tool_name=tool_call.tool_name,

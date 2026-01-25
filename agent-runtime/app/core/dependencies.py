@@ -108,6 +108,47 @@ def get_event_publisher() -> EventPublisherAdapter:
     return _event_publisher_adapter
 
 
+# ==================== HITL Dependencies ====================
+
+async def get_hitl_repository(
+    db: AsyncSession = Depends(get_db_session),
+    db_service: DatabaseService = Depends(get_database_service)
+):
+    """
+    Получить HITL repository.
+    
+    Args:
+        db: Database session (инжектируется)
+        db_service: Database service (инжектируется)
+        
+    Returns:
+        HITLRepositoryImpl: Repository implementation
+    """
+    from ..infrastructure.persistence.repositories import HITLRepositoryImpl
+    return HITLRepositoryImpl(db=db, db_service=db_service)
+
+
+async def get_hitl_service(
+    repository = Depends(get_hitl_repository),
+    event_publisher: EventPublisherAdapter = Depends(get_event_publisher)
+):
+    """
+    Получить HITL service.
+    
+    Args:
+        repository: HITL repository (инжектируется)
+        event_publisher: Event publisher (инжектируется)
+        
+    Returns:
+        HITLService: Domain service для HITL
+    """
+    from ..domain.services import HITLService
+    return HITLService(
+        repository=repository,
+        event_publisher=event_publisher.publish
+    )
+
+
 # ==================== Domain Service Dependencies ====================
 
 async def get_session_management_service(
@@ -185,7 +226,8 @@ async def get_agent_context_manager_adapter(
 async def get_message_orchestration_service(
     session_service: SessionManagementService = Depends(get_session_management_service),
     agent_service: AgentOrchestrationService = Depends(get_agent_orchestration_service),
-    event_publisher: EventPublisherAdapter = Depends(get_event_publisher)
+    event_publisher: EventPublisherAdapter = Depends(get_event_publisher),
+    hitl_service = Depends(get_hitl_service)
 ):
     """
     Получить доменный сервис оркестрации сообщений.
@@ -194,6 +236,7 @@ async def get_message_orchestration_service(
         session_service: Сервис управления сессиями (инжектируется)
         agent_service: Сервис оркестрации агентов (инжектируется)
         event_publisher: Адаптер для публикации событий (инжектируется)
+        hitl_service: Сервис HITL (инжектируется)
         
     Returns:
         MessageOrchestrationService: Доменный сервис
@@ -206,8 +249,7 @@ async def get_message_orchestration_service(
         get_llm_event_publisher,
         get_tool_registry,
         get_tool_filter_service,
-        get_llm_response_processor,
-        get_hitl_manager
+        get_llm_response_processor
     )
     from ..application.handlers.stream_llm_response_handler import StreamLLMResponseHandler
     
@@ -218,7 +260,7 @@ async def get_message_orchestration_service(
         response_processor=get_llm_response_processor(),
         event_publisher=get_llm_event_publisher(),
         session_service=session_service,
-        hitl_manager=get_hitl_manager()
+        hitl_service=hitl_service
     )
     
     return MessageOrchestrationService(
@@ -227,7 +269,8 @@ async def get_message_orchestration_service(
         agent_router=agent_router,
         lock_manager=session_lock_manager,
         event_publisher=event_publisher.publish,
-        stream_handler=stream_handler
+        stream_handler=stream_handler,
+        hitl_service=hitl_service
     )
 
 

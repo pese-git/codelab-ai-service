@@ -40,13 +40,15 @@ class MessageOrchestrationService:
         _agent_router: Роутер для получения экземпляров агентов
         _lock_manager: Менеджер блокировок сессий
         _event_publisher: Функция для публикации событий (опционально)
+        _hitl_service: Сервис HITL (опционально, для обратной совместимости)
     
     Пример:
         >>> service = MessageOrchestrationService(
         ...     session_service=session_service,
         ...     agent_service=agent_service,
         ...     agent_router=agent_router,
-        ...     lock_manager=lock_manager
+        ...     lock_manager=lock_manager,
+        ...     hitl_service=hitl_service
         ... )
         >>> async for chunk in service.process_message(
         ...     session_id="session-1",
@@ -62,7 +64,8 @@ class MessageOrchestrationService:
         agent_router,  # AgentRouter instance
         lock_manager,  # SessionLockManager instance
         event_publisher=None,
-        stream_handler: Optional["StreamLLMResponseHandler"] = None
+        stream_handler: Optional["StreamLLMResponseHandler"] = None,
+        hitl_service=None  # HITLService instance (optional for backward compatibility)
     ):
         """
         Инициализация сервиса.
@@ -74,6 +77,7 @@ class MessageOrchestrationService:
             lock_manager: Менеджер блокировок для защиты от race conditions
             event_publisher: Функция для публикации событий (опционально)
             stream_handler: Handler для стриминга LLM ответов (опционально, для новой архитектуры)
+            hitl_service: Сервис HITL (опционально, для обратной совместимости)
         """
         self._session_service = session_service
         self._agent_service = agent_service
@@ -81,6 +85,7 @@ class MessageOrchestrationService:
         self._lock_manager = lock_manager
         self._event_publisher = event_publisher
         self._stream_handler = stream_handler
+        self._hitl_service = hitl_service
         
         # TEMPORARY: Явное логирование для отладки
         logger.error(
@@ -513,16 +518,17 @@ class MessageOrchestrationService:
         )
         
         async with self._lock_manager.lock(session_id):
-            # Проверить, есть ли pending approval для этого call_id
-            # Если да и error содержит rejection - удалить pending approval
-            if error and ("Операция отклонена" in error or "User rejected" in error):
-                from .hitl_management import hitl_manager
-                pending = await hitl_manager.get_pending(session_id, call_id)
-                if pending:
-                    logger.info(
-                        f"Removing pending approval due to rejection error: {call_id}"
-                    )
-                    await hitl_manager.remove_pending(session_id, call_id)
+            # NOTE: НЕ удаляем pending approval автоматически при ошибке rejection
+            # Pending approval должен быть удален только после явного решения пользователя через HITL dialog
+            # Это позволяет IDE восстановить диалог после перезапуска
+            
+            # Старая логика (закомментирована):
+            # if error and ("Операция отклонена" in error or "User rejected" in error):
+            #     if self._hitl_service:
+            #         pending = await self._hitl_service.get_pending(session_id, call_id)
+            #         if pending:
+            #             logger.info(f"Removing pending approval due to rejection error: {call_id}")
+            #             await self._hitl_service.remove_pending(session_id, call_id)
             
             # Получить сессию
             session = await self._session_service.get_or_create_session(session_id)
@@ -704,7 +710,6 @@ class MessageOrchestrationService:
         """
         import json
         from ...models.hitl_models import HITLDecision
-        from .hitl_management import hitl_manager
         
         logger.info(
             f"Обработка HITL решения для сессии {session_id}: "
@@ -726,7 +731,7 @@ class MessageOrchestrationService:
                 return
             
             # Получить pending state
-            pending_state = await hitl_manager.get_pending(session_id, call_id)
+            pending_state = await self._hitl_service.get_pending(session_id, call_id)
             if not pending_state:
                 error_msg = f"No pending HITL state found for call_id={call_id}"
                 logger.error(error_msg)
@@ -738,7 +743,7 @@ class MessageOrchestrationService:
                 return
             
             # Логировать решение в audit
-            await hitl_manager.log_decision(
+            await self._hitl_service.log_decision(
                 session_id=session_id,
                 call_id=call_id,
                 tool_name=pending_state.tool_name,
@@ -777,7 +782,7 @@ class MessageOrchestrationService:
                 }
             
             # Удалить pending state
-            await hitl_manager.remove_pending(session_id, call_id)
+            await self._hitl_service.remove_pending(session_id, call_id)
             
             # Добавить результат в историю сессии
             result_str = json.dumps(result)

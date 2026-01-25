@@ -102,12 +102,15 @@ def get_llm_response_processor() -> LLMResponseProcessor:
 
 def get_hitl_manager():
     """
-    Получить HITL менеджер.
+    Получить HITL менеджер (DEPRECATED).
+    
+    DEPRECATED: Используйте get_hitl_service() из dependencies.py
+    Оставлено для обратной совместимости.
     
     Returns:
         HITLManager: Менеджер для управления HITL состоянием
     """
-    # Используем существующий глобальный менеджер
+    # Используем существующий глобальный менеджер (deprecated)
     return hitl_manager
 
 
@@ -119,7 +122,7 @@ async def get_stream_llm_response_handler(
     response_processor: LLMResponseProcessor = Depends(get_llm_response_processor),
     event_publisher: LLMEventPublisher = Depends(get_llm_event_publisher),
     session_service: SessionManagementService = Depends(get_session_management_service),
-    hitl_manager = Depends(get_hitl_manager)
+    hitl_service = Depends(lambda: __import__('app.core.dependencies', fromlist=['get_hitl_service']).get_hitl_service)
 ) -> StreamLLMResponseHandler:
     """
     Получить handler для стриминга LLM ответов.
@@ -130,18 +133,22 @@ async def get_stream_llm_response_handler(
         response_processor: Процессор ответов (инжектируется)
         event_publisher: Event publisher (инжектируется)
         session_service: Сервис управления сессиями (инжектируется)
-        hitl_manager: HITL менеджер (инжектируется)
+        hitl_service: HITL сервис (инжектируется)
         
     Returns:
         StreamLLMResponseHandler: Handler для стриминга
     """
+    # Получить hitl_service из dependencies.py (избегаем циклического импорта)
+    from .dependencies import get_hitl_service as get_hitl_svc
+    hitl_svc = await get_hitl_svc()
+    
     return StreamLLMResponseHandler(
         llm_client=llm_client,
         tool_filter=tool_filter,
         response_processor=response_processor,
         event_publisher=event_publisher,
         session_service=session_service,
-        hitl_manager=hitl_manager
+        hitl_service=hitl_svc
     )
 
 

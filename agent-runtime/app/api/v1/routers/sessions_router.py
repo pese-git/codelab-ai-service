@@ -27,7 +27,8 @@ from ....core.dependencies import (
     get_get_session_handler,
     get_list_sessions_handler,
     get_session_manager_adapter,
-    get_agent_context_manager_adapter
+    get_agent_context_manager_adapter,
+    get_hitl_service
 )
 
 logger = logging.getLogger("agent-runtime.api.sessions")
@@ -342,7 +343,8 @@ async def get_session_history(
 @router.get("/{session_id}/pending-approvals")
 async def get_pending_approvals(
     session_id: str,
-    session_manager_adapter=Depends(get_session_manager_adapter)
+    session_manager_adapter=Depends(get_session_manager_adapter),
+    hitl_service=Depends(get_hitl_service)
 ):
     """
     Получить все pending approval запросы для сессии.
@@ -352,6 +354,7 @@ async def get_pending_approvals(
     
     Args:
         session_id: ID сессии
+        hitl_service: HITL сервис (инжектируется)
         
     Returns:
         Список pending approval запросов с деталями
@@ -381,9 +384,6 @@ async def get_pending_approvals(
     logger.debug(f"Getting pending approvals for session {session_id}")
     
     try:
-        # Получить HITL manager
-        from ....domain.services.hitl_management import hitl_manager
-        
         # Проверить существование сессии
         if not session_manager_adapter.exists(session_id):
             raise HTTPException(
@@ -391,8 +391,8 @@ async def get_pending_approvals(
                 detail=f"Session {session_id} not found"
             )
         
-        # Получить pending approvals из HITL manager (загружает из БД)
-        pending_approvals = await hitl_manager.get_all_pending(session_id)
+        # Получить pending approvals из HITL service (загружает из БД)
+        pending_approvals = await hitl_service.get_all_pending(session_id)
         
         return {
             "session_id": session_id,

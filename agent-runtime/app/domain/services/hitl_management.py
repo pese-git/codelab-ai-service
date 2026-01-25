@@ -1,8 +1,24 @@
 """
 HITL Manager for managing pending tool calls and user decisions.
 
-Uses database as the source of truth for pending approvals.
-No longer depends on AgentContext for caching.
+⚠️ DEPRECATED: This module is deprecated and will be removed in a future version.
+Use HITLService from hitl_service.py instead.
+
+Migration guide:
+- Replace: from .hitl_management import hitl_manager
+- With: from .hitl_service import HITLService (use via Dependency Injection)
+- Use: hitl_service = Depends(get_hitl_service) in FastAPI endpoints
+
+Reasons for deprecation:
+- Violates Clean Architecture (Domain → Infrastructure dependency)
+- Uses global singleton pattern (anti-pattern)
+- Creates DB sessions internally (transaction management issues)
+- Difficult to test and mock
+
+New architecture:
+- HITLRepository (interface) - Domain Layer
+- HITLRepositoryImpl - Infrastructure Layer
+- HITLService - Domain Layer (stateless, DI-based)
 
 UPDATED: Migrated to domain/services layer
 """
