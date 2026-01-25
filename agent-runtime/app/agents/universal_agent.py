@@ -3,13 +3,16 @@ Universal Agent for Single-Agent mode (baseline for POC).
 Has access to all tools and a universal prompt.
 """
 import logging
-from typing import AsyncGenerator, Dict, Any
+from typing import AsyncGenerator, Dict, Any, TYPE_CHECKING
 from app.agents.base_agent import BaseAgent, AgentType
 from app.agents.prompts.universal import UNIVERSAL_SYSTEM_PROMPT
 from app.models.schemas import StreamChunk
-from app.infrastructure.llm.streaming import stream_response
 from app.domain.entities.session import Session
 from app.domain.services.session_management import SessionManagementService
+from app.core.config import AppConfig
+
+if TYPE_CHECKING:
+    from app.application.handlers.stream_llm_response_handler import StreamLLMResponseHandler
 
 logger = logging.getLogger("agent-runtime.universal_agent")
 
@@ -52,7 +55,8 @@ class UniversalAgent(BaseAgent):
         message: str,
         context: Dict[str, Any],
         session: Session,
-        session_service: SessionManagementService
+        session_service: SessionManagementService,
+        stream_handler: "StreamLLMResponseHandler"
     ) -> AsyncGenerator[StreamChunk, None]:
         """
         Process message through Universal agent.
@@ -79,12 +83,15 @@ class UniversalAgent(BaseAgent):
         else:
             history.insert(0, {"role": "system", "content": self.system_prompt})
         
-        # Create adapter for backward compatibility with llm_stream_service
-        from app.infrastructure.adapters.session_manager_adapter import SessionManagerAdapter
-        session_mgr_adapter = SessionManagerAdapter(session_service)
-        
-        # Delegate to LLM stream service with all tools
-        async for chunk in stream_response(session_id, history, self.allowed_tools, session_mgr_adapter):
+        # Use new StreamLLMResponseHandler (passed as parameter)
+        # Universal agent has access to all tools (None = all tools)
+        async for chunk in stream_handler.handle(
+            session_id=session_id,
+            history=history,
+            model=AppConfig.LLM_MODEL,
+            allowed_tools=None,  # All tools allowed
+            correlation_id=context.get("correlation_id")
+        ):
             # Validate tool usage (should always pass since all tools are allowed)
             if chunk.type == "tool_call":
                 if not self.can_use_tool(chunk.tool_name):

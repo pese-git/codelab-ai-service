@@ -15,6 +15,7 @@ from app.core.config import AppConfig
 if TYPE_CHECKING:
     from app.domain.entities.session import Session
     from app.domain.services.session_management import SessionManagementService
+    from app.application.handlers.stream_llm_response_handler import StreamLLMResponseHandler
 
 logger = logging.getLogger("agent-runtime.orchestrator_agent")
 
@@ -93,7 +94,8 @@ class OrchestratorAgent(BaseAgent):
         message: str,
         context: Dict[str, Any],
         session: "Session",
-        session_service: "SessionManagementService"
+        session_service: "SessionManagementService",
+        stream_handler: "StreamLLMResponseHandler"
     ) -> AsyncGenerator[StreamChunk, None]:
         """
         Analyze request using LLM and determine which agent should handle it.

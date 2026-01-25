@@ -201,13 +201,33 @@ async def get_message_orchestration_service(
     from ..domain.services import MessageOrchestrationService
     from ..domain.services.agent_registry import agent_router
     from ..infrastructure.concurrency import session_lock_manager
+    from .dependencies_llm import (
+        get_llm_client,
+        get_llm_event_publisher,
+        get_tool_registry,
+        get_tool_filter_service,
+        get_llm_response_processor,
+        get_hitl_manager
+    )
+    from ..application.handlers.stream_llm_response_handler import StreamLLMResponseHandler
+    
+    # Создать stream handler вручную с правильными зависимостями
+    stream_handler = StreamLLMResponseHandler(
+        llm_client=get_llm_client(),
+        tool_filter=get_tool_filter_service(get_tool_registry()),
+        response_processor=get_llm_response_processor(),
+        event_publisher=get_llm_event_publisher(),
+        session_service=session_service,
+        hitl_manager=get_hitl_manager()
+    )
     
     return MessageOrchestrationService(
         session_service=session_service,
         agent_service=agent_service,
         agent_router=agent_router,
         lock_manager=session_lock_manager,
-        event_publisher=event_publisher.publish
+        event_publisher=event_publisher.publish,
+        stream_handler=stream_handler
     )
 
 

@@ -5,13 +5,16 @@ Handles architecture design, technical specifications, and documentation.
 Can only edit markdown (.md) files.
 """
 import logging
-from typing import AsyncGenerator, Dict, Any
+from typing import AsyncGenerator, Dict, Any, TYPE_CHECKING
 from app.agents.base_agent import BaseAgent, AgentType
 from app.agents.prompts.architect import ARCHITECT_PROMPT
 from app.models.schemas import StreamChunk
-from app.infrastructure.llm.streaming import stream_response
 from app.domain.entities.session import Session
 from app.domain.services.session_management import SessionManagementService
+from app.core.config import AppConfig
+
+if TYPE_CHECKING:
+    from app.application.handlers.stream_llm_response_handler import StreamLLMResponseHandler
 
 logger = logging.getLogger("agent-runtime.architect_agent")
 
@@ -55,7 +58,8 @@ class ArchitectAgent(BaseAgent):
         message: str,
         context: Dict[str, Any],
         session: Session,
-        session_service: SessionManagementService
+        session_service: SessionManagementService,
+        stream_handler: "StreamLLMResponseHandler"
     ) -> AsyncGenerator[StreamChunk, None]:
         """
         Process message through Architect agent.
@@ -81,12 +85,14 @@ class ArchitectAgent(BaseAgent):
         else:
             history.insert(0, {"role": "system", "content": self.system_prompt})
         
-        # Create adapter for backward compatibility with llm_stream_service
-        from app.infrastructure.adapters.session_manager_adapter import SessionManagerAdapter
-        session_mgr_adapter = SessionManagerAdapter(session_service)
-        
-        # Delegate to LLM stream service with allowed tools
-        async for chunk in stream_response(session_id, history, self.allowed_tools, session_mgr_adapter):
+        # Use new StreamLLMResponseHandler (passed as parameter)
+        async for chunk in stream_handler.handle(
+            session_id=session_id,
+            history=history,
+            model=AppConfig.LLM_MODEL,
+            allowed_tools=self.allowed_tools,
+            correlation_id=context.get("correlation_id")
+        ):
             # Handle switch_mode tool call - DON'T add tool_result to history!
             if chunk.type == "tool_call" and chunk.tool_name == "switch_mode":
                 target_mode = chunk.arguments.get("mode", "orchestrator")

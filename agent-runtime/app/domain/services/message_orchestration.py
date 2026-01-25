@@ -8,7 +8,7 @@
 import uuid
 import time
 import logging
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator, Optional, TYPE_CHECKING
 
 from ..entities.agent_context import AgentType
 from ..repositories.session_repository import SessionRepository
@@ -17,6 +17,9 @@ from .session_management import SessionManagementService
 from .agent_orchestration import AgentOrchestrationService
 from ...models.schemas import StreamChunk
 from ...core.errors import SessionNotFoundError, AgentSwitchError
+
+if TYPE_CHECKING:
+    from ...application.handlers.stream_llm_response_handler import StreamLLMResponseHandler
 
 logger = logging.getLogger("agent-runtime.domain.message_orchestration")
 
@@ -58,7 +61,8 @@ class MessageOrchestrationService:
         agent_service: AgentOrchestrationService,
         agent_router,  # AgentRouter instance
         lock_manager,  # SessionLockManager instance
-        event_publisher=None
+        event_publisher=None,
+        stream_handler: Optional["StreamLLMResponseHandler"] = None
     ):
         """
         Инициализация сервиса.
@@ -69,12 +73,19 @@ class MessageOrchestrationService:
             agent_router: Роутер агентов для получения экземпляров
             lock_manager: Менеджер блокировок для защиты от race conditions
             event_publisher: Функция для публикации событий (опционально)
+            stream_handler: Handler для стриминга LLM ответов (опционально, для новой архитектуры)
         """
         self._session_service = session_service
         self._agent_service = agent_service
         self._agent_router = agent_router
         self._lock_manager = lock_manager
         self._event_publisher = event_publisher
+        self._stream_handler = stream_handler
+        
+        # TEMPORARY: Явное логирование для отладки
+        logger.error(
+            f"🔥 MessageOrchestrationService initialized with stream_handler={stream_handler is not None}"
+        )
     
     async def process_message(
         self,
@@ -194,7 +205,8 @@ class MessageOrchestrationService:
                         message=message,
                         context=self._context_to_dict(context),
                         session=session,
-                        session_service=self._session_service
+                        session_service=self._session_service,
+                        stream_handler=self._stream_handler
                     ):
                         if chunk.type == "switch_agent":
                             # Извлечь целевого агента из метаданных
@@ -247,7 +259,8 @@ class MessageOrchestrationService:
                     message=message,
                     context=self._context_to_dict(context),
                     session=session,
-                    session_service=self._session_service
+                    session_service=self._session_service,
+                    stream_handler=self._stream_handler
                 ):
                     # Проверить запросы на переключение агента от самого агента
                     if chunk.type == "switch_agent":
@@ -328,7 +341,8 @@ class MessageOrchestrationService:
                             message=message,
                             context=self._context_to_dict(context),
                             session=session,
-                            session_service=self._session_service
+                            session_service=self._session_service,
+                            stream_handler=self._stream_handler
                         ):
                             yield new_chunk
                         
@@ -561,7 +575,8 @@ class MessageOrchestrationService:
                 message=None,  # None означает "не добавлять user message"
                 context=self._context_to_dict(context),
                 session=session,
-                session_service=self._session_service
+                session_service=self._session_service,
+                stream_handler=self._stream_handler
             ):
                 chunk_count += 1
                 logger.debug(f"Получен chunk #{chunk_count}: type={chunk.type}, is_final={chunk.is_final}")
@@ -639,7 +654,8 @@ class MessageOrchestrationService:
                         message=last_user_message,  # Передаем оригинальное сообщение пользователя
                         context=self._context_to_dict(context),
                         session=session,
-                        session_service=self._session_service
+                        session_service=self._session_service,
+                        stream_handler=self._stream_handler
                     ):
                         yield new_chunk
                     
