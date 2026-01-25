@@ -242,6 +242,7 @@ async def get_message_orchestration_service(
         MessageOrchestrationService: Доменный сервис
     """
     from ..domain.services import MessageOrchestrationService
+    from ..domain.interfaces.stream_handler import IStreamHandler
     from ..domain.services.agent_registry import agent_router
     from ..infrastructure.concurrency import session_lock_manager
     from .dependencies_llm import (
@@ -253,8 +254,9 @@ async def get_message_orchestration_service(
     )
     from ..application.handlers.stream_llm_response_handler import StreamLLMResponseHandler
     
-    # Создать stream handler вручную с правильными зависимостями
-    stream_handler = StreamLLMResponseHandler(
+    # Создать stream handler с явным type hint IStreamHandler
+    # StreamLLMResponseHandler реализует интерфейс IStreamHandler из Domain слоя
+    stream_handler: IStreamHandler = StreamLLMResponseHandler(
         llm_client=get_llm_client(),
         tool_filter=get_tool_filter_service(get_tool_registry()),
         response_processor=get_llm_response_processor(),

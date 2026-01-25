@@ -14,7 +14,7 @@ from app.domain.services.session_management import SessionManagementService
 from app.core.config import AppConfig
 
 if TYPE_CHECKING:
-    from app.application.handlers.stream_llm_response_handler import StreamLLMResponseHandler
+    from app.domain.interfaces.stream_handler import IStreamHandler
 
 logger = logging.getLogger("agent-runtime.ask_agent")
 
@@ -58,7 +58,7 @@ class AskAgent(BaseAgent):
         context: Dict[str, Any],
         session: Session,
         session_service: SessionManagementService,
-        stream_handler: "StreamLLMResponseHandler"
+        stream_handler: "IStreamHandler"
     ) -> AsyncGenerator[StreamChunk, None]:
         """
         Process message through Ask agent.
@@ -69,6 +69,7 @@ class AskAgent(BaseAgent):
             context: Agent context with history
             session: Domain entity Session with message history
             session_service: Session management service for operations
+            stream_handler: Handler для LLM стриминга (интерфейс из Domain слоя)
             
         Yields:
             StreamChunk: Chunks for SSE streaming

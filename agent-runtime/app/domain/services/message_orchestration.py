@@ -19,7 +19,7 @@ from ...models.schemas import StreamChunk
 from ...core.errors import SessionNotFoundError, AgentSwitchError
 
 if TYPE_CHECKING:
-    from ...application.handlers.stream_llm_response_handler import StreamLLMResponseHandler
+    from ...domain.interfaces.stream_handler import IStreamHandler
 
 logger = logging.getLogger("agent-runtime.domain.message_orchestration")
 
@@ -64,7 +64,7 @@ class MessageOrchestrationService:
         agent_router,  # AgentRouter instance
         lock_manager,  # SessionLockManager instance
         event_publisher=None,
-        stream_handler: Optional["StreamLLMResponseHandler"] = None,
+        stream_handler: Optional["IStreamHandler"] = None,
         hitl_service=None  # HITLService instance (optional for backward compatibility)
     ):
         """
@@ -76,7 +76,7 @@ class MessageOrchestrationService:
             agent_router: Роутер агентов для получения экземпляров
             lock_manager: Менеджер блокировок для защиты от race conditions
             event_publisher: Функция для публикации событий (опционально)
-            stream_handler: Handler для стриминга LLM ответов (опционально, для новой архитектуры)
+            stream_handler: Handler для стриминга LLM ответов (интерфейс из Domain слоя)
             hitl_service: Сервис HITL (опционально, для обратной совместимости)
         """
         self._session_service = session_service

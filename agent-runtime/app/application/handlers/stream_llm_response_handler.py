@@ -14,6 +14,7 @@ import time
 import logging
 from typing import AsyncGenerator, List, Dict, Optional, Any
 
+from ...domain.interfaces.stream_handler import IStreamHandler
 from ...domain.services.llm_response_processor import LLMResponseProcessor
 from ...domain.services.tool_filter_service import ToolFilterService
 from ...domain.services.session_management import SessionManagementService
@@ -26,7 +27,7 @@ from ...models.schemas import StreamChunk
 logger = logging.getLogger("agent-runtime.application.stream_llm_response_handler")
 
 
-class StreamLLMResponseHandler:
+class StreamLLMResponseHandler(IStreamHandler):
     """
     Application Service для стриминга ответов LLM.
     
