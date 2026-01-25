@@ -64,84 +64,8 @@ class TestSessionManagerEvents:
         pytest.skip("AsyncSessionManager не существует в новой архитектуре")
 
 
-class TestHITLManagerEvents:
-    """Test event publishing from HITLManager."""
-    
-    @pytest.mark.asyncio
-    async def test_add_pending_publishes_event(self):
-        """Test that adding pending approval publishes HITLApprovalRequestedEvent."""
-        from app.domain.services.hitl_management import HITLManager
-        
-        # Create event bus and collector
-        bus = EventBus()
-        received_events = []
-        
-        @bus.subscribe(event_type=EventType.HITL_APPROVAL_REQUESTED)
-        async def collector(event):
-            received_events.append(event)
-        
-        # Mock the event_bus in the module
-        with patch('app.services.hitl_manager.event_bus', bus):
-            # Create manager
-            manager = HITLManager()
-            manager._save_pending_async = AsyncMock()
-            
-            # Add pending approval
-            await manager.add_pending(
-                session_id="test-session",
-                call_id="call-123",
-                tool_name="write_file",
-                arguments={"path": "test.py"},
-                reason="File modification"
-            )
-            
-            # Wait for event handlers
-            import asyncio
-            await asyncio.sleep(0.1)
-            
-            # Verify event was published
-            assert len(received_events) == 1
-            assert received_events[0].event_type == EventType.HITL_APPROVAL_REQUESTED
-            assert received_events[0].data["call_id"] == "call-123"
-            assert received_events[0].data["tool_name"] == "write_file"
-    
-    @pytest.mark.asyncio
-    async def test_log_decision_publishes_event(self):
-        """Test that logging decision publishes HITLDecisionMadeEvent."""
-        from app.domain.services.hitl_management import HITLManager
-        
-        # Create event bus and collector
-        bus = EventBus()
-        received_events = []
-        
-        @bus.subscribe(event_type=EventType.HITL_DECISION_MADE)
-        async def collector(event):
-            received_events.append(event)
-        
-        # Mock the event_bus in the module
-        with patch('app.services.hitl_manager.event_bus', bus):
-            # Create manager
-            manager = HITLManager()
-            
-            # Log decision
-            await manager.log_decision(
-                session_id="test-session",
-                call_id="call-123",
-                tool_name="write_file",
-                original_arguments={"path": "test.py"},
-                decision=HITLDecision.APPROVE,
-                modified_arguments=None
-            )
-            
-            # Wait for event handlers
-            import asyncio
-            await asyncio.sleep(0.1)
-            
-            # Verify event was published
-            assert len(received_events) == 1
-            assert received_events[0].event_type == EventType.HITL_DECISION_MADE
-            assert received_events[0].data["decision"] == "approve"  # Lowercase from enum value
-            assert received_events[0].data["tool_name"] == "write_file"
+# TestHITLManagerEvents removed - HITLManager is deprecated
+# HITL events are tested in TestEndToEndEventFlow
 
 
 class TestEndToEndEventFlow:
