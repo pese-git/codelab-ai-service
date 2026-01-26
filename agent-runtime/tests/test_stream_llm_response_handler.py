@@ -56,10 +56,10 @@ class TestStreamLLMResponseHandler:
         return service
     
     @pytest.fixture
-    def mock_hitl_manager(self):
-        """Mock HITL manager"""
-        manager = AsyncMock()
-        return manager
+    def mock_hitl_service(self):
+        """Mock HITL service"""
+        service = AsyncMock()
+        return service
     
     @pytest.fixture
     def handler(
@@ -69,7 +69,7 @@ class TestStreamLLMResponseHandler:
         mock_response_processor,
         mock_event_publisher,
         mock_session_service,
-        mock_hitl_manager
+        mock_hitl_service
     ):
         """Создать handler с mock зависимостями"""
         return StreamLLMResponseHandler(
@@ -78,7 +78,7 @@ class TestStreamLLMResponseHandler:
             response_processor=mock_response_processor,
             event_publisher=mock_event_publisher,
             session_service=mock_session_service,
-            hitl_manager=mock_hitl_manager
+            hitl_service=mock_hitl_service
         )
     
     @pytest.mark.asyncio
@@ -145,7 +145,7 @@ class TestStreamLLMResponseHandler:
         mock_response_processor,
         mock_event_publisher,
         mock_session_service,
-        mock_hitl_manager
+        mock_hitl_service
     ):
         """Тест обработки tool call без необходимости одобрения"""
         # Arrange
@@ -190,8 +190,8 @@ class TestStreamLLMResponseHandler:
         assert chunks[0].tool_name == "read_file"
         assert chunks[0].requires_approval == False
         
-        # HITL manager НЕ должен быть вызван
-        mock_hitl_manager.add_pending.assert_not_called()
+        # HITL service НЕ должен быть вызван
+        mock_hitl_service.add_pending.assert_not_called()
         
         # Session service должен сохранить сообщение
         mock_session_service.add_message.assert_called_once()
@@ -204,7 +204,7 @@ class TestStreamLLMResponseHandler:
         mock_response_processor,
         mock_event_publisher,
         mock_session_service,
-        mock_hitl_manager
+        mock_hitl_service
     ):
         """Тест обработки tool call с необходимостью одобрения"""
         # Arrange
@@ -248,8 +248,8 @@ class TestStreamLLMResponseHandler:
         assert chunks[0].type == "tool_call"
         assert chunks[0].requires_approval == True
         
-        # HITL manager должен сохранить pending state
-        mock_hitl_manager.add_pending.assert_called_once_with(
+        # HITL service должен сохранить pending state
+        mock_hitl_service.add_pending.assert_called_once_with(
             session_id="session-1",
             call_id="call-1",
             tool_name="write_file",
