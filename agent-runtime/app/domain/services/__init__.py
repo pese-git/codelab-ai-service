@@ -10,6 +10,7 @@ from .agent_orchestration import AgentOrchestrationService
 from .message_orchestration import MessageOrchestrationService
 from .hitl_service import HITLService
 from .hitl_policy import HITLPolicyService, hitl_policy_service
+from .approval_management import ApprovalManager, get_approval_manager_with_db, approval_manager
 from .agent_registry import AgentRegistry, agent_registry, agent_router
 from .tool_registry import TOOLS_SPEC, LOCAL_TOOLS, execute_local_tool
 
@@ -28,6 +29,9 @@ __all__ = [
     "HITLService",
     "HITLPolicyService",
     "hitl_policy_service",
+    "ApprovalManager",
+    "get_approval_manager_with_db",
+    "approval_manager",
     "AgentRegistry",
     "agent_registry",
     "agent_router",
