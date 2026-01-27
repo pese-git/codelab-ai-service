@@ -335,7 +335,8 @@ async def get_tool_result_handler(
         agent_service=agent_service,
         agent_router=agent_router,
         stream_handler=stream_handler,
-        switch_helper=switch_helper
+        switch_helper=switch_helper,
+        hitl_service=hitl_service  # BUGFIX: Передаем hitl_service для удаления pending approvals
     )
 
 
