@@ -1,6 +1,6 @@
 [project]
 name = "codelab-llm-proxy"
-version = "0.1.0"
+version = "0.10.0"
 description = "CodeLab LLM Proxy Service - Унифицированный доступ к LLM провайдерам"
 requires-python = ">=3.12"
 license = { text = "MIT" }
