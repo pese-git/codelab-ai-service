@@ -265,11 +265,16 @@ class ApprovalManager:
             request_id: Request identifier to approve
         """
         try:
+            logger.info(f"[DEBUG] ApprovalManager.approve() called for request_id={request_id}")
+            
             # ✅ Get approval via repository
             approval = await self._repository.get_pending(request_id)
             
             if not approval:
+                logger.error(f"[DEBUG] Approval {request_id} not found in get_pending()")
                 raise ValueError(f"Approval {request_id} not found")
+            
+            logger.info(f"[DEBUG] Found pending approval: {request_id}, status={approval.status}")
             
             # ✅ Update status via repository
             await self._repository.update_status(
@@ -278,7 +283,7 @@ class ApprovalManager:
                 decision_at=datetime.now(timezone.utc)
             )
             
-            logger.info(f"Approval approved: {request_id}")
+            logger.info(f"[DEBUG] Approval approved: {request_id} - update_status() completed")
             
             # ✅ Publish event synchronously (after DB flush, before commit)
             await event_bus.publish(
@@ -309,11 +314,16 @@ class ApprovalManager:
             reason: Why user rejected (optional)
         """
         try:
+            logger.info(f"[DEBUG] ApprovalManager.reject() called for request_id={request_id}, reason={reason}")
+            
             # ✅ Get approval via repository
             approval = await self._repository.get_pending(request_id)
             
             if not approval:
+                logger.error(f"[DEBUG] Approval {request_id} not found in get_pending()")
                 raise ValueError(f"Approval {request_id} not found")
+            
+            logger.info(f"[DEBUG] Found pending approval: {request_id}, status={approval.status}")
             
             # ✅ Update status via repository
             await self._repository.update_status(
@@ -323,7 +333,7 @@ class ApprovalManager:
                 decision_reason=reason
             )
             
-            logger.info(f"Approval rejected: {request_id}{f', reason: {reason}' if reason else ''}")
+            logger.info(f"[DEBUG] Approval rejected: {request_id}{f', reason: {reason}' if reason else ''} - update_status() completed")
             
             # ✅ Publish event synchronously (after DB flush, before commit)
             await event_bus.publish(

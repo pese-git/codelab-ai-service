@@ -131,10 +131,18 @@ class HITLDecisionHandler:
         
         # Обновить статус approval в зависимости от решения
         from ...models.hitl_models import HITLDecision
+        logger.info(f"[DEBUG] HITLDecisionHandler: About to update approval status for call_id={call_id}, decision={decision_enum}")
+        
         if decision_enum == HITLDecision.REJECT:
+            logger.info(f"[DEBUG] Calling approval_manager.reject() for call_id={call_id}")
             await self._approval_manager.reject(call_id, reason=feedback)
+            logger.info(f"[DEBUG] approval_manager.reject() completed for call_id={call_id}")
         else:
+            logger.info(f"[DEBUG] Calling approval_manager.approve() for call_id={call_id}")
             await self._approval_manager.approve(call_id)
+            logger.info(f"[DEBUG] approval_manager.approve() completed for call_id={call_id}")
+        
+        logger.info(f"[DEBUG] Approval status updated, now adding result to session history")
         
         # Добавить результат в историю сессии
         result_str = json.dumps(result)

@@ -314,6 +314,10 @@ class ApprovalRepositoryImpl(ApprovalRepository):
         """
         Обновить статус approval request.
         
+        ВАЖНО: Эта операция делает commit для немедленного сохранения изменений,
+        так как статус approval должен быть обновлен атомарно и сразу.
+        Это соответствует поведению старой реализации (DatabaseService.delete_pending_approval).
+        
         Args:
             request_id: ID запроса
             status: Новый статус
@@ -324,21 +328,28 @@ class ApprovalRepositoryImpl(ApprovalRepository):
             True если обновлено, False если не найдено
         """
         try:
+            logger.info(f"[DEBUG] ApprovalRepositoryImpl.update_status() called: request_id={request_id}, status={status}")
+            
             result = await self._db.execute(
                 select(PendingApproval).where(PendingApproval.request_id == request_id)
             )
             approval = result.scalar_one_or_none()
             
             if not approval:
-                logger.warning(f"Pending approval not found for update: {request_id}")
+                logger.warning(f"[DEBUG] Pending approval not found for update: {request_id}")
                 return False
+            
+            logger.info(f"[DEBUG] Found approval in DB: request_id={request_id}, current_status={approval.status}")
             
             approval.status = status
             approval.decision_at = decision_at
             if decision_reason:
                 approval.decision_reason = decision_reason
             
-            await self._db.flush()  # Flush changes within transaction, don't commit
+            logger.info(f"[DEBUG] Before commit: approval.status={approval.status}")
+            # КРИТИЧНО: Делаем commit для немедленного сохранения (как в старой реализации)
+            await self._db.commit()
+            logger.info(f"[DEBUG] After commit: approval.status={approval.status} - CHANGES COMMITTED!")
             logger.info(f"Updated approval status: {request_id} -> {status}")
             return True
             
