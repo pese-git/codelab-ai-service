@@ -314,9 +314,9 @@ class ApprovalRepositoryImpl(ApprovalRepository):
         """
         Обновить статус approval request.
         
-        ВАЖНО: Эта операция делает commit для немедленного сохранения изменений,
-        так как статус approval должен быть обновлен атомарно и сразу.
-        Это соответствует поведению старой реализации (DatabaseService.delete_pending_approval).
+        ВАЖНО: Эта операция использует flush() вместо commit() для сохранения атомарности
+        транзакций. Внешний контекст транзакции управляет коммитами, что позволяет
+        откатить изменения если последующие операции завершатся с ошибкой.
         
         Args:
             request_id: ID запроса
@@ -346,10 +346,10 @@ class ApprovalRepositoryImpl(ApprovalRepository):
             if decision_reason:
                 approval.decision_reason = decision_reason
             
-            logger.info(f"[DEBUG] Before commit: approval.status={approval.status}")
-            # КРИТИЧНО: Делаем commit для немедленного сохранения (как в старой реализации)
-            await self._db.commit()
-            logger.info(f"[DEBUG] After commit: approval.status={approval.status} - CHANGES COMMITTED!")
+            logger.info(f"[DEBUG] Before flush: approval.status={approval.status}")
+            # Используем flush() для сохранения атомарности транзакций
+            await self._db.flush()
+            logger.info(f"[DEBUG] After flush: approval.status={approval.status} - CHANGES FLUSHED!")
             logger.info(f"Updated approval status: {request_id} -> {status}")
             return True
             
@@ -438,7 +438,7 @@ class ApprovalRepositoryImpl(ApprovalRepository):
             request_type=model.request_type,
             subject=model.subject,
             session_id=model.session_id,
-            details=model.details,
+            details=model.details or {},
             reason=model.reason,
             created_at=model.created_at,
             status=model.status

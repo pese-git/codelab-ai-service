@@ -130,7 +130,6 @@ class HITLDecisionHandler:
         )
         
         # Обновить статус approval в зависимости от решения
-        from ...models.hitl_models import HITLDecision
         logger.info(f"[DEBUG] HITLDecisionHandler: About to update approval status for call_id={call_id}, decision={decision_enum}")
         
         if decision_enum == HITLDecision.REJECT:
