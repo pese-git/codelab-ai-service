@@ -29,7 +29,6 @@ from app.events.approval_events import (
     ApprovalApprovedEvent,
     ApprovalRejectedEvent
 )
-from app.infrastructure.persistence.db_retry import with_db_retry
 
 logger = logging.getLogger("agent-runtime.approval_management")
 
@@ -144,7 +143,6 @@ class ApprovalManager:
         
         return True
     
-    @with_db_retry(max_retries=3, initial_backoff_ms=100)
     async def add_pending(
         self,
         request_id: str,
@@ -254,7 +252,6 @@ class ApprovalManager:
             logger.error(f"Failed to get pending approvals: {e}", exc_info=True)
             raise
     
-    @with_db_retry(max_retries=3, initial_backoff_ms=100)
     async def approve(
         self,
         request_id: str
@@ -297,7 +294,6 @@ class ApprovalManager:
             logger.error(f"Failed to approve: {e}", exc_info=True)
             raise
     
-    @with_db_retry(max_retries=3, initial_backoff_ms=100)
     async def reject(
         self,
         request_id: str,

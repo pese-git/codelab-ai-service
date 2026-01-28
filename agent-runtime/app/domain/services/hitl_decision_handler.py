@@ -14,6 +14,7 @@ from ...models.schemas import StreamChunk
 if TYPE_CHECKING:
     from .session_management import SessionManagementService
     from .message_processor import MessageProcessor
+    from .approval_management import ApprovalManager
 
 logger = logging.getLogger("agent-runtime.domain.hitl_decision_handler")
 
@@ -25,19 +26,18 @@ class HITLDecisionHandler:
     Ответственности:
     - Валидация решения (approve/edit/reject)
     - Получение pending state
-    - Логирование решения в audit
     - Обработка решения и добавление в историю
     - Продолжение обработки через MessageProcessor
     
     Атрибуты:
-        _hitl_service: Сервис HITL
+        _approval_manager: Unified approval manager
         _session_service: Сервис управления сессиями
         _message_processor: Процессор сообщений для продолжения
     """
     
     def __init__(
         self,
-        hitl_service,  # HITLService
+        approval_manager: "ApprovalManager",
         session_service: "SessionManagementService",
         message_processor: "MessageProcessor"
     ):
@@ -45,15 +45,15 @@ class HITLDecisionHandler:
         Инициализация handler.
         
         Args:
-            hitl_service: Сервис HITL
+            approval_manager: Unified approval manager
             session_service: Сервис управления сессиями
             message_processor: Процессор сообщений для продолжения
         """
-        self._hitl_service = hitl_service
+        self._approval_manager = approval_manager
         self._session_service = session_service
         self._message_processor = message_processor
         
-        logger.debug("HITLDecisionHandler инициализирован")
+        logger.debug("HITLDecisionHandler инициализирован с ApprovalManager")
     
     async def handle(
         self,
@@ -104,10 +104,10 @@ class HITLDecisionHandler:
             )
             return
         
-        # Получить pending state
-        pending_state = await self._hitl_service.get_pending(session_id, call_id)
-        if not pending_state:
-            error_msg = f"No pending HITL state found for call_id={call_id}"
+        # Получить pending approval
+        pending_approval = await self._approval_manager.get_pending(call_id)
+        if not pending_approval:
+            error_msg = f"No pending approval found for request_id={call_id}"
             logger.error(error_msg)
             yield StreamChunk(
                 type="error",
@@ -116,27 +116,25 @@ class HITLDecisionHandler:
             )
             return
         
-        # Логировать решение в audit
-        await self._hitl_service.log_decision(
-            session_id=session_id,
-            call_id=call_id,
-            tool_name=pending_state.tool_name,
-            original_arguments=pending_state.arguments,
-            decision=decision_enum,
-            modified_arguments=modified_arguments,
-            feedback=feedback
-        )
+        # Извлечь tool_name и arguments из details
+        tool_name = pending_approval.subject
+        arguments = pending_approval.details.get("arguments", {}) if pending_approval.details else {}
         
         # Обработать решение
         result = await self._process_decision(
             decision_enum=decision_enum,
-            pending_state=pending_state,
+            tool_name=tool_name,
+            arguments=arguments,
             modified_arguments=modified_arguments,
             feedback=feedback
         )
         
-        # Удалить pending state
-        await self._hitl_service.remove_pending(session_id, call_id)
+        # Обновить статус approval в зависимости от решения
+        from ...models.hitl_models import HITLDecision
+        if decision_enum == HITLDecision.REJECT:
+            await self._approval_manager.reject(call_id, reason=feedback)
+        else:
+            await self._approval_manager.approve(call_id)
         
         # Добавить результат в историю сессии
         result_str = json.dumps(result)
@@ -144,7 +142,7 @@ class HITLDecisionHandler:
             session_id=session_id,
             role="tool",
             content=result_str,
-            name=pending_state.tool_name,
+            name=tool_name,
             tool_call_id=call_id
         )
         
@@ -164,7 +162,8 @@ class HITLDecisionHandler:
     async def _process_decision(
         self,
         decision_enum,  # HITLDecision
-        pending_state,
+        tool_name: str,
+        arguments: dict,
         modified_arguments: Optional[dict],
         feedback: Optional[str]
     ) -> dict:
@@ -173,7 +172,8 @@ class HITLDecisionHandler:
         
         Args:
             decision_enum: Enum решения
-            pending_state: Pending state из HITL service
+            tool_name: Имя инструмента
+            arguments: Оригинальные аргументы
             modified_arguments: Модифицированные аргументы (для edit)
             feedback: Обратная связь (для reject)
             
@@ -184,30 +184,30 @@ class HITLDecisionHandler:
         
         if decision_enum == HITLDecision.APPROVE:
             # Выполнить инструмент с оригинальными аргументами
-            logger.info(f"HITL APPROVED: executing {pending_state.tool_name}")
+            logger.info(f"HITL APPROVED: executing {tool_name}")
             return {
                 "status": "approved",
-                "tool_name": pending_state.tool_name,
-                "arguments": pending_state.arguments
+                "tool_name": tool_name,
+                "arguments": arguments
             }
             
         elif decision_enum == HITLDecision.EDIT:
             # Выполнить инструмент с модифицированными аргументами
             logger.info(
-                f"HITL EDITED: executing {pending_state.tool_name} with modified args"
+                f"HITL EDITED: executing {tool_name} with modified args"
             )
             return {
                 "status": "approved_with_edits",
-                "tool_name": pending_state.tool_name,
-                "arguments": modified_arguments or pending_state.arguments
+                "tool_name": tool_name,
+                "arguments": modified_arguments or arguments
             }
             
         elif decision_enum == HITLDecision.REJECT:
             # Не выполнять, отправить feedback LLM
-            logger.info(f"HITL REJECTED: {pending_state.tool_name}, feedback={feedback}")
+            logger.info(f"HITL REJECTED: {tool_name}, feedback={feedback}")
             return {
                 "status": "rejected",
-                "tool_name": pending_state.tool_name,
+                "tool_name": tool_name,
                 "feedback": feedback or "User rejected this operation"
             }
         
