@@ -110,42 +110,59 @@ def get_event_publisher() -> EventPublisherAdapter:
 
 # ==================== HITL Dependencies ====================
 
-async def get_hitl_repository(
-    db: AsyncSession = Depends(get_db_session),
-    db_service: DatabaseService = Depends(get_database_service)
+async def get_hitl_policy_service():
+    """
+    Получить HITL policy service.
+    
+    Returns:
+        HITLPolicyService: Service для оценки HITL политик
+    """
+    from ..domain.services.hitl_policy import HITLPolicyService
+    return HITLPolicyService()
+
+
+# ==================== Unified Approval System Dependencies ====================
+
+async def get_approval_repository(
+    db: AsyncSession = Depends(get_db_session)
 ):
     """
-    Получить HITL repository.
+    Получить approval repository.
     
     Args:
         db: Database session (инжектируется)
-        db_service: Database service (инжектируется)
         
     Returns:
-        HITLRepositoryImpl: Repository implementation
+        ApprovalRepository: Repository implementation для approval requests
     """
-    from ..infrastructure.persistence.repositories import HITLRepositoryImpl
-    return HITLRepositoryImpl(db=db, db_service=db_service)
+    from ..infrastructure.persistence.repositories.approval_repository_impl import ApprovalRepositoryImpl
+    return ApprovalRepositoryImpl(db)
 
 
-async def get_hitl_service(
-    repository = Depends(get_hitl_repository),
-    event_publisher: EventPublisherAdapter = Depends(get_event_publisher)
+async def get_approval_manager(
+    repository = Depends(get_approval_repository),
+    hitl_policy_service = Depends(get_hitl_policy_service)
 ):
     """
-    Получить HITL service.
+    Получить ApprovalManager instance.
     
     Args:
-        repository: HITL repository (инжектируется)
-        event_publisher: Event publisher (инжектируется)
+        repository: ApprovalRepository (инжектируется)
+        hitl_policy_service: HITLPolicyService (инжектируется)
         
     Returns:
-        HITLService: Domain service для HITL
+        ApprovalManager: Unified approval manager для всех типов запросов
     """
-    from ..domain.services import HITLService
-    return HITLService(
-        repository=repository,
-        event_publisher=event_publisher.publish
+    from ..domain.services.approval_management import ApprovalManager
+    from ..domain.entities.approval import ApprovalPolicy
+    
+    # Создать unified policy из HITL policy
+    # TODO: В будущем можно расширить для поддержки других типов approval
+    approval_policy = ApprovalPolicy.default()
+    
+    return ApprovalManager(
+        approval_repository=repository,
+        approval_policy=approval_policy
     )
 
 
@@ -220,7 +237,7 @@ async def get_message_processor(
     session_service: SessionManagementService = Depends(get_session_management_service),
     agent_service: AgentOrchestrationService = Depends(get_agent_orchestration_service),
     switch_helper = Depends(get_agent_switch_helper),
-    hitl_service = Depends(get_hitl_service)
+    approval_manager = Depends(get_approval_manager)
 ):
     """
     Получить процессор сообщений.
@@ -229,7 +246,7 @@ async def get_message_processor(
         session_service: Сервис управления сессиями (инжектируется)
         agent_service: Сервис оркестрации агентов (инжектируется)
         switch_helper: Helper для переключения агентов (инжектируется)
-        hitl_service: Сервис HITL (инжектируется)
+        approval_manager: Unified approval manager (инжектируется)
         
     Returns:
         MessageProcessor: Процессор сообщений
@@ -246,14 +263,14 @@ async def get_message_processor(
     )
     from ..application.handlers.stream_llm_response_handler import StreamLLMResponseHandler
     
-    # Создать stream handler с явным type hint IStreamHandler
+    # Создать stream handler с ApprovalManager
     stream_handler: IStreamHandler = StreamLLMResponseHandler(
         llm_client=get_llm_client(),
         tool_filter=get_tool_filter_service(get_tool_registry()),
         response_processor=get_llm_response_processor(),
         event_publisher=get_llm_event_publisher(),
         session_service=session_service,
-        hitl_service=hitl_service
+        approval_manager=approval_manager
     )
     
     return MessageProcessor(
@@ -294,7 +311,7 @@ async def get_tool_result_handler(
     session_service: SessionManagementService = Depends(get_session_management_service),
     agent_service: AgentOrchestrationService = Depends(get_agent_orchestration_service),
     switch_helper = Depends(get_agent_switch_helper),
-    hitl_service = Depends(get_hitl_service)
+    approval_manager = Depends(get_approval_manager)
 ):
     """
     Получить handler результатов инструментов.
@@ -303,7 +320,7 @@ async def get_tool_result_handler(
         session_service: Сервис управления сессиями (инжектируется)
         agent_service: Сервис оркестрации агентов (инжектируется)
         switch_helper: Helper для переключения агентов (инжектируется)
-        hitl_service: Сервис HITL (инжектируется)
+        approval_manager: Unified approval manager (инжектируется)
         
     Returns:
         ToolResultHandler: Handler результатов инструментов
@@ -320,14 +337,14 @@ async def get_tool_result_handler(
     )
     from ..application.handlers.stream_llm_response_handler import StreamLLMResponseHandler
     
-    # Создать stream handler
+    # Создать stream handler с ApprovalManager
     stream_handler: IStreamHandler = StreamLLMResponseHandler(
         llm_client=get_llm_client(),
         tool_filter=get_tool_filter_service(get_tool_registry()),
         response_processor=get_llm_response_processor(),
         event_publisher=get_llm_event_publisher(),
         session_service=session_service,
-        hitl_service=hitl_service
+        approval_manager=approval_manager
     )
     
     return ToolResultHandler(
@@ -336,14 +353,14 @@ async def get_tool_result_handler(
         agent_router=agent_router,
         stream_handler=stream_handler,
         switch_helper=switch_helper,
-        hitl_service=hitl_service  # BUGFIX: Передаем hitl_service для удаления pending approvals
+        approval_manager=approval_manager  # Передаем approval_manager для удаления pending approvals
     )
 
 
 # ==================== HITL Decision Handler ====================
 
 async def get_hitl_decision_handler(
-    hitl_service = Depends(get_hitl_service),
+    approval_manager = Depends(get_approval_manager),
     session_service: SessionManagementService = Depends(get_session_management_service),
     message_processor = Depends(get_message_processor)
 ):
@@ -351,7 +368,7 @@ async def get_hitl_decision_handler(
     Получить handler HITL решений.
     
     Args:
-        hitl_service: Сервис HITL (инжектируется)
+        approval_manager: Unified approval manager (инжектируется)
         session_service: Сервис управления сессиями (инжектируется)
         message_processor: Процессор сообщений (инжектируется)
         
@@ -360,7 +377,7 @@ async def get_hitl_decision_handler(
     """
     from ..domain.services import HITLDecisionHandler
     return HITLDecisionHandler(
-        hitl_service=hitl_service,
+        approval_manager=approval_manager,
         session_service=session_service,
         message_processor=message_processor
     )

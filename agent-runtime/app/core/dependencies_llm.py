@@ -112,48 +112,6 @@ def get_llm_response_processor() -> LLMResponseProcessor:
     return LLMResponseProcessor(hitl_policy=hitl_policy_service)
 
 
-# ==================== Application Handler Dependencies ====================
-
-async def get_stream_llm_response_handler(
-    llm_client: LLMClient = Depends(get_llm_client),
-    tool_filter: ToolFilterService = Depends(get_tool_filter_service),
-    response_processor: LLMResponseProcessor = Depends(get_llm_response_processor),
-    event_publisher: LLMEventPublisher = Depends(get_llm_event_publisher),
-    session_service: SessionManagementService = Depends(get_session_management_service)
-) -> StreamLLMResponseHandler:
-    """
-    Получить handler для стриминга LLM ответов.
-    
-    Note: HITLService инжектируется через get_message_orchestration_service,
-    так как StreamLLMResponseHandler создается там вручную.
-    
-    Args:
-        llm_client: LLM клиент (инжектируется)
-        tool_filter: Сервис фильтрации инструментов (инжектируется)
-        response_processor: Процессор ответов (инжектируется)
-        event_publisher: Event publisher (инжектируется)
-        session_service: Сервис управления сессиями (инжектируется)
-        
-    Returns:
-        StreamLLMResponseHandler: Handler для стриминга
-        
-    Note: Эта функция не используется напрямую, так как StreamLLMResponseHandler
-    создается в get_message_orchestration_service с правильными зависимостями.
-    """
-    # Получить hitl_service из dependencies.py
-    from .dependencies import get_hitl_service
-    hitl_svc = await get_hitl_service()
-    
-    return StreamLLMResponseHandler(
-        llm_client=llm_client,
-        tool_filter=tool_filter,
-        response_processor=response_processor,
-        event_publisher=event_publisher,
-        session_service=session_service,
-        hitl_service=hitl_svc
-    )
-
-
 # ==================== Annotated Types ====================
 
 # Удобные типы для использования в роутерах
@@ -161,4 +119,3 @@ LLMClientDep = Annotated[LLMClient, Depends(get_llm_client)]
 LLMEventPublisherDep = Annotated[LLMEventPublisher, Depends(get_llm_event_publisher)]
 ToolFilterServiceDep = Annotated[ToolFilterService, Depends(get_tool_filter_service)]
 LLMResponseProcessorDep = Annotated[LLMResponseProcessor, Depends(get_llm_response_processor)]
-StreamLLMResponseHandlerDep = Annotated[StreamLLMResponseHandler, Depends(get_stream_llm_response_handler)]

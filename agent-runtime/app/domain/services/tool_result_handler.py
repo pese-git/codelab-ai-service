@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from .agent_orchestration import AgentOrchestrationService
     from .helpers.agent_switch_helper import AgentSwitchHelper
     from ..interfaces.stream_handler import IStreamHandler
-    from .hitl_service import HITLService
+    from .approval_management import ApprovalManager
 
 logger = logging.getLogger("agent-runtime.domain.tool_result_handler")
 
@@ -36,6 +36,7 @@ class ToolResultHandler:
         _agent_router: Роутер для получения экземпляров агентов
         _stream_handler: Handler для стриминга LLM ответов
         _switch_helper: Helper для переключения агентов
+        _approval_manager: Unified approval manager
     """
     
     def __init__(
@@ -45,7 +46,7 @@ class ToolResultHandler:
         agent_router,  # AgentRouter
         stream_handler: Optional["IStreamHandler"],
         switch_helper: "AgentSwitchHelper",
-        hitl_service: Optional["HITLService"] = None  # НОВОЕ
+        approval_manager: Optional["ApprovalManager"] = None
     ):
         """
         Инициализация handler.
@@ -56,18 +57,18 @@ class ToolResultHandler:
             agent_router: Роутер для получения экземпляров агентов
             stream_handler: Handler для стриминга LLM ответов
             switch_helper: Helper для переключения агентов
-            hitl_service: Сервис HITL для удаления pending approvals (опционально)
+            approval_manager: Unified approval manager для удаления pending approvals
         """
         self._session_service = session_service
         self._agent_service = agent_service
         self._agent_router = agent_router
         self._stream_handler = stream_handler
         self._switch_helper = switch_helper
-        self._hitl_service = hitl_service  # НОВОЕ
+        self._approval_manager = approval_manager
         
         logger.debug(
             f"ToolResultHandler инициализирован с stream_handler={stream_handler is not None}, "
-            f"hitl_service={hitl_service is not None}"
+            f"approval_manager={approval_manager is not None}"
         )
     
     async def handle(
@@ -98,31 +99,42 @@ class ToolResultHandler:
             f"call_id={call_id}, has_error={error is not None}"
         )
         
-        # BUGFIX: Удаляем pending approval при получении tool_result
+        # BUGFIX: Обновляем статус pending approval при получении tool_result
         # Если tool_result получен (успех или ошибка), значит решение пользователя
-        # уже принято (approve/reject) и pending approval больше не нужен.
+        # уже принято (approve/reject) и нужно обновить статус pending approval.
         # Это предотвращает повторное появление диалога после перезапуска IDE.
-        if self._hitl_service:
+        if self._approval_manager:
             try:
-                removed = await self._hitl_service.remove_pending(session_id, call_id)
-                if removed:
-                    logger.info(
-                        f"✅ Removed pending approval for call_id={call_id} "
-                        f"after receiving tool_result (user decision processed)"
-                    )
+                # Проверяем, есть ли pending approval для этого call_id
+                pending = await self._approval_manager.get_pending(call_id)
+                if pending:
+                    # Если есть error, значит пользователь reject'нул
+                    # Если нет error, значит пользователь approve'нул
+                    if error:
+                        await self._approval_manager.reject(call_id, reason=f"Tool execution failed: {error}")
+                        logger.info(
+                            f"✅ Marked pending approval as rejected for request_id={call_id} "
+                            f"after receiving tool_result with error"
+                        )
+                    else:
+                        await self._approval_manager.approve(call_id)
+                        logger.info(
+                            f"✅ Marked pending approval as approved for request_id={call_id} "
+                            f"after receiving successful tool_result"
+                        )
                 else:
                     logger.debug(
-                        f"No pending approval found for call_id={call_id} "
+                        f"No pending approval found for request_id={call_id} "
                         f"(tool was executed without approval requirement)"
                     )
             except Exception as e:
                 logger.warning(
-                    f"Failed to remove pending approval for call_id={call_id}: {e}"
+                    f"Failed to update pending approval status for request_id={call_id}: {e}"
                 )
-                # Не блокируем обработку из-за ошибки удаления
+                # Не блокируем обработку из-за ошибки обновления статуса
         else:
             logger.debug(
-                "HITL service not available, skipping pending approval cleanup"
+                "ApprovalManager not available, skipping pending approval status update"
             )
         
         # Получить сессию

@@ -12,6 +12,7 @@ class EventCategory(str, Enum):
     SESSION = "session"
     TOOL = "tool"
     HITL = "hitl"
+    APPROVAL = "approval"
     SYSTEM = "system"
     METRICS = "metrics"
 
@@ -42,6 +43,11 @@ class EventType(str, Enum):
     HITL_APPROVAL_REQUESTED = "hitl.approval.requested"
     HITL_DECISION_MADE = "hitl.decision.made"
     HITL_TIMEOUT_OCCURRED = "hitl.timeout.occurred"
+    
+    # Approval Events (Unified Approval System)
+    APPROVAL_REQUESTED = "approval.requested"
+    APPROVAL_APPROVED = "approval.approved"
+    APPROVAL_REJECTED = "approval.rejected"
     
     # System Events
     SYSTEM_STARTUP = "system.startup"

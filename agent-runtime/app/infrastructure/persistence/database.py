@@ -111,13 +111,18 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     
     async with async_session_maker() as session:
         try:
+            logger.debug(f"[DEBUG] get_db(): Session created, yielding to handler")
             yield session
+            logger.info(f"[DEBUG] get_db(): Handler completed, committing transaction NOW")
             await session.commit()
-        except Exception:
+            logger.info(f"[DEBUG] get_db(): Transaction committed successfully")
+        except Exception as e:
+            logger.error(f"[DEBUG] get_db(): Exception occurred, rolling back: {e}")
             await session.rollback()
             raise
         finally:
             await session.close()
+            logger.debug(f"[DEBUG] get_db(): Session closed")
 
 
 async def init_db():
