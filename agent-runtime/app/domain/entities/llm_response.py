@@ -7,7 +7,7 @@
 
 import json
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class TokenUsage(BaseModel):
@@ -38,10 +38,12 @@ class TokenUsage(BaseModel):
         description="Общее количество токенов"
     )
     
-    def __post_init__(self):
+    @model_validator(mode='after')
+    def validate_total_tokens(self):
         """Валидация: total должен быть суммой prompt и completion"""
         if self.total_tokens == 0 and (self.prompt_tokens > 0 or self.completion_tokens > 0):
             self.total_tokens = self.prompt_tokens + self.completion_tokens
+        return self
 
 
 class ToolCall(BaseModel):

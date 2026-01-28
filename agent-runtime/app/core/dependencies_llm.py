@@ -42,6 +42,19 @@ def get_llm_client() -> LLMClient:
     return _llm_client
 
 
+async def cleanup_llm_client():
+    """
+    Закрыть LLM клиент и освободить ресурсы.
+    
+    Должен вызываться при shutdown приложения.
+    """
+    global _llm_client
+    if _llm_client is not None:
+        await _llm_client.close()
+        _llm_client = None
+        logger.info("LLM client closed and resources released")
+
+
 # Singleton instance of event publisher
 _llm_event_publisher: LLMEventPublisher | None = None
 
