@@ -8,7 +8,6 @@
 from .session_management import SessionManagementService
 from .agent_orchestration import AgentOrchestrationService
 from .message_orchestration import MessageOrchestrationService
-from .hitl_service import HITLService
 from .hitl_policy import HITLPolicyService, hitl_policy_service
 from .approval_management import ApprovalManager, get_approval_manager_with_db, approval_manager
 from .agent_registry import AgentRegistry, agent_registry, agent_router
@@ -26,7 +25,6 @@ __all__ = [
     "SessionManagementService",
     "AgentOrchestrationService",
     "MessageOrchestrationService",
-    "HITLService",
     "HITLPolicyService",
     "hitl_policy_service",
     "ApprovalManager",

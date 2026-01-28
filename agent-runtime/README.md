@@ -100,13 +100,13 @@ graph TB
         TRH[ToolResultHandler]
         HITLH[HITLDecisionHandler]
         Helper[AgentSwitchHelper]
+        AM[ApprovalManager]
     end
     
     subgraph "Core Services"
         SMS[SessionManagementService]
         AOS[AgentOrchestrationService]
         AR[AgentRouter]
-        HITL[HITLService]
     end
     
     Router --> MOS
@@ -122,13 +122,15 @@ graph TB
     MP --> SMS
     MP --> AOS
     MP --> AR
+    MP --> AM
     
     AS --> AOS
     
     TRH --> SMS
     TRH --> AR
+    TRH --> AM
     
-    HITLH --> HITL
+    HITLH --> AM
     HITLH --> SMS
     HITLH --> MP
     
@@ -137,6 +139,7 @@ graph TB
     
     style MOS fill:#51cf66
     style Helper fill:#ffd43b
+    style AM fill:#ff6b6b
 ```
 
 #### Диаграмма последовательности обработки сообщения

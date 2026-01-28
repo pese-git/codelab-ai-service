@@ -110,45 +110,6 @@ def get_event_publisher() -> EventPublisherAdapter:
 
 # ==================== HITL Dependencies ====================
 
-async def get_hitl_repository(
-    db: AsyncSession = Depends(get_db_session),
-    db_service: DatabaseService = Depends(get_database_service)
-):
-    """
-    Получить HITL repository.
-    
-    Args:
-        db: Database session (инжектируется)
-        db_service: Database service (инжектируется)
-        
-    Returns:
-        HITLRepositoryImpl: Repository implementation
-    """
-    from ..infrastructure.persistence.repositories import HITLRepositoryImpl
-    return HITLRepositoryImpl(db=db, db_service=db_service)
-
-
-async def get_hitl_service(
-    repository = Depends(get_hitl_repository),
-    event_publisher: EventPublisherAdapter = Depends(get_event_publisher)
-):
-    """
-    Получить HITL service.
-    
-    Args:
-        repository: HITL repository (инжектируется)
-        event_publisher: Event publisher (инжектируется)
-        
-    Returns:
-        HITLService: Domain service для HITL
-    """
-    from ..domain.services import HITLService
-    return HITLService(
-        repository=repository,
-        event_publisher=event_publisher.publish
-    )
-
-
 async def get_hitl_policy_service():
     """
     Получить HITL policy service.
