@@ -15,6 +15,7 @@ from app.core.config import AppConfig
 if TYPE_CHECKING:
     from app.domain.entities.session import Session
     from app.domain.services.session_management import SessionManagementService
+    from app.domain.interfaces.stream_handler import IStreamHandler
 
 logger = logging.getLogger("agent-runtime.orchestrator_agent")
 
@@ -93,7 +94,8 @@ class OrchestratorAgent(BaseAgent):
         message: str,
         context: Dict[str, Any],
         session: "Session",
-        session_service: "SessionManagementService"
+        session_service: "SessionManagementService",
+        stream_handler: "IStreamHandler"
     ) -> AsyncGenerator[StreamChunk, None]:
         """
         Analyze request using LLM and determine which agent should handle it.
@@ -104,6 +106,7 @@ class OrchestratorAgent(BaseAgent):
             context: Agent context with history
             session: Domain entity Session (not used by orchestrator)
             session_service: Session management service (not used by orchestrator)
+            stream_handler: Handler для LLM стриминга (интерфейс из Domain слоя)
             
         Yields:
             StreamChunk: Switch agent chunk with routing decision

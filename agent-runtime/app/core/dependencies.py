@@ -108,6 +108,47 @@ def get_event_publisher() -> EventPublisherAdapter:
     return _event_publisher_adapter
 
 
+# ==================== HITL Dependencies ====================
+
+async def get_hitl_repository(
+    db: AsyncSession = Depends(get_db_session),
+    db_service: DatabaseService = Depends(get_database_service)
+):
+    """
+    Получить HITL repository.
+    
+    Args:
+        db: Database session (инжектируется)
+        db_service: Database service (инжектируется)
+        
+    Returns:
+        HITLRepositoryImpl: Repository implementation
+    """
+    from ..infrastructure.persistence.repositories import HITLRepositoryImpl
+    return HITLRepositoryImpl(db=db, db_service=db_service)
+
+
+async def get_hitl_service(
+    repository = Depends(get_hitl_repository),
+    event_publisher: EventPublisherAdapter = Depends(get_event_publisher)
+):
+    """
+    Получить HITL service.
+    
+    Args:
+        repository: HITL repository (инжектируется)
+        event_publisher: Event publisher (инжектируется)
+        
+    Returns:
+        HITLService: Domain service для HITL
+    """
+    from ..domain.services import HITLService
+    return HITLService(
+        repository=repository,
+        event_publisher=event_publisher.publish
+    )
+
+
 # ==================== Domain Service Dependencies ====================
 
 async def get_session_management_service(
@@ -150,6 +191,181 @@ async def get_agent_orchestration_service(
     )
 
 
+# ==================== Agent Switch Helper ====================
+
+async def get_agent_switch_helper(
+    session_service: SessionManagementService = Depends(get_session_management_service),
+    agent_service: AgentOrchestrationService = Depends(get_agent_orchestration_service)
+):
+    """
+    Получить helper для переключения агентов.
+    
+    Args:
+        session_service: Сервис управления сессиями (инжектируется)
+        agent_service: Сервис оркестрации агентов (инжектируется)
+        
+    Returns:
+        AgentSwitchHelper: Helper для переключения агентов
+    """
+    from ..domain.services.helpers import AgentSwitchHelper
+    return AgentSwitchHelper(
+        session_service=session_service,
+        agent_service=agent_service
+    )
+
+
+# ==================== Message Processor ====================
+
+async def get_message_processor(
+    session_service: SessionManagementService = Depends(get_session_management_service),
+    agent_service: AgentOrchestrationService = Depends(get_agent_orchestration_service),
+    switch_helper = Depends(get_agent_switch_helper),
+    hitl_service = Depends(get_hitl_service)
+):
+    """
+    Получить процессор сообщений.
+    
+    Args:
+        session_service: Сервис управления сессиями (инжектируется)
+        agent_service: Сервис оркестрации агентов (инжектируется)
+        switch_helper: Helper для переключения агентов (инжектируется)
+        hitl_service: Сервис HITL (инжектируется)
+        
+    Returns:
+        MessageProcessor: Процессор сообщений
+    """
+    from ..domain.services import MessageProcessor
+    from ..domain.interfaces.stream_handler import IStreamHandler
+    from ..domain.services.agent_registry import agent_router
+    from .dependencies_llm import (
+        get_llm_client,
+        get_llm_event_publisher,
+        get_tool_registry,
+        get_tool_filter_service,
+        get_llm_response_processor
+    )
+    from ..application.handlers.stream_llm_response_handler import StreamLLMResponseHandler
+    
+    # Создать stream handler с явным type hint IStreamHandler
+    stream_handler: IStreamHandler = StreamLLMResponseHandler(
+        llm_client=get_llm_client(),
+        tool_filter=get_tool_filter_service(get_tool_registry()),
+        response_processor=get_llm_response_processor(),
+        event_publisher=get_llm_event_publisher(),
+        session_service=session_service,
+        hitl_service=hitl_service
+    )
+    
+    return MessageProcessor(
+        session_service=session_service,
+        agent_service=agent_service,
+        agent_router=agent_router,
+        stream_handler=stream_handler,
+        switch_helper=switch_helper
+    )
+
+
+# ==================== Agent Switcher ====================
+
+async def get_agent_switcher(
+    agent_service: AgentOrchestrationService = Depends(get_agent_orchestration_service),
+    switch_helper = Depends(get_agent_switch_helper)
+):
+    """
+    Получить switcher агентов.
+    
+    Args:
+        agent_service: Сервис оркестрации агентов (инжектируется)
+        switch_helper: Helper для переключения агентов (инжектируется)
+        
+    Returns:
+        AgentSwitcher: Switcher агентов
+    """
+    from ..domain.services import AgentSwitcher
+    return AgentSwitcher(
+        agent_service=agent_service,
+        switch_helper=switch_helper
+    )
+
+
+# ==================== Tool Result Handler ====================
+
+async def get_tool_result_handler(
+    session_service: SessionManagementService = Depends(get_session_management_service),
+    agent_service: AgentOrchestrationService = Depends(get_agent_orchestration_service),
+    switch_helper = Depends(get_agent_switch_helper),
+    hitl_service = Depends(get_hitl_service)
+):
+    """
+    Получить handler результатов инструментов.
+    
+    Args:
+        session_service: Сервис управления сессиями (инжектируется)
+        agent_service: Сервис оркестрации агентов (инжектируется)
+        switch_helper: Helper для переключения агентов (инжектируется)
+        hitl_service: Сервис HITL (инжектируется)
+        
+    Returns:
+        ToolResultHandler: Handler результатов инструментов
+    """
+    from ..domain.services import ToolResultHandler
+    from ..domain.interfaces.stream_handler import IStreamHandler
+    from ..domain.services.agent_registry import agent_router
+    from .dependencies_llm import (
+        get_llm_client,
+        get_llm_event_publisher,
+        get_tool_registry,
+        get_tool_filter_service,
+        get_llm_response_processor
+    )
+    from ..application.handlers.stream_llm_response_handler import StreamLLMResponseHandler
+    
+    # Создать stream handler
+    stream_handler: IStreamHandler = StreamLLMResponseHandler(
+        llm_client=get_llm_client(),
+        tool_filter=get_tool_filter_service(get_tool_registry()),
+        response_processor=get_llm_response_processor(),
+        event_publisher=get_llm_event_publisher(),
+        session_service=session_service,
+        hitl_service=hitl_service
+    )
+    
+    return ToolResultHandler(
+        session_service=session_service,
+        agent_service=agent_service,
+        agent_router=agent_router,
+        stream_handler=stream_handler,
+        switch_helper=switch_helper,
+        hitl_service=hitl_service  # BUGFIX: Передаем hitl_service для удаления pending approvals
+    )
+
+
+# ==================== HITL Decision Handler ====================
+
+async def get_hitl_decision_handler(
+    hitl_service = Depends(get_hitl_service),
+    session_service: SessionManagementService = Depends(get_session_management_service),
+    message_processor = Depends(get_message_processor)
+):
+    """
+    Получить handler HITL решений.
+    
+    Args:
+        hitl_service: Сервис HITL (инжектируется)
+        session_service: Сервис управления сессиями (инжектируется)
+        message_processor: Процессор сообщений (инжектируется)
+        
+    Returns:
+        HITLDecisionHandler: Handler HITL решений
+    """
+    from ..domain.services import HITLDecisionHandler
+    return HITLDecisionHandler(
+        hitl_service=hitl_service,
+        session_service=session_service,
+        message_processor=message_processor
+    )
+
+
 async def get_session_manager_adapter(
     session_service: SessionManagementService = Depends(get_session_management_service)
 ):
@@ -183,31 +399,32 @@ async def get_agent_context_manager_adapter(
 
 
 async def get_message_orchestration_service(
-    session_service: SessionManagementService = Depends(get_session_management_service),
-    agent_service: AgentOrchestrationService = Depends(get_agent_orchestration_service),
-    event_publisher: EventPublisherAdapter = Depends(get_event_publisher)
+    message_processor = Depends(get_message_processor),
+    agent_switcher = Depends(get_agent_switcher),
+    tool_result_handler = Depends(get_tool_result_handler),
+    hitl_handler = Depends(get_hitl_decision_handler)
 ):
     """
-    Получить доменный сервис оркестрации сообщений.
+    Получить доменный сервис оркестрации сообщений (фасад).
     
     Args:
-        session_service: Сервис управления сессиями (инжектируется)
-        agent_service: Сервис оркестрации агентов (инжектируется)
-        event_publisher: Адаптер для публикации событий (инжектируется)
+        message_processor: Процессор сообщений (инжектируется)
+        agent_switcher: Switcher агентов (инжектируется)
+        tool_result_handler: Handler результатов инструментов (инжектируется)
+        hitl_handler: Handler HITL решений (инжектируется)
         
     Returns:
-        MessageOrchestrationService: Доменный сервис
+        MessageOrchestrationService: Доменный сервис (фасад)
     """
     from ..domain.services import MessageOrchestrationService
-    from ..domain.services.agent_registry import agent_router
     from ..infrastructure.concurrency import session_lock_manager
     
     return MessageOrchestrationService(
-        session_service=session_service,
-        agent_service=agent_service,
-        agent_router=agent_router,
-        lock_manager=session_lock_manager,
-        event_publisher=event_publisher.publish
+        message_processor=message_processor,
+        agent_switcher=agent_switcher,
+        tool_result_handler=tool_result_handler,
+        hitl_handler=hitl_handler,
+        lock_manager=session_lock_manager
     )
 
 

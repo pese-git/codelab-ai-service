@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from app.infrastructure.adapters import SessionManagerAdapter
     from app.domain.entities.session import Session
     from app.domain.services.session_management import SessionManagementService
+    from app.domain.interfaces.stream_handler import IStreamHandler
 
 logger = logging.getLogger("agent-runtime.base_agent")
 
@@ -72,7 +73,8 @@ class BaseAgent(ABC):
         message: str,
         context: Dict[str, Any],
         session: "Session",
-        session_service: "SessionManagementService"
+        session_service: "SessionManagementService",
+        stream_handler: "IStreamHandler"
     ) -> AsyncGenerator:
         """
         Process a message through this agent.
@@ -83,9 +85,15 @@ class BaseAgent(ABC):
             context: Agent context with history and metadata
             session: Domain entity Session with message history
             session_service: Session management service for operations
+            stream_handler: Handler для LLM стриминга (интерфейс из Domain слоя)
             
         Yields:
             StreamChunk: Chunks for SSE streaming
+            
+        Note:
+            stream_handler использует интерфейс IStreamHandler из Domain слоя,
+            что позволяет Domain слою не зависеть от конкретной реализации
+            из Application слоя. Это соблюдает Dependency Rule Clean Architecture.
         """
         pass
     

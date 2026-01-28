@@ -6,7 +6,7 @@ Local tools (echo, calculator) can be executed directly.
 Other tools (file operations, commands) are executed on IDE side via WebSocket.
 """
 import logging
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 
 from app.models.schemas import ToolCall
 
@@ -375,6 +375,81 @@ async def execute_local_tool(tool_call: ToolCall) -> str:
         logger.error(error_msg, exc_info=True)
         return error_msg
 
+
+class ToolRegistry:
+    """
+    Реестр инструментов для агентов.
+    
+    Предоставляет доступ к спецификациям инструментов
+    и функциям для их выполнения.
+    
+    Пример:
+        >>> registry = ToolRegistry()
+        >>> all_tools = registry.get_all_tools()
+        >>> len(all_tools)
+        7
+    """
+    
+    def __init__(self):
+        """Инициализация реестра"""
+        self._tools_spec = TOOLS_SPEC
+        self._local_tools = LOCAL_TOOLS
+        logger.info(f"ToolRegistry initialized with {len(self._tools_spec)} tools")
+    
+    def get_all_tools(self) -> List[Dict[str, Any]]:
+        """
+        Получить все доступные инструменты.
+        
+        Returns:
+            Список спецификаций инструментов в формате OpenAI
+        """
+        return self._tools_spec.copy()
+    
+    def get_tool_spec(self, tool_name: str) -> Optional[Dict[str, Any]]:
+        """
+        Получить спецификацию конкретного инструмента.
+        
+        Args:
+            tool_name: Имя инструмента
+            
+        Returns:
+            Спецификация инструмента или None если не найден
+        """
+        for tool in self._tools_spec:
+            if tool["function"]["name"] == tool_name:
+                return tool
+        return None
+    
+    def is_local_tool(self, tool_name: str) -> bool:
+        """
+        Проверить, является ли инструмент локальным.
+        
+        Локальные инструменты выполняются в agent-runtime,
+        остальные - на стороне IDE.
+        
+        Args:
+            tool_name: Имя инструмента
+            
+        Returns:
+            True если инструмент локальный
+        """
+        return tool_name in self._local_tools
+    
+    def get_local_tool_function(self, tool_name: str) -> Optional[Callable]:
+        """
+        Получить функцию локального инструмента.
+        
+        Args:
+            tool_name: Имя инструмента
+            
+        Returns:
+            Функция инструмента или None если не локальный
+        """
+        return self._local_tools.get(tool_name)
+
+
+# Singleton instance
+tool_registry = ToolRegistry()
 
 # Log registered tools on module load
 logger.info(f"Registered local tools: {list(LOCAL_TOOLS.keys())}")

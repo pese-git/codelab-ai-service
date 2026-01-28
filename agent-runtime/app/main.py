@@ -183,6 +183,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Error stopping cleanup service: {e}")
     
+    # Cleanup LLM client resources
+    try:
+        from app.core.dependencies_llm import cleanup_llm_client
+        await cleanup_llm_client()
+        logger.info("✓ LLM client resources released")
+    except Exception as e:
+        logger.error(f"Error cleaning up LLM client: {e}")
+    
     # Shutdown обрабатывается репозиториями в новой архитектуре
     logger.info("✓ Session/context managers shutdown (managed by new architecture)")
     
