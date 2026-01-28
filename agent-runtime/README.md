@@ -101,12 +101,18 @@ graph TB
         HITLH[HITLDecisionHandler]
         Helper[AgentSwitchHelper]
         AM[ApprovalManager]
+        HPS[HITLPolicyService]
     end
     
     subgraph "Core Services"
         SMS[SessionManagementService]
         AOS[AgentOrchestrationService]
         AR[AgentRouter]
+    end
+    
+    subgraph "Infrastructure"
+        ApprovalRepo[ApprovalRepository]
+        EB[EventBus]
     end
     
     Router --> MOS
@@ -137,9 +143,14 @@ graph TB
     Helper --> SMS
     Helper --> AOS
     
+    AM --> HPS
+    AM --> ApprovalRepo
+    AM --> EB
+    
     style MOS fill:#51cf66
     style Helper fill:#ffd43b
     style AM fill:#ff6b6b
+    style HPS fill:#74c0fc
 ```
 
 #### Диаграмма последовательности обработки сообщения
