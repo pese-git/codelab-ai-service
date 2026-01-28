@@ -141,9 +141,8 @@ class StreamLLMResponseHandler(IStreamHandler):
             ...         print(f"Message: {chunk.content}")
         """
         try:
-            # TEMPORARY: Явное логирование для отладки
-            logger.error(
-                f"🔥 NEW CODE: StreamLLMResponseHandler.handle() called for session {session_id} "
+            logger.debug(
+                f"StreamLLMResponseHandler.handle() called for session {session_id} "
                 f"with {len(history)} messages"
             )
             logger.info(
