@@ -432,12 +432,19 @@ def _get_global_approval_manager() -> ApprovalManager:
         from app.services.database import get_db
         
         class SelfManagedRepository(ApprovalRepository):
-            """Repository that creates its own DB sessions (for backward compatibility)"""
+            """
+            Repository that creates its own DB sessions (for backward compatibility).
+            
+            IMPORTANT: This repository manages its own database sessions and commits.
+            Each method creates a new session, performs the operation, and commits
+            the transaction before closing the session.
+            """
             
             async def save_pending(self, request_id, request_type, subject, session_id, details, reason=None):
                 async for db in get_db():
                     repo = ApprovalRepositoryImpl(db)
                     await repo.save_pending(request_id, request_type, subject, session_id, details, reason)
+                    await db.commit()  # Explicit commit after flush
             
             async def get_pending(self, request_id):
                 async for db in get_db():
@@ -452,12 +459,16 @@ def _get_global_approval_manager() -> ApprovalManager:
             async def update_status(self, request_id, status, decision_at, decision_reason=None):
                 async for db in get_db():
                     repo = ApprovalRepositoryImpl(db)
-                    return await repo.update_status(request_id, status, decision_at, decision_reason)
+                    result = await repo.update_status(request_id, status, decision_at, decision_reason)
+                    await db.commit()  # Explicit commit after flush
+                    return result
             
             async def delete_pending(self, request_id):
                 async for db in get_db():
                     repo = ApprovalRepositoryImpl(db)
-                    return await repo.delete_pending(request_id)
+                    result = await repo.delete_pending(request_id)
+                    await db.commit()  # Explicit commit after flush
+                    return result
             
             async def count_pending(self, session_id):
                 async for db in get_db():

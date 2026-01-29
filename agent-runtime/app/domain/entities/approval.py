@@ -8,12 +8,13 @@ Provides entities for:
 
 This replaces the HITL-specific entities with a unified approach.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 import re
 
 from pydantic import BaseModel, Field
+from .base import Entity
 
 
 class ApprovalRequestType(str, Enum):
@@ -136,29 +137,50 @@ class ApprovalPolicy(BaseModel):
         }
 
 
-class PendingApprovalState(BaseModel):
+class PendingApprovalState(Entity):
     """
     State of an approval request pending user decision.
     
     Unified entity for all request types.
+    
+    Note: Uses request_id as the primary identifier (mapped to Entity.id).
     """
     
-    request_id: str = Field(description="Unique identifier")
     request_type: str = Field(description="Type: tool, plan, etc.")
     subject: str = Field(description="Subject (tool name, plan title)")
     session_id: str = Field(description="Related session")
     details: Dict[str, Any] = Field(description="Request details (flexible)")
     reason: Optional[str] = Field(default=None, description="Why approval is required")
-    created_at: datetime = Field(description="When request was created")
     status: Literal['pending', 'approved', 'rejected'] = Field(
         default='pending'
     )
+    
+    @property
+    def request_id(self) -> str:
+        """Alias for id field to maintain backward compatibility."""
+        return self.id
+    
+    def __init__(self, request_id: str = None, **data):
+        """
+        Initialize with request_id mapped to id.
+        
+        Args:
+            request_id: Unique identifier (mapped to Entity.id)
+            **data: Other fields
+        """
+        # Map request_id to id for Entity base class
+        if request_id is not None:
+            data['id'] = request_id
+        elif 'id' not in data:
+            raise ValueError("Either 'request_id' or 'id' must be provided")
+        
+        super().__init__(**data)
     
     class Config:
         json_schema_extra = {
             "examples": [
                 {
-                    "request_id": "req-tool-123",
+                    "id": "req-tool-123",
                     "request_type": "tool",
                     "subject": "write_file",
                     "session_id": "session-abc",
@@ -172,7 +194,7 @@ class PendingApprovalState(BaseModel):
                     "status": "pending"
                 },
                 {
-                    "request_id": "req-plan-456",
+                    "id": "req-plan-456",
                     "request_type": "plan",
                     "subject": "Migration to Riverpod",
                     "session_id": "session-abc",
