@@ -28,7 +28,7 @@ from ....core.dependencies import (
     get_list_sessions_handler,
     get_session_manager_adapter,
     get_agent_context_manager_adapter,
-    get_hitl_service
+    get_approval_manager
 )
 
 logger = logging.getLogger("agent-runtime.api.sessions")
@@ -344,7 +344,7 @@ async def get_session_history(
 async def get_pending_approvals(
     session_id: str,
     session_manager_adapter=Depends(get_session_manager_adapter),
-    hitl_service=Depends(get_hitl_service)
+    approval_manager=Depends(get_approval_manager)
 ):
     """
     Получить все pending approval запросы для сессии.
@@ -354,7 +354,7 @@ async def get_pending_approvals(
     
     Args:
         session_id: ID сессии
-        hitl_service: HITL сервис (инжектируется)
+        approval_manager: Unified approval manager (инжектируется)
         
     Returns:
         Список pending approval запросов с деталями
@@ -371,11 +371,15 @@ async def get_pending_approvals(
             "session_id": "session-123",
             "pending_approvals": [
                 {
+                    "request_id": "req-1",
+                    "request_type": "tool",
+                    "subject": "write_file",
+                    "details": {"arguments": {"path": "test.py", "content": "..."}},
+                    "reason": "File modification requires approval",
+                    "created_at": "2026-01-20T04:00:00Z",
                     "call_id": "call-1",
                     "tool_name": "write_file",
-                    "arguments": {"path": "test.py", "content": "..."},
-                    "reason": "File modification requires approval",
-                    "created_at": "2026-01-20T04:00:00Z"
+                    "arguments": {"path": "test.py", "content": "..."}
                 }
             ],
             "count": 1
@@ -391,18 +395,24 @@ async def get_pending_approvals(
                 detail=f"Session {session_id} not found"
             )
         
-        # Получить pending approvals из HITL service (загружает из БД)
-        pending_approvals = await hitl_service.get_all_pending(session_id)
+        # Получить pending approvals из ApprovalManager (загружает из БД)
+        pending_approvals = await approval_manager.get_all_pending(session_id)
         
         return {
             "session_id": session_id,
             "pending_approvals": [
                 {
-                    "call_id": p.call_id,
-                    "tool_name": p.tool_name,
-                    "arguments": p.arguments,
+                    # Unified fields
+                    "request_id": p.request_id,
+                    "request_type": p.request_type,
+                    "subject": p.subject,
+                    "details": p.details,
                     "reason": p.reason,
-                    "created_at": p.created_at.isoformat() if p.created_at else None
+                    "created_at": p.created_at.isoformat() if p.created_at else None,
+                    # Legacy fields for backward compatibility
+                    "call_id": p.request_id,  # call_id = request_id для tool approvals
+                    "tool_name": p.subject if p.request_type == "tool" else None,
+                    "arguments": p.details.get("arguments", {}) if p.details and p.request_type == "tool" else {}
                 }
                 for p in pending_approvals
             ],

@@ -18,7 +18,7 @@ from ...domain.interfaces.stream_handler import IStreamHandler
 from ...domain.services.llm_response_processor import LLMResponseProcessor
 from ...domain.services.tool_filter_service import ToolFilterService
 from ...domain.services.session_management import SessionManagementService
-from ...domain.services.hitl_service import HITLService
+from ...domain.services.approval_management import ApprovalManager
 from ...domain.entities.llm_response import ProcessedResponse
 from ...infrastructure.llm.llm_client import LLMClient
 from ...infrastructure.events.llm_event_publisher import LLMEventPublisher
@@ -50,7 +50,7 @@ class StreamLLMResponseHandler(IStreamHandler):
         _response_processor: Сервис обработки ответов
         _event_publisher: Publisher для событий
         _session_service: Сервис управления сессиями
-        _hitl_service: Сервис HITL
+        _approval_manager: Unified approval manager
     
     Пример:
         >>> handler = StreamLLMResponseHandler(
@@ -59,7 +59,7 @@ class StreamLLMResponseHandler(IStreamHandler):
         ...     response_processor=response_processor,
         ...     event_publisher=event_publisher,
         ...     session_service=session_service,
-        ...     hitl_service=hitl_service
+        ...     approval_manager=approval_manager
         ... )
         >>> async for chunk in handler.handle(
         ...     session_id="session-1",
@@ -76,7 +76,7 @@ class StreamLLMResponseHandler(IStreamHandler):
         response_processor: LLMResponseProcessor,
         event_publisher: LLMEventPublisher,
         session_service: SessionManagementService,
-        hitl_service: HITLService
+        approval_manager: ApprovalManager
     ):
         """
         Инициализация handler.
@@ -87,16 +87,16 @@ class StreamLLMResponseHandler(IStreamHandler):
             response_processor: Сервис обработки ответов
             event_publisher: Publisher для событий
             session_service: Сервис управления сессиями
-            hitl_service: Сервис HITL
+            approval_manager: Unified approval manager
         """
         self._llm_client = llm_client
         self._tool_filter = tool_filter
         self._response_processor = response_processor
         self._event_publisher = event_publisher
         self._session_service = session_service
-        self._hitl_service = hitl_service
+        self._approval_manager = approval_manager
         
-        logger.info("StreamLLMResponseHandler initialized")
+        logger.info("StreamLLMResponseHandler initialized with ApprovalManager")
     
     async def handle(
         self,
@@ -282,19 +282,20 @@ class StreamLLMResponseHandler(IStreamHandler):
             correlation_id=correlation_id
         )
         
-        # 3. HITL: Сохранение pending approval (если требуется)
+        # 3. Approval: Сохранение pending approval (если требуется)
         if processed.requires_approval:
-            await self._hitl_service.add_pending(
+            await self._approval_manager.add_pending(
+                request_id=tool_call.id,
+                request_type="tool",
+                subject=tool_call.tool_name,
                 session_id=session_id,
-                call_id=tool_call.id,
-                tool_name=tool_call.tool_name,
-                arguments=tool_call.arguments,
+                details={"arguments": tool_call.arguments},
                 reason=processed.approval_reason
             )
             
             logger.info(
-                f"Added HITL pending state for call_id={tool_call.id}, "
-                f"reason={processed.approval_reason}"
+                f"Added pending approval for request_id={tool_call.id}, "
+                f"tool={tool_call.tool_name}, reason={processed.approval_reason}"
             )
             
             # 4. Публикация события tool approval required

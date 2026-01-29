@@ -17,6 +17,12 @@ from .hitl import (
     HITLAuditLog,
     HITLPendingState
 )
+from .approval import (
+    ApprovalRequestType,
+    ApprovalPolicyRule,
+    ApprovalPolicy,
+    PendingApprovalState
+)
 
 __all__ = [
     "Entity",
@@ -31,4 +37,8 @@ __all__ = [
     "HITLUserDecision",
     "HITLAuditLog",
     "HITLPendingState",
+    "ApprovalRequestType",
+    "ApprovalPolicyRule",
+    "ApprovalPolicy",
+    "PendingApprovalState",
 ]
