@@ -21,27 +21,31 @@ logger = logging.getLogger("agent-runtime.orchestrator_agent")
 
 
 # Classification prompt for LLM
-CLASSIFICATION_PROMPT = """Classify the task:
+CLASSIFICATION_PROMPT = """Classify the task strictly.
 
-1. Is it atomic (single-step) or complex (multi-step)?
-2. Which agent should handle it?
+Definitions:
 
-Atomic tasks:
-- Single file changes
-- Simple questions
-- Direct commands
+A task is ATOMIC only if ALL conditions are met:
+- Single clear step
+- Can be completed by ONE agent
+- Does NOT require studying or exploring an existing project
+- Does NOT involve building an application or system
+- Does NOT require architectural or design decisions
+- Does NOT involve multiple components or files
 
-Complex tasks:
-- Multi-file changes
-- System design
-- Feature implementations
+If ANY condition is false, the task is NON-ATOMIC.
 
-Respond with JSON:
+Routing rules:
+- NON-ATOMIC tasks MUST be routed to "plan" (Architect)
+- ATOMIC tasks may be routed to "code", "debug", or "explain"
+
+Respond with JSON ONLY:
+
 {{
-  "is_atomic": true|false,
-  "agent": "architect|code|debug|ask",
-  "confidence": "high|medium|low",
-  "reasoning": "explanation"
+  "is_atomic": true | false,
+  "agent": "code | plan | debug | explain",
+  "confidence": "high | medium | low",
+  "reason": "short explanation"
 }}
 
 Task: {user_message}
@@ -151,8 +155,8 @@ class OrchestratorAgent(BaseAgent):
             response = await llm_proxy_client.chat_completion(
                 model=AppConfig.LLM_MODEL,
                 messages=[
-                    {"role": "system", "content": ORCHESTRATOR_PROMPT},
-                    {"role": "user", "content": classification_prompt}
+                    {"role": "system", "content": classification_prompt},
+                    {"role": "user", "content": message}
                 ],
                 stream=False,
                 extra_params={"temperature": 0.3}  # Lower temperature for more consistent classification
@@ -181,9 +185,12 @@ class OrchestratorAgent(BaseAgent):
             
             # Map to AgentType
             agent_mapping = {
+                "code": AgentType.CODER,
                 "coder": AgentType.CODER,
+                "plan": AgentType.ARCHITECT,
                 "architect": AgentType.ARCHITECT,
                 "debug": AgentType.DEBUG,
+                "explain": AgentType.ASK,
                 "ask": AgentType.ASK,
                 "universal": AgentType.UNIVERSAL
             }
