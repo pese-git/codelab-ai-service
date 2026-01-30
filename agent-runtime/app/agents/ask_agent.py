@@ -44,8 +44,8 @@ class AskAgent(BaseAgent):
                 "read_file",
                 "search_in_code",
                 "list_files",
-                "attempt_completion",
-                "switch_mode"  # Allow switching to other agents
+                "ask_followup_question",
+                "attempt_completion"
             ]
             # Minimal tools - only for reading and context
         )
@@ -100,31 +100,6 @@ class AskAgent(BaseAgent):
             allowed_tools=self.allowed_tools,
             correlation_id=context.get("correlation_id")
         ):
-            # Handle switch_mode tool call - DON'T add tool_result to history!
-            if chunk.type == "tool_call" and chunk.tool_name == "switch_mode":
-                target_mode = chunk.arguments.get("mode", "orchestrator")
-                reason = chunk.arguments.get("reason", "Agent requested switch")
-                
-                logger.info(
-                    f"Ask agent requesting switch to {target_mode}: {reason}"
-                )
-                
-                # ВАЖНО: НЕ добавляем tool_result в историю!
-                # Это предотвращает ошибку "No tool call found" от OpenRouter API
-                # Просто отправляем switch_agent chunk
-                
-                # Emit switch_agent chunk
-                yield StreamChunk(
-                    type="switch_agent",
-                    content=f"Switching to {target_mode} agent",
-                    metadata={
-                        "target_agent": target_mode,
-                        "reason": reason
-                    },
-                    is_final=True
-                )
-                return
-            
             # Validate tool usage
             if chunk.type == "tool_call":
                 if not self.can_use_tool(chunk.tool_name):

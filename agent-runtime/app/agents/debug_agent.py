@@ -45,8 +45,7 @@ class DebugAgent(BaseAgent):
                 "search_in_code",
                 "execute_command",  # For running tests and diagnostics
                 "attempt_completion",
-                "ask_followup_question",
-                "switch_mode"  # Allow switching to other agents
+                "ask_followup_question"
             ]
             # No file_restrictions needed - write_file is not in allowed_tools
         )
@@ -94,30 +93,6 @@ class DebugAgent(BaseAgent):
             allowed_tools=self.allowed_tools,
             correlation_id=context.get("correlation_id")
         ):
-            # Handle switch_mode tool call - DON'T add tool_result to history!
-            if chunk.type == "tool_call" and chunk.tool_name == "switch_mode":
-                target_mode = chunk.arguments.get("mode", "orchestrator")
-                reason = chunk.arguments.get("reason", "Agent requested switch")
-                
-                logger.info(
-                    f"Debug agent requesting switch to {target_mode}: {reason}"
-                )
-                
-                # ВАЖНО: НЕ добавляем tool_result в историю!
-                # Это предотвращает ошибку "No tool call found" от OpenRouter API
-                
-                # Emit switch_agent chunk
-                yield StreamChunk(
-                    type="switch_agent",
-                    content=f"Switching to {target_mode} agent",
-                    metadata={
-                        "target_agent": target_mode,
-                        "reason": reason
-                    },
-                    is_final=True
-                )
-                return
-            
             # Validate tool usage
             if chunk.type == "tool_call":
                 if not self.can_use_tool(chunk.tool_name):
