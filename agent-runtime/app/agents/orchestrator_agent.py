@@ -21,52 +21,31 @@ logger = logging.getLogger("agent-runtime.orchestrator_agent")
 
 
 # Classification prompt for LLM
-CLASSIFICATION_PROMPT = """You are a task classifier for a multi-agent system. Analyze the user's request and determine which specialized agent should handle it.
+CLASSIFICATION_PROMPT = """Classify the task:
 
-Available agents:
-1. **coder** - for writing, modifying, and refactoring code
-   - Creating new files or components
-   - Modifying existing code
-   - Implementing features
-   - Fixing bugs in code
-   - Refactoring code
+1. Is it atomic (single-step) or complex (multi-step)?
+2. Which agent should handle it?
 
-2. **architect** - for planning, designing, and creating technical specifications
-   - Designing system architecture
-   - Creating technical specifications
-   - Planning implementation strategies
-   - Designing data models or APIs
-   - Creating documentation and diagrams
+Atomic tasks:
+- Single file changes
+- Simple questions
+- Direct commands
 
-3. **debug** - for troubleshooting, investigating errors, and debugging
-   - Analyzing error messages
-   - Investigating bugs
-   - Finding root causes
-   - Troubleshooting issues
-   - Analyzing logs or stack traces
+Complex tasks:
+- Multi-file changes
+- System design
+- Feature implementations
 
-4. **ask** - for answering questions, explaining concepts, and providing documentation
-   - Explaining programming concepts
-   - Answering technical questions
-   - Providing documentation
-   - Teaching or learning
-   - General knowledge queries
-
-5. **universal** - universal agent that can handle any task (used in single-agent mode)
-   - All of the above capabilities combined
-   - Used when only one agent is available
-
-Analyze the user's request and respond with ONLY a JSON object in this format:
+Respond with JSON:
 {{
-  "agent": "coder|architect|debug|ask|universal",
+  "is_atomic": true|false,
+  "agent": "architect|code|debug|ask",
   "confidence": "high|medium|low",
-  "reasoning": "brief explanation of why this agent was chosen"
+  "reasoning": "explanation"
 }}
 
-User request: {user_message}
-
-Response (JSON only):"""
-
+Task: {user_message}
+"""
 
 class OrchestratorAgent(BaseAgent):
     """
@@ -172,7 +151,7 @@ class OrchestratorAgent(BaseAgent):
             response = await llm_proxy_client.chat_completion(
                 model=AppConfig.LLM_MODEL,
                 messages=[
-                    {"role": "system", "content": "You are a task classifier. Respond only with JSON."},
+                    {"role": "system", "content": ORCHESTRATOR_PROMPT},
                     {"role": "user", "content": classification_prompt}
                 ],
                 stream=False,
