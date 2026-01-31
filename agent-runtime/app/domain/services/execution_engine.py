@@ -254,50 +254,28 @@ class ExecutionEngine:
         Raises:
             ExecutionEngineError: При циклических зависимостях
         """
-        # Проверить на циклические зависимости
-        if self.dependency_resolver.has_cyclic_dependencies(plan):
+        try:
+            # Получить порядок выполнения по уровням из DependencyResolver
+            levels = self.dependency_resolver.get_execution_order(plan)
+            
+            # Преобразовать уровни Subtask в батчи ID с учетом max_parallel_tasks
+            batches = []
+            for level in levels:
+                # Разбить уровень на батчи по max_parallel_tasks
+                level_ids = [subtask.id for subtask in level]
+                
+                # Если уровень больше max_parallel_tasks, разбить на несколько батчей
+                for i in range(0, len(level_ids), self.max_parallel_tasks):
+                    batch = level_ids[i:i + self.max_parallel_tasks]
+                    batches.append(batch)
+            
+            return batches
+            
+        except ValueError as e:
+            # DependencyResolver выбрасывает ValueError при циклических зависимостях
             raise ExecutionEngineError(
-                f"Plan {plan.id} has circular dependencies"
-            )
-        
-        # Построить граф зависимостей для топологической сортировки
-        dependencies = {
-            subtask.id: subtask.dependencies
-            for subtask in plan.subtasks
-        }
-        
-        # Получить топологический порядок
-        sorted_ids = self.dependency_resolver.topological_sort(dependencies)
-        
-        # Разбить на батчи для параллельного выполнения
-        batches = []
-        completed: Set[str] = set()
-        remaining = set(sorted_ids)
-        
-        while remaining:
-            # Найти все задачи, готовые к выполнению
-            ready = []
-            for subtask_id in remaining:
-                subtask = plan.get_subtask_by_id(subtask_id)
-                if subtask and subtask.is_ready(list(completed)):
-                    ready.append(subtask_id)
-            
-            if not ready:
-                # Не должно происходить если нет циклов
-                raise ExecutionEngineError(
-                    f"No ready subtasks found, but {len(remaining)} remaining"
-                )
-            
-            # Ограничить размер батча
-            batch = ready[:self.max_parallel_tasks]
-            batches.append(batch)
-            
-            # Обновить состояние
-            for subtask_id in batch:
-                remaining.remove(subtask_id)
-                completed.add(subtask_id)
-        
-        return batches
+                f"Plan {plan.id} has circular dependencies: {str(e)}"
+            ) from e
     
     async def _execute_batch(
         self,
@@ -326,7 +304,7 @@ class ExecutionEngine:
         tasks = []
         for subtask_id in subtask_ids:
             task = self._execute_subtask_safe(
-                plan_id=plan.id,
+                plan=plan,
                 subtask_id=subtask_id,
                 session_id=session_id,
                 session_service=session_service,
@@ -355,7 +333,7 @@ class ExecutionEngine:
     
     async def _execute_subtask_safe(
         self,
-        plan_id: str,
+        plan: Plan,
         subtask_id: str,
         session_id: str,
         session_service: "SessionManagementService",
@@ -365,7 +343,7 @@ class ExecutionEngine:
         Безопасно выполнить подзадачу с обработкой ошибок.
         
         Args:
-            plan_id: ID плана
+            plan: План
             subtask_id: ID подзадачи
             session_id: ID сессии
             session_service: Сервис управления сессиями
@@ -374,17 +352,50 @@ class ExecutionEngine:
         Returns:
             Результат выполнения
         """
+        subtask = plan.get_subtask_by_id(subtask_id)
+        if not subtask:
+            return {
+                "status": "failed",
+                "subtask_id": subtask_id,
+                "error": f"Subtask {subtask_id} not found in plan"
+            }
+        
         try:
+            # Начать выполнение подзадачи
+            subtask.start()
+            await self.plan_repository.update(plan)
+            
+            # Выполнить подзадачу
             result = await self.subtask_executor.execute_subtask(
-                plan_id=plan_id,
+                plan_id=plan.id,
                 subtask_id=subtask_id,
                 session_id=session_id,
                 session_service=session_service,
                 stream_handler=stream_handler
             )
+            
+            # Обновить статус подзадачи в зависимости от результата
+            if result.get("status") == "completed":
+                result_content = result.get("result", {})
+                result_str = str(result_content.get("content", "Completed"))
+                subtask.complete(result_str)
+            else:
+                error_msg = result.get("error", "Unknown error")
+                subtask.fail(error_msg)
+            
+            await self.plan_repository.update(plan)
             return result
+            
         except SubtaskExecutionError as e:
             logger.error(f"Subtask {subtask_id} execution error: {e}")
+            # Пометить подзадачу как failed
+            try:
+                if subtask.status == SubtaskStatus.RUNNING:
+                    subtask.fail(str(e))
+                    await self.plan_repository.update(plan)
+            except Exception as update_error:
+                logger.error(f"Failed to update subtask status: {update_error}")
+            
             return {
                 "status": "failed",
                 "subtask_id": subtask_id,
@@ -395,6 +406,14 @@ class ExecutionEngine:
                 f"Unexpected error executing subtask {subtask_id}: {e}",
                 exc_info=True
             )
+            # Пометить подзадачу как failed
+            try:
+                if subtask.status == SubtaskStatus.RUNNING:
+                    subtask.fail(f"Unexpected error: {str(e)}")
+                    await self.plan_repository.update(plan)
+            except Exception as update_error:
+                logger.error(f"Failed to update subtask status: {update_error}")
+            
             return {
                 "status": "failed",
                 "subtask_id": subtask_id,
