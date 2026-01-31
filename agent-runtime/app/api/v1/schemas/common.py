@@ -28,7 +28,17 @@ class ToolCall(BaseModel):
 class StreamChunk(BaseModel):
     """SSE event chunk for streaming responses"""
     
-    type: Literal["assistant_message", "tool_call", "error", "done", "switch_agent", "agent_switched"] = Field(
+    type: Literal[
+        "assistant_message",
+        "tool_call",
+        "error",
+        "done",
+        "switch_agent",
+        "agent_switched",
+        "status",  # For progress updates
+        "plan_created",  # For plan creation notification
+        "execution_completed"  # For plan execution completion
+    ] = Field(
         description="Type of the stream chunk"
     )
     content: Optional[str] = Field(default=None, description="Text content for assistant messages")

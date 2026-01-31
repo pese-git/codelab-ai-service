@@ -94,7 +94,7 @@ class SubtaskExecutor:
         )
         
         # Получить план и подзадачу
-        plan = await self.plan_repository.get_by_id(plan_id)
+        plan = await self.plan_repository.find_by_id(plan_id)
         if not plan:
             raise SubtaskExecutionError(f"Plan {plan_id} not found")
         
@@ -113,7 +113,7 @@ class SubtaskExecutor:
         
         # Начать выполнение
         subtask.start()
-        await self.plan_repository.update(plan)
+        await self.plan_repository.save(plan)
         
         try:
             # Получить целевого агента
@@ -149,7 +149,7 @@ class SubtaskExecutor:
             
             # Завершить подзадачу успешно
             subtask.complete(result=result["content"])
-            await self.plan_repository.update(plan)
+            await self.plan_repository.save(plan)
             
             logger.info(
                 f"Subtask {subtask_id} completed successfully "
@@ -175,7 +175,7 @@ class SubtaskExecutor:
             # Завершить подзадачу с ошибкой
             error_message = f"{type(e).__name__}: {str(e)}"
             subtask.fail(error=error_message)
-            await self.plan_repository.update(plan)
+            await self.plan_repository.save(plan)
             
             raise SubtaskExecutionError(
                 f"Failed to execute subtask {subtask_id}: {error_message}"
@@ -305,7 +305,7 @@ class SubtaskExecutor:
         logger.info(f"Retrying failed subtask {subtask_id}")
         
         # Получить план и подзадачу
-        plan = await self.plan_repository.get_by_id(plan_id)
+        plan = await self.plan_repository.find_by_id(plan_id)
         if not plan:
             raise SubtaskExecutionError(f"Plan {plan_id} not found")
         
@@ -327,7 +327,7 @@ class SubtaskExecutor:
         subtask.error = None
         subtask.started_at = None
         subtask.completed_at = None
-        await self.plan_repository.update(plan)
+        await self.plan_repository.save(plan)
         
         # Выполнить заново
         return await self.execute_subtask(
@@ -356,7 +356,7 @@ class SubtaskExecutor:
         Raises:
             SubtaskExecutionError: Если план или подзадача не найдены
         """
-        plan = await self.plan_repository.get_by_id(plan_id)
+        plan = await self.plan_repository.find_by_id(plan_id)
         if not plan:
             raise SubtaskExecutionError(f"Plan {plan_id} not found")
         

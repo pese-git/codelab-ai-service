@@ -21,7 +21,9 @@ class FSMState(str, Enum):
         CLASSIFY: Классификация задачи (atomic vs complex)
         PLAN_REQUIRED: Определено, что требуется планирование
         ARCHITECT_PLANNING: Architect создаёт план
-        EXECUTION: Исполнение плана или атомарной задачи
+        PLAN_REVIEW: План создан, ожидает одобрения пользователя
+        PLAN_EXECUTION: План одобрен, выполняется через ExecutionEngine
+        EXECUTION: Исполнение атомарной задачи (без плана)
         ERROR_HANDLING: Обработка ошибки выполнения
         COMPLETED: Задача завершена успешно
     """
@@ -30,6 +32,8 @@ class FSMState(str, Enum):
     CLASSIFY = "classify"
     PLAN_REQUIRED = "plan_required"
     ARCHITECT_PLANNING = "architect_planning"
+    PLAN_REVIEW = "plan_review"
+    PLAN_EXECUTION = "plan_execution"
     EXECUTION = "execution"
     ERROR_HANDLING = "error_handling"
     COMPLETED = "completed"
@@ -57,6 +61,15 @@ class FSMEvent(str, Enum):
     # События из ARCHITECT_PLANNING
     PLAN_CREATED = "plan_created"
     PLANNING_FAILED = "planning_failed"
+    
+    # События из PLAN_REVIEW (NEW)
+    PLAN_APPROVED = "plan_approved"
+    PLAN_REJECTED = "plan_rejected"
+    PLAN_MODIFICATION_REQUESTED = "plan_modification_requested"
+    
+    # События из PLAN_EXECUTION (NEW)
+    PLAN_EXECUTION_COMPLETED = "plan_execution_completed"
+    PLAN_EXECUTION_FAILED = "plan_execution_failed"
     
     # События из EXECUTION
     ALL_SUBTASKS_DONE = "all_subtasks_done"
@@ -93,8 +106,17 @@ class FSMTransitionRules:
             FSMEvent.ROUTE_TO_ARCHITECT: FSMState.ARCHITECT_PLANNING,
         },
         FSMState.ARCHITECT_PLANNING: {
-            FSMEvent.PLAN_CREATED: FSMState.EXECUTION,
+            FSMEvent.PLAN_CREATED: FSMState.PLAN_REVIEW,
             FSMEvent.PLANNING_FAILED: FSMState.ERROR_HANDLING,
+        },
+        FSMState.PLAN_REVIEW: {
+            FSMEvent.PLAN_APPROVED: FSMState.PLAN_EXECUTION,
+            FSMEvent.PLAN_REJECTED: FSMState.IDLE,
+            FSMEvent.PLAN_MODIFICATION_REQUESTED: FSMState.ARCHITECT_PLANNING,
+        },
+        FSMState.PLAN_EXECUTION: {
+            FSMEvent.PLAN_EXECUTION_COMPLETED: FSMState.COMPLETED,
+            FSMEvent.PLAN_EXECUTION_FAILED: FSMState.ERROR_HANDLING,
         },
         FSMState.EXECUTION: {
             FSMEvent.ALL_SUBTASKS_DONE: FSMState.COMPLETED,

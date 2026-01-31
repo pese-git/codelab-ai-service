@@ -89,6 +89,22 @@ async def get_agent_context_repository(
     return AgentContextRepositoryImpl(db)
 
 
+async def get_plan_repository(
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Получить репозиторий планов.
+    
+    Args:
+        db: Сессия БД (инжектируется)
+        
+    Returns:
+        PlanRepositoryImpl: Реализация репозитория планов
+    """
+    from ..infrastructure.persistence.repositories.plan_repository_impl import PlanRepositoryImpl
+    return PlanRepositoryImpl(db)
+
+
 # ==================== Event Publisher Dependencies ====================
 
 # Singleton instance of EventPublisherAdapter
@@ -415,11 +431,130 @@ async def get_agent_context_manager_adapter(
     return AgentContextManagerAdapter(agent_service)
 
 
+# ==================== Planning System Dependencies ====================
+
+async def get_architect_agent_for_planning(
+    plan_repository = Depends(get_plan_repository)
+):
+    """
+    Получить ArchitectAgent для создания планов.
+    
+    Args:
+        plan_repository: Репозиторий планов (инжектируется)
+        
+    Returns:
+        ArchitectAgent: Agent для создания планов
+    """
+    from ..agents.architect_agent import ArchitectAgent
+    return ArchitectAgent(plan_repository=plan_repository)
+
+
+async def get_execution_engine(
+    plan_repository = Depends(get_plan_repository)
+):
+    """
+    Получить ExecutionEngine для выполнения планов.
+    
+    Args:
+        plan_repository: Репозиторий планов (инжектируется)
+        
+    Returns:
+        ExecutionEngine: Engine для выполнения планов
+    """
+    from ..domain.services.execution_engine import ExecutionEngine
+    from ..domain.services.subtask_executor import SubtaskExecutor
+    from ..domain.services.dependency_resolver import DependencyResolver
+    
+    # Создать зависимости для ExecutionEngine
+    subtask_executor = SubtaskExecutor(
+        plan_repository=plan_repository,
+        max_retries=3
+    )
+    
+    dependency_resolver = DependencyResolver()
+    
+    return ExecutionEngine(
+        plan_repository=plan_repository,
+        subtask_executor=subtask_executor,
+        dependency_resolver=dependency_resolver,
+        max_parallel_tasks=3
+    )
+
+
+async def get_execution_coordinator(
+    execution_engine = Depends(get_execution_engine),
+    plan_repository = Depends(get_plan_repository)
+):
+    """
+    Получить ExecutionCoordinator для координации выполнения планов.
+    
+    Args:
+        execution_engine: ExecutionEngine (инжектируется)
+        plan_repository: Репозиторий планов (инжектируется)
+        
+    Returns:
+        ExecutionCoordinator: Coordinator для выполнения планов
+    """
+    from ..application.coordinators.execution_coordinator import ExecutionCoordinator
+    
+    return ExecutionCoordinator(
+        execution_engine=execution_engine,
+        plan_repository=plan_repository
+    )
+
+
+async def ensure_orchestrator_option2_initialized(
+    architect_agent = Depends(get_architect_agent_for_planning),
+    execution_coordinator = Depends(get_execution_coordinator)
+):
+    """
+    Ensure OrchestratorAgent has Option 2 dependencies initialized.
+    
+    This function injects planning capabilities into OrchestratorAgent
+    on each request. If already initialized, it's a no-op.
+    
+    Args:
+        architect_agent: ArchitectAgent (инжектируется)
+        execution_coordinator: ExecutionCoordinator (инжектируется)
+    """
+    from ..domain.services.agent_registry import agent_router
+    from ..agents.base_agent import AgentType
+    
+    try:
+        # Get OrchestratorAgent from router using correct method
+        orchestrator = agent_router.get_agent(AgentType.ORCHESTRATOR)
+        
+        # Check if already initialized
+        if orchestrator.architect_agent is not None:
+            return
+        
+        logger.info("Initializing OrchestratorAgent Option 2 dependencies...")
+        
+        # Inject dependencies into OrchestratorAgent
+        orchestrator.set_planning_dependencies(
+            architect_agent=architect_agent,
+            execution_coordinator=execution_coordinator
+        )
+        
+        logger.info("✓ OrchestratorAgent Option 2 dependencies initialized successfully")
+        
+    except ValueError as e:
+        # Agent not found
+        logger.warning(f"OrchestratorAgent not found in agent router: {e}")
+    except Exception as e:
+        logger.error(
+            f"Failed to initialize OrchestratorAgent Option 2 dependencies: {e}",
+            exc_info=True
+        )
+        logger.warning("Plan creation will not be available")
+
+
 async def get_message_orchestration_service(
     message_processor = Depends(get_message_processor),
     agent_switcher = Depends(get_agent_switcher),
     tool_result_handler = Depends(get_tool_result_handler),
-    hitl_handler = Depends(get_hitl_decision_handler)
+    hitl_handler = Depends(get_hitl_decision_handler),
+    _option2_init = Depends(ensure_orchestrator_option2_initialized)
 ):
     """
     Получить доменный сервис оркестрации сообщений (фасад).
@@ -429,12 +564,16 @@ async def get_message_orchestration_service(
         agent_switcher: Switcher агентов (инжектируется)
         tool_result_handler: Handler результатов инструментов (инжектируется)
         hitl_handler: Handler HITL решений (инжектируется)
+        _option2_init: Инициализация Option 2 зависимостей (инжектируется, выполняется один раз)
         
     Returns:
         MessageOrchestrationService: Доменный сервис (фасад)
     """
     from ..domain.services import MessageOrchestrationService
     from ..infrastructure.concurrency import session_lock_manager
+    
+    # Note: _option2_init dependency ensures OrchestratorAgent has planning capabilities
+    # before processing any messages. This runs once on first request.
     
     return MessageOrchestrationService(
         message_processor=message_processor,
