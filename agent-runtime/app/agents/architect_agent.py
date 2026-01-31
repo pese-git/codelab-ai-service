@@ -5,16 +5,19 @@ Handles architecture design, technical specifications, and documentation.
 Can only edit markdown (.md) files.
 """
 import logging
-from typing import AsyncGenerator, Dict, Any, TYPE_CHECKING
+import json
+from typing import AsyncGenerator, Dict, Any, Optional, List, TYPE_CHECKING
 from app.agents.base_agent import BaseAgent, AgentType
 from app.agents.prompts.architect import ARCHITECT_PROMPT
 from app.models.schemas import StreamChunk
 from app.domain.entities.session import Session
+from app.domain.entities.plan import Plan, Subtask
 from app.domain.services.session_management import SessionManagementService
 from app.core.config import AppConfig
 
 if TYPE_CHECKING:
     from app.domain.interfaces.stream_handler import IStreamHandler
+    from app.domain.repositories.plan_repository import PlanRepository
 
 logger = logging.getLogger("agent-runtime.architect_agent")
 
@@ -34,8 +37,13 @@ class ArchitectAgent(BaseAgent):
     - Cannot modify code files
     """
     
-    def __init__(self):
-        """Initialize Architect agent"""
+    def __init__(self, plan_repository: Optional["PlanRepository"] = None):
+        """
+        Initialize Architect agent.
+        
+        Args:
+            plan_repository: Repository for saving plans (optional for testing)
+        """
         super().__init__(
             agent_type=AgentType.ARCHITECT,
             system_prompt=ARCHITECT_PROMPT,
@@ -45,11 +53,13 @@ class ArchitectAgent(BaseAgent):
                 "list_files",
                 "search_in_code",
                 "attempt_completion",
-                "ask_followup_question",
-                "create_plan"  # For creating execution plans
+                "ask_followup_question"
+                # NOTE: No create_plan tool for Option 2
+                # Plan creation is done via direct method call from Orchestrator
             ],
             file_restrictions=[r".*\.md$"]  # Only markdown files
         )
+        self.plan_repository = plan_repository
         logger.info("Architect agent initialized with .md file restrictions")
     
     async def process(
@@ -126,3 +136,280 @@ class ArchitectAgent(BaseAgent):
                         return
             
             yield chunk
+    
+    async def create_plan(
+        self,
+        session_id: str,
+        task: str,
+        context: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """
+        Create execution plan for complex task.
+        
+        This method is called directly by OrchestratorAgent (not via LLM tool).
+        Uses LLM to analyze task and decompose into subtasks.
+        
+        Args:
+            session_id: Session ID
+            task: Task description to plan
+            context: Additional context (optional)
+            
+        Returns:
+            plan_id: ID of created and approved plan
+            
+        Raises:
+            ValueError: If plan creation fails or validation errors
+            
+        Example:
+            >>> architect = ArchitectAgent(plan_repository)
+            >>> plan_id = await architect.create_plan(
+            ...     session_id="session-123",
+            ...     task="Create Flutter login form with validation"
+            ... )
+        """
+        logger.info(f"Architect creating plan for task: {task[:100]}...")
+        
+        if not self.plan_repository:
+            raise ValueError("PlanRepository not configured for ArchitectAgent")
+        
+        context = context or {}
+        
+        try:
+            # 1. Analyze task with LLM to get subtasks
+            analysis = await self._analyze_task_for_planning(
+                session_id=session_id,
+                task=task,
+                context=context
+            )
+            
+            # 2. Validate analysis
+            self._validate_plan_analysis(analysis)
+            
+            # 3. Create Plan entity
+            plan = Plan(
+                session_id=session_id,
+                goal=task,
+                metadata={
+                    "created_by": "architect",
+                    "analysis": analysis.get("reasoning", ""),
+                    "context": context
+                }
+            )
+            
+            # 4. Add subtasks from analysis
+            for i, subtask_data in enumerate(analysis["subtasks"]):
+                subtask = Subtask(
+                    description=subtask_data["description"],
+                    agent=AgentType(subtask_data["agent"]),
+                    dependencies=subtask_data.get("dependencies", []),
+                    estimated_time=subtask_data.get("estimated_time", "5 min"),
+                    metadata={"index": i}
+                )
+                plan.add_subtask(subtask)
+            
+            # 5. Approve plan automatically (user approval happens in Orchestrator)
+            plan.approve()
+            
+            # 6. Save to repository
+            await self.plan_repository.save(plan)
+            
+            logger.info(
+                f"Plan {plan.id} created successfully with "
+                f"{len(plan.subtasks)} subtasks"
+            )
+            
+            return plan.id
+            
+        except Exception as e:
+            logger.error(f"Failed to create plan: {e}", exc_info=True)
+            raise ValueError(f"Plan creation failed: {str(e)}") from e
+    
+    async def _analyze_task_for_planning(
+        self,
+        session_id: str,
+        task: str,
+        context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Analyze task using LLM to decompose into subtasks.
+        
+        Args:
+            session_id: Session ID
+            task: Task description
+            context: Additional context
+            
+        Returns:
+            Analysis dict with subtasks structure:
+            {
+                "reasoning": "Why this decomposition...",
+                "subtasks": [
+                    {
+                        "description": "Concrete action",
+                        "agent": "coder|debug|ask",
+                        "dependencies": [0, 1],  # indices
+                        "estimated_time": "5 min"
+                    }
+                ]
+            }
+        """
+        # Construct planning prompt for LLM
+        prompt = self._build_planning_prompt(task, context)
+        
+        # For now, return a simplified mock response
+        # TODO: Implement actual LLM call through stream_handler
+        # This will be implemented when we integrate with LLM properly
+        
+        logger.warning(
+            "Using simplified task analysis. "
+            "Full LLM integration pending."
+        )
+        
+        # Simple heuristic decomposition
+        return self._simple_task_decomposition(task)
+    
+    def _build_planning_prompt(
+        self,
+        task: str,
+        context: Dict[str, Any]
+    ) -> str:
+        """Build prompt for LLM to analyze and decompose task."""
+        return f"""You are an expert software architect. Analyze this task and break it down into concrete, executable subtasks.
+
+Task: {task}
+
+Context: {json.dumps(context, indent=2) if context else "None"}
+
+Requirements:
+1. Each subtask must be concrete and actionable
+2. Assign each subtask to the appropriate agent:
+   - "coder": For code changes, file creation, implementation
+   - "debug": For troubleshooting, fixing bugs, investigating issues
+   - "ask": For answering questions, providing explanations
+3. NEVER assign subtasks to "architect" - architect only creates plans
+4. Specify dependencies by index (0-based) if subtasks depend on each other
+5. Provide realistic time estimates
+
+Respond with JSON only:
+{{
+  "reasoning": "Brief explanation of the decomposition strategy",
+  "subtasks": [
+    {{
+      "description": "Clear description of what to do",
+      "agent": "coder",
+      "dependencies": [],
+      "estimated_time": "5 min"
+    }}
+  ]
+}}
+
+JSON response:"""
+    
+    def _simple_task_decomposition(self, task: str) -> Dict[str, Any]:
+        """
+        Simple heuristic task decomposition.
+        
+        This is a placeholder until full LLM integration.
+        Provides basic decomposition based on keywords.
+        """
+        task_lower = task.lower()
+        subtasks = []
+        
+        # Heuristic: if task mentions "create", "implement", "add"
+        if any(word in task_lower for word in ["create", "implement", "add", "build"]):
+            subtasks.append({
+                "description": f"Implement: {task}",
+                "agent": "coder",
+                "dependencies": [],
+                "estimated_time": "10 min"
+            })
+        
+        # Heuristic: if task mentions "test", "verify"
+        if any(word in task_lower for word in ["test", "verify", "check"]):
+            subtasks.append({
+                "description": f"Test and verify: {task}",
+                "agent": "debug",
+                "dependencies": [0] if subtasks else [],
+                "estimated_time": "5 min"
+            })
+        
+        # Default: single coder subtask
+        if not subtasks:
+            subtasks.append({
+                "description": task,
+                "agent": "coder",
+                "dependencies": [],
+                "estimated_time": "10 min"
+            })
+        
+        return {
+            "reasoning": "Simple heuristic decomposition (LLM integration pending)",
+            "subtasks": subtasks
+        }
+    
+    def _validate_plan_analysis(self, analysis: Dict[str, Any]) -> None:
+        """
+        Validate LLM analysis for plan creation.
+        
+        Args:
+            analysis: Analysis dict from LLM
+            
+        Raises:
+            ValueError: If validation fails
+        """
+        # Check required fields
+        if "subtasks" not in analysis:
+            raise ValueError("Analysis missing 'subtasks' field")
+        
+        if not analysis["subtasks"]:
+            raise ValueError("Analysis has no subtasks")
+        
+        if not isinstance(analysis["subtasks"], list):
+            raise ValueError("'subtasks' must be a list")
+        
+        # Validate each subtask
+        for i, subtask in enumerate(analysis["subtasks"]):
+            # Required fields
+            if "description" not in subtask:
+                raise ValueError(f"Subtask {i} missing 'description'")
+            
+            if "agent" not in subtask:
+                raise ValueError(f"Subtask {i} missing 'agent'")
+            
+            # Validate agent (NOT architect)
+            if subtask["agent"] == "architect":
+                raise ValueError(
+                    f"Subtask {i} assigned to 'architect'. "
+                    "Architect cannot execute subtasks, only create plans."
+                )
+            
+            # Validate agent type
+            valid_agents = ["coder", "debug", "ask"]
+            if subtask["agent"] not in valid_agents:
+                raise ValueError(
+                    f"Subtask {i} has invalid agent: '{subtask['agent']}'. "
+                    f"Must be one of: {valid_agents}"
+                )
+            
+            # Validate dependencies if present
+            if "dependencies" in subtask:
+                if not isinstance(subtask["dependencies"], list):
+                    raise ValueError(
+                        f"Subtask {i} dependencies must be a list"
+                    )
+                
+                # Check dependency indices are valid
+                for dep_idx in subtask["dependencies"]:
+                    if not isinstance(dep_idx, int):
+                        raise ValueError(
+                            f"Subtask {i} dependency index must be integer"
+                        )
+                    if dep_idx < 0 or dep_idx >= len(analysis["subtasks"]):
+                        raise ValueError(
+                            f"Subtask {i} has invalid dependency index: {dep_idx}"
+                        )
+                    if dep_idx >= i:
+                        raise ValueError(
+                            f"Subtask {i} cannot depend on future subtask {dep_idx}"
+                        )
+        
+        logger.debug(f"Plan analysis validated: {len(analysis['subtasks'])} subtasks")
