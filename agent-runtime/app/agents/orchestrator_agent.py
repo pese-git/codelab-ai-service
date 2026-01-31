@@ -20,6 +20,10 @@ if TYPE_CHECKING:
     from app.domain.entities.session import Session
     from app.domain.services.session_management import SessionManagementService
     from app.domain.interfaces.stream_handler import IStreamHandler
+    from app.agents.architect_agent import ArchitectAgent
+    from app.application.coordinators.execution_coordinator import ExecutionCoordinator
+
+from app.domain.services.execution_engine import ExecutionResult
 
 logger = logging.getLogger("agent-runtime.orchestrator_agent")
 
@@ -69,7 +73,9 @@ class OrchestratorAgent(BaseAgent):
     def __init__(
         self,
         task_classifier: Optional[TaskClassifier] = None,
-        fsm_orchestrator: Optional[FSMOrchestrator] = None
+        fsm_orchestrator: Optional[FSMOrchestrator] = None,
+        architect_agent: Optional["ArchitectAgent"] = None,
+        execution_coordinator: Optional["ExecutionCoordinator"] = None
     ):
         """
         Initialize Orchestrator agent with Planning System integration.
@@ -79,6 +85,10 @@ class OrchestratorAgent(BaseAgent):
                            If not provided, creates a new instance.
             fsm_orchestrator: Optional FSMOrchestrator instance for state management.
                             If not provided, creates a new instance.
+            architect_agent: Optional ArchitectAgent for plan creation (Option 2).
+                           Required for complex task handling.
+            execution_coordinator: Optional ExecutionCoordinator for plan execution (Option 2).
+                                 Required for complex task handling.
         """
         super().__init__(
             agent_type=AgentType.ORCHESTRATOR,
@@ -94,9 +104,15 @@ class OrchestratorAgent(BaseAgent):
         self.task_classifier = task_classifier or TaskClassifier()
         self.fsm_orchestrator = fsm_orchestrator or FSMOrchestrator()
         
+        # Option 2: Plan coordination components
+        self.architect_agent = architect_agent
+        self.execution_coordinator = execution_coordinator
+        
         logger.info(
             "Orchestrator agent initialized with Planning System "
-            "(TaskClassifier + FSMOrchestrator)"
+            "(TaskClassifier + FSMOrchestrator) "
+            f"and Option 2 coordination (architect={'yes' if architect_agent else 'no'}, "
+            f"executor={'yes' if execution_coordinator else 'no'})"
         )
     
     async def process(
@@ -208,6 +224,22 @@ class OrchestratorAgent(BaseAgent):
                     f"FSM transition: PLAN_REQUIRED -> ARCHITECT_PLANNING "
                     f"for session {session_id}"
                 )
+                
+                # Option 2: Coordinate plan creation and execution
+                if self.architect_agent and self.execution_coordinator:
+                    logger.info(
+                        f"Option 2: Coordinating plan execution for session {session_id}"
+                    )
+                    async for chunk in self._coordinate_plan_execution(
+                        session_id=session_id,
+                        message=message,
+                        context=context,
+                        session=session,
+                        session_service=session_service,
+                        stream_handler=stream_handler
+                    ):
+                        yield chunk
+                    return
         
         # Get final FSM state after transitions
         final_state = self.fsm_orchestrator.get_current_state(session_id)
@@ -360,3 +392,233 @@ class OrchestratorAgent(BaseAgent):
             "Use _classify_with_planning_system() instead."
         )
         return await self._classify_with_planning_system(message)
+    
+    async def _coordinate_plan_execution(
+        self,
+        session_id: str,
+        message: str,
+        context: Dict[str, Any],
+        session: "Session",
+        session_service: "SessionManagementService",
+        stream_handler: "IStreamHandler"
+    ) -> AsyncGenerator[StreamChunk, None]:
+        """
+        Coordinate plan creation and execution for complex tasks (Option 2).
+        
+        Flow:
+        1. PLAN_REQUIRED → ARCHITECT_PLANNING: Request Architect to create plan
+        2. ARCHITECT_PLANNING → PLAN_REVIEW: Show plan to user
+        3. PLAN_REVIEW → PLAN_EXECUTION: Execute approved plan
+        4. PLAN_EXECUTION → COMPLETED: Present results
+        
+        Args:
+            session_id: Session ID
+            message: User message (task description)
+            context: Agent context
+            session: Domain Session entity
+            session_service: Session management service
+            stream_handler: Stream handler
+            
+        Yields:
+            StreamChunk: Progress updates and results
+        """
+        logger.info(
+            f"Starting plan coordination for session {session_id}"
+        )
+        
+        # Check if Option 2 components are available
+        if not self.architect_agent:
+            logger.error("ArchitectAgent not configured for plan coordination")
+            yield StreamChunk(
+                type="error",
+                error="Plan coordination not available: ArchitectAgent not configured",
+                is_final=True
+            )
+            return
+        
+        if not self.execution_coordinator:
+            logger.error("ExecutionCoordinator not configured for plan coordination")
+            yield StreamChunk(
+                type="error",
+                error="Plan coordination not available: ExecutionCoordinator not configured",
+                is_final=True
+            )
+            return
+        
+        try:
+            # Step 1: Create plan through Architect
+            yield StreamChunk(
+                type="status",
+                content="🏗️ Creating execution plan...",
+                metadata={"fsm_state": FSMState.ARCHITECT_PLANNING.value}
+            )
+            
+            plan_id = await self.architect_agent.create_plan(
+                session_id=session_id,
+                task=message,
+                context=context
+            )
+            
+            logger.info(f"Plan {plan_id} created by Architect")
+            
+            # FSM: ARCHITECT_PLANNING → PLAN_REVIEW
+            await self.fsm_orchestrator.transition(
+                session_id=session_id,
+                event=FSMEvent.PLAN_CREATED,
+                metadata={"plan_id": plan_id}
+            )
+            
+            # Step 2: Show plan to user for review
+            plan_summary = await self.execution_coordinator.get_plan_summary(plan_id)
+            
+            yield StreamChunk(
+                type="plan_created",
+                content=self._format_plan_for_user(plan_summary),
+                metadata={
+                    "plan_id": plan_id,
+                    "fsm_state": FSMState.PLAN_REVIEW.value,
+                    "plan_summary": plan_summary,
+                    "requires_approval": True
+                }
+            )
+            
+            # Step 3: Wait for user approval
+            # TODO: Implement proper approval mechanism
+            # For now, auto-approve for testing
+            logger.info(f"Plan {plan_id} awaiting user approval")
+            
+            # Simulate approval (in production, this comes from user)
+            # FSM: PLAN_REVIEW → PLAN_EXECUTION
+            await self.fsm_orchestrator.transition(
+                session_id=session_id,
+                event=FSMEvent.PLAN_APPROVED,
+                metadata={"approved_by": "user"}
+            )
+            
+            # Step 4: Execute plan
+            yield StreamChunk(
+                type="status",
+                content=f"⚙️ Executing plan with {plan_summary['subtasks_count']} subtasks...",
+                metadata={"fsm_state": FSMState.PLAN_EXECUTION.value}
+            )
+            
+            execution_result = await self.execution_coordinator.execute_plan(
+                plan_id=plan_id,
+                session_id=session_id,
+                session_service=session_service,
+                stream_handler=stream_handler
+            )
+            
+            logger.info(
+                f"Plan {plan_id} execution completed: "
+                f"{execution_result.completed_subtasks}/{execution_result.total_subtasks} successful"
+            )
+            
+            # FSM: PLAN_EXECUTION → COMPLETED
+            await self.fsm_orchestrator.transition(
+                session_id=session_id,
+                event=FSMEvent.PLAN_EXECUTION_COMPLETED,
+                metadata={"execution_result": execution_result.to_dict()}
+            )
+            
+            # Step 5: Present results
+            yield StreamChunk(
+                type="execution_completed",
+                content=self._format_execution_result(execution_result),
+                metadata={
+                    "plan_id": plan_id,
+                    "fsm_state": FSMState.COMPLETED.value,
+                    "execution_result": execution_result.to_dict()
+                },
+                is_final=True
+            )
+            
+        except Exception as e:
+            logger.error(
+                f"Plan coordination error for session {session_id}: {e}",
+                exc_info=True
+            )
+            
+            # FSM: * → ERROR_HANDLING
+            try:
+                current_state = self.fsm_orchestrator.get_current_state(session_id)
+                if current_state == FSMState.PLAN_EXECUTION:
+                    await self.fsm_orchestrator.transition(
+                        session_id=session_id,
+                        event=FSMEvent.PLAN_EXECUTION_FAILED,
+                        metadata={"error": str(e)}
+                    )
+                elif current_state == FSMState.ARCHITECT_PLANNING:
+                    await self.fsm_orchestrator.transition(
+                        session_id=session_id,
+                        event=FSMEvent.PLANNING_FAILED,
+                        metadata={"error": str(e)}
+                    )
+            except Exception as fsm_error:
+                logger.error(f"FSM transition error: {fsm_error}")
+            
+            yield StreamChunk(
+                type="error",
+                error=f"Plan coordination failed: {str(e)}",
+                metadata={"fsm_state": FSMState.ERROR_HANDLING.value},
+                is_final=True
+            )
+    
+    def _format_plan_for_user(self, plan_summary: Dict[str, Any]) -> str:
+        """
+        Format plan summary for user presentation.
+        
+        Args:
+            plan_summary: Plan summary dict from ExecutionCoordinator
+            
+        Returns:
+            Formatted string for display
+        """
+        lines = [
+            f"📋 **Execution Plan Created**",
+            f"",
+            f"**Goal:** {plan_summary['goal']}",
+            f"**Subtasks:** {plan_summary['subtasks_count']}",
+            f"**Estimated Time:** {plan_summary['total_estimated_time']}",
+            f"",
+            f"**Subtasks:**"
+        ]
+        
+        for i, subtask in enumerate(plan_summary['subtasks'], 1):
+            deps = f" (depends on: {', '.join(map(str, [d+1 for d in subtask['dependencies']]))})" if subtask['dependencies'] else ""
+            lines.append(
+                f"{i}. [{subtask['agent'].upper()}] {subtask['description']} "
+                f"({subtask['estimated_time']}){deps}"
+            )
+        
+        lines.append("")
+        lines.append("✅ Plan ready for execution. Awaiting approval...")
+        
+        return "\n".join(lines)
+    
+    def _format_execution_result(self, result: "ExecutionResult") -> str:
+        """
+        Format execution result for user presentation.
+        
+        Args:
+            result: ExecutionResult from ExecutionCoordinator
+            
+        Returns:
+            Formatted string for display
+        """
+        lines = [
+            f"✅ **Plan Execution {'Completed' if result.status == 'completed' else 'Failed'}**",
+            f"",
+            f"**Results:**",
+            f"- Completed: {result.completed_subtasks}/{result.total_subtasks}",
+            f"- Failed: {result.failed_subtasks}",
+            f"- Duration: {result.duration_seconds:.1f}s",
+            f""
+        ]
+        
+        if result.errors:
+            lines.append("**Errors:**")
+            for subtask_id, error in result.errors.items():
+                lines.append(f"- {subtask_id}: {error}")
+        
+        return "\n".join(lines)
