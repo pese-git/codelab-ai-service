@@ -153,6 +153,25 @@ class OrchestratorAgent(BaseAgent):
         current_state = self.fsm_orchestrator.get_current_state(session_id)
         logger.debug(f"Current FSM state for session {session_id}: {current_state.value}")
         
+        # Reset FSM if in terminal state (COMPLETED, ERROR_HANDLING) or EXECUTION
+        # This allows processing new messages in the same session
+        if current_state in [FSMState.COMPLETED, FSMState.ERROR_HANDLING, FSMState.EXECUTION]:
+            logger.info(
+                f"Resetting FSM from {current_state.value} to IDLE for new message "
+                f"in session {session_id}"
+            )
+            if current_state == FSMState.COMPLETED:
+                await self.fsm_orchestrator.transition(
+                    session_id=session_id,
+                    event=FSMEvent.RESET,
+                    metadata={"reason": "new_message"}
+                )
+            else:
+                # For EXECUTION or ERROR_HANDLING, reset directly
+                self.fsm_orchestrator.reset(session_id)
+            
+            current_state = FSMState.IDLE
+        
         # FSM Transition: IDLE -> CLASSIFY
         if current_state == FSMState.IDLE:
             await self.fsm_orchestrator.transition(
