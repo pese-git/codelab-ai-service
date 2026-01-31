@@ -653,7 +653,7 @@ class OrchestratorAgent(BaseAgent):
             f"- Completed: {result.completed_subtasks}/{result.total_subtasks}",
             f"- Failed: {result.failed_subtasks}",
             f"- Duration: {result.duration_seconds:.1f}s",
-            f""
+            ""
         ]
         
         if result.errors:
