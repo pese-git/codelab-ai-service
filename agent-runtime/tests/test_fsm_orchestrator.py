@@ -318,7 +318,7 @@ class TestFSMWorkflows:
         assert state == FSMState.IDLE
     
     async def test_complex_task_workflow(self):
-        """Тест: полный workflow для сложной задачи"""
+        """Тест: полный workflow для сложной задачи (Option 2)"""
         orchestrator = FSMOrchestrator()
         
         # IDLE -> CLASSIFY
@@ -332,12 +332,16 @@ class TestFSMWorkflows:
         await orchestrator.transition("s1", FSMEvent.ROUTE_TO_ARCHITECT)
         assert orchestrator.get_current_state("s1") == FSMState.ARCHITECT_PLANNING
         
-        # ARCHITECT_PLANNING -> EXECUTION
+        # ARCHITECT_PLANNING -> PLAN_REVIEW (Option 2: plan created, awaiting approval)
         await orchestrator.transition("s1", FSMEvent.PLAN_CREATED)
-        assert orchestrator.get_current_state("s1") == FSMState.EXECUTION
+        assert orchestrator.get_current_state("s1") == FSMState.PLAN_REVIEW
         
-        # EXECUTION -> COMPLETED
-        await orchestrator.transition("s1", FSMEvent.ALL_SUBTASKS_DONE)
+        # PLAN_REVIEW -> PLAN_EXECUTION (user approved)
+        await orchestrator.transition("s1", FSMEvent.PLAN_APPROVED)
+        assert orchestrator.get_current_state("s1") == FSMState.PLAN_EXECUTION
+        
+        # PLAN_EXECUTION -> COMPLETED
+        await orchestrator.transition("s1", FSMEvent.PLAN_EXECUTION_COMPLETED)
         assert orchestrator.get_current_state("s1") == FSMState.COMPLETED
     
     async def test_error_handling_workflow(self):
@@ -357,15 +361,20 @@ class TestFSMWorkflows:
         assert orchestrator.get_current_state("s1") == FSMState.EXECUTION
     
     async def test_replanning_workflow(self):
-        """Тест: workflow с replanning"""
+        """Тест: workflow с replanning (Option 2)"""
         orchestrator = FSMOrchestrator()
         
-        # Дойти до ERROR_HANDLING
+        # Дойти до ERROR_HANDLING через PLAN_EXECUTION
         await orchestrator.transition("s1", FSMEvent.RECEIVE_MESSAGE)
         await orchestrator.transition("s1", FSMEvent.IS_ATOMIC_FALSE)
         await orchestrator.transition("s1", FSMEvent.ROUTE_TO_ARCHITECT)
         await orchestrator.transition("s1", FSMEvent.PLAN_CREATED)
-        await orchestrator.transition("s1", FSMEvent.SUBTASK_FAILED)
+        await orchestrator.transition("s1", FSMEvent.PLAN_APPROVED)
+        assert orchestrator.get_current_state("s1") == FSMState.PLAN_EXECUTION
+        
+        # PLAN_EXECUTION -> ERROR_HANDLING (execution failed)
+        await orchestrator.transition("s1", FSMEvent.PLAN_EXECUTION_FAILED)
+        assert orchestrator.get_current_state("s1") == FSMState.ERROR_HANDLING
         
         # ERROR_HANDLING -> ARCHITECT_PLANNING (replanning)
         await orchestrator.transition("s1", FSMEvent.REQUIRES_REPLANNING)

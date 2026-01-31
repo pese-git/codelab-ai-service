@@ -22,8 +22,7 @@ if TYPE_CHECKING:
     from app.domain.interfaces.stream_handler import IStreamHandler
     from app.agents.architect_agent import ArchitectAgent
     from app.application.coordinators.execution_coordinator import ExecutionCoordinator
-
-from app.domain.services.execution_engine import ExecutionResult
+    from app.domain.services.execution_engine import ExecutionResult
 
 logger = logging.getLogger("agent-runtime.orchestrator_agent")
 
