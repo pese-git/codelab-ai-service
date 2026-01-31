@@ -6,6 +6,7 @@ Can only edit markdown (.md) files.
 """
 import logging
 import json
+import uuid
 from typing import AsyncGenerator, Dict, Any, Optional, List, TYPE_CHECKING
 from app.agents.base_agent import BaseAgent, AgentType
 from app.agents.prompts.architect import ARCHITECT_PROMPT
@@ -185,8 +186,9 @@ class ArchitectAgent(BaseAgent):
             # 2. Validate analysis
             self._validate_plan_analysis(analysis)
             
-            # 3. Create Plan entity
+            # 3. Create Plan entity with generated ID
             plan = Plan(
+                id=str(uuid.uuid4()),
                 session_id=session_id,
                 goal=task,
                 metadata={
@@ -196,9 +198,10 @@ class ArchitectAgent(BaseAgent):
                 }
             )
             
-            # 4. Add subtasks from analysis
+            # 4. Add subtasks from analysis with generated IDs
             for i, subtask_data in enumerate(analysis["subtasks"]):
                 subtask = Subtask(
+                    id=str(uuid.uuid4()),
                     description=subtask_data["description"],
                     agent=AgentType(subtask_data["agent"]),
                     dependencies=subtask_data.get("dependencies", []),

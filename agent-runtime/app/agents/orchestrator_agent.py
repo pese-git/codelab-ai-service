@@ -114,6 +114,28 @@ class OrchestratorAgent(BaseAgent):
             f"executor={'yes' if execution_coordinator else 'no'})"
         )
     
+    def set_planning_dependencies(
+        self,
+        architect_agent: "ArchitectAgent",
+        execution_coordinator: "ExecutionCoordinator"
+    ) -> None:
+        """
+        Set planning dependencies for Option 2 support.
+        
+        This method allows injecting dependencies after agent creation,
+        enabling proper dependency injection without circular dependencies.
+        
+        Args:
+            architect_agent: ArchitectAgent instance for plan creation
+            execution_coordinator: ExecutionCoordinator for plan execution
+        """
+        self.architect_agent = architect_agent
+        self.execution_coordinator = execution_coordinator
+        logger.info(
+            "Planning dependencies set for OrchestratorAgent "
+            "(Option 2 support enabled)"
+        )
+    
     async def process(
         self,
         session_id: str,

@@ -9,6 +9,7 @@ from .base import Base
 from .session import SessionModel, MessageModel
 from .agent_context import AgentContextModel, AgentSwitchModel
 from .hitl import PendingApproval
+from .plan import PlanModel, SubtaskModel
 
 __all__ = [
     "Base",
@@ -17,4 +18,6 @@ __all__ = [
     "AgentContextModel",
     "AgentSwitchModel",
     "PendingApproval",
+    "PlanModel",
+    "SubtaskModel",
 ]

@@ -166,7 +166,7 @@ class ExecutionCoordinator:
         Raises:
             ExecutionCoordinatorError: If plan is not ready
         """
-        plan = await self.plan_repository.get_by_id(plan_id)
+        plan = await self.plan_repository.find_by_id(plan_id)
         
         if not plan:
             raise ExecutionCoordinatorError(f"Plan {plan_id} not found")
@@ -258,7 +258,7 @@ class ExecutionCoordinator:
         Raises:
             ExecutionCoordinatorError: If plan not found
         """
-        plan = await self.plan_repository.get_by_id(plan_id)
+        plan = await self.plan_repository.find_by_id(plan_id)
         
         if not plan:
             raise ExecutionCoordinatorError(f"Plan {plan_id} not found")

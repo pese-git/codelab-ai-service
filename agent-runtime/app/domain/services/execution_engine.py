@@ -144,7 +144,7 @@ class ExecutionEngine:
         start_time = datetime.now(timezone.utc)
         
         # Получить план
-        plan = await self.plan_repository.get_by_id(plan_id)
+        plan = await self.plan_repository.find_by_id(plan_id)
         if not plan:
             raise ExecutionEngineError(f"Plan {plan_id} not found")
         
@@ -156,7 +156,7 @@ class ExecutionEngine:
         
         # Начать выполнение
         plan.start_execution()
-        await self.plan_repository.update(plan)
+        await self.plan_repository.save(plan)
         
         try:
             # Получить порядок выполнения с учетом зависимостей
@@ -210,7 +210,7 @@ class ExecutionEngine:
                     f"subtasks failed"
                 )
             
-            await self.plan_repository.update(plan)
+            await self.plan_repository.save(plan)
             
             # Вычислить длительность
             end_time = datetime.now(timezone.utc)
@@ -232,7 +232,7 @@ class ExecutionEngine:
             
             # Пометить план как failed
             plan.fail(f"Execution error: {str(e)}")
-            await self.plan_repository.update(plan)
+            await self.plan_repository.save(plan)
             
             raise ExecutionEngineError(
                 f"Failed to execute plan {plan_id}: {str(e)}"
@@ -363,7 +363,7 @@ class ExecutionEngine:
         try:
             # Начать выполнение подзадачи
             subtask.start()
-            await self.plan_repository.update(plan)
+            await self.plan_repository.save(plan)
             
             # Выполнить подзадачу
             result = await self.subtask_executor.execute_subtask(
@@ -383,7 +383,7 @@ class ExecutionEngine:
                 error_msg = result.get("error", "Unknown error")
                 subtask.fail(error_msg)
             
-            await self.plan_repository.update(plan)
+            await self.plan_repository.save(plan)
             return result
             
         except SubtaskExecutionError as e:
@@ -392,7 +392,7 @@ class ExecutionEngine:
             try:
                 if subtask.status == SubtaskStatus.RUNNING:
                     subtask.fail(str(e))
-                    await self.plan_repository.update(plan)
+                    await self.plan_repository.save(plan)
             except Exception as update_error:
                 logger.error(f"Failed to update subtask status: {update_error}")
             
@@ -410,7 +410,7 @@ class ExecutionEngine:
             try:
                 if subtask.status == SubtaskStatus.RUNNING:
                     subtask.fail(f"Unexpected error: {str(e)}")
-                    await self.plan_repository.update(plan)
+                    await self.plan_repository.save(plan)
             except Exception as update_error:
                 logger.error(f"Failed to update subtask status: {update_error}")
             
@@ -436,7 +436,7 @@ class ExecutionEngine:
         Raises:
             ExecutionEngineError: Если план не найден
         """
-        plan = await self.plan_repository.get_by_id(plan_id)
+        plan = await self.plan_repository.find_by_id(plan_id)
         if not plan:
             raise ExecutionEngineError(f"Plan {plan_id} not found")
         
@@ -475,14 +475,14 @@ class ExecutionEngine:
         """
         logger.info(f"Cancelling execution of plan {plan_id}: {reason}")
         
-        plan = await self.plan_repository.get_by_id(plan_id)
+        plan = await self.plan_repository.find_by_id(plan_id)
         if not plan:
             raise ExecutionEngineError(f"Plan {plan_id} not found")
         
         # Отменить план
         try:
             plan.cancel(reason)
-            await self.plan_repository.update(plan)
+            await self.plan_repository.save(plan)
             
             logger.info(f"Plan {plan_id} cancelled successfully")
             
