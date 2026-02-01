@@ -11,7 +11,9 @@ from app.models.websocket import (
     WSToolResult,
     WSAgentSwitched,
     WSSwitchAgent,
-    WSHITLDecision
+    WSHITLDecision,
+    WSPlanApprovalRequired,
+    WSPlanDecision
 )
 from app.models.rest import HealthResponse
 from app.core.dependencies import (
@@ -491,6 +493,9 @@ async def websocket_endpoint(
                     elif msg_type == "hitl_decision":
                         msg = WSHITLDecision.model_validate(ide_msg)
                         logger.info(f"[{session_id}] Received hitl_decision: call_id={msg.call_id}, decision={msg.decision}")
+                    elif msg_type == "plan_decision":
+                        msg = WSPlanDecision.model_validate(ide_msg)
+                        logger.info(f"[{session_id}] Received plan_decision: approval_request_id={msg.approval_request_id}, decision={msg.decision}")
                     else:
                         logger.warning(f"[{session_id}] Unknown message type: {msg_type}")
                         err = WSErrorResponse.model_construct(

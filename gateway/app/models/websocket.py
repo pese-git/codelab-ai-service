@@ -125,3 +125,60 @@ class WSHITLDecision(BaseModel):
                 }
             ]
         }
+
+
+class WSPlanApprovalRequired(BaseModel):
+    """WebSocket message for plan approval request from Agent to IDE"""
+    
+    type: Literal["plan_approval_required"]
+    content: str
+    approval_request_id: str
+    plan_id: str
+    plan_summary: Dict[str, Any]
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "type": "plan_approval_required",
+                "content": "Plan requires your approval before execution",
+                "approval_request_id": "plan-approval-abc123",
+                "plan_id": "plan-xyz789",
+                "plan_summary": {
+                    "goal": "Create Flutter login form",
+                    "subtasks_count": 4,
+                    "total_estimated_time": "20 min"
+                }
+            }
+        }
+
+
+class WSPlanDecision(BaseModel):
+    """WebSocket message for plan approval decision from IDE to Agent"""
+    
+    type: Literal["plan_decision"]
+    approval_request_id: str
+    decision: Literal["approve", "reject", "modify"]
+    feedback: Optional[str] = None
+    
+    class Config:
+        json_schema_extra = {
+            "examples": [
+                {
+                    "type": "plan_decision",
+                    "approval_request_id": "plan-approval-abc123",
+                    "decision": "approve"
+                },
+                {
+                    "type": "plan_decision",
+                    "approval_request_id": "plan-approval-abc123",
+                    "decision": "reject",
+                    "feedback": "Plan is too complex"
+                },
+                {
+                    "type": "plan_decision",
+                    "approval_request_id": "plan-approval-abc123",
+                    "decision": "modify",
+                    "feedback": "Please add error handling"
+                }
+            ]
+        }
