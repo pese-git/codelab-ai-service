@@ -94,3 +94,53 @@ class ListSessionsResponse(BaseModel):
     total: int = Field(description="Общее количество сессий")
     limit: int = Field(description="Лимит на странице")
     offset: int = Field(description="Смещение")
+
+
+class PlanDecisionRequest(BaseModel):
+    """
+    Запрос на принятие решения по одобрению плана.
+    
+    Атрибуты:
+        approval_request_id: ID запроса на одобрение
+        decision: Решение пользователя (approve/reject/modify)
+        feedback: Обратная связь пользователя (опционально)
+    
+    Пример:
+        {
+            "approval_request_id": "plan-approval-abc123",
+            "decision": "approve",
+            "feedback": null
+        }
+    """
+    
+    approval_request_id: str = Field(
+        description="ID запроса на одобрение плана"
+    )
+    decision: str = Field(
+        description="Решение пользователя: approve, reject, modify"
+    )
+    feedback: Optional[str] = Field(
+        default=None,
+        description="Обратная связь пользователя (для reject/modify)"
+    )
+    
+    class Config:
+        json_schema_extra = {
+            "examples": [
+                {
+                    "approval_request_id": "plan-approval-abc123",
+                    "decision": "approve",
+                    "feedback": None
+                },
+                {
+                    "approval_request_id": "plan-approval-abc123",
+                    "decision": "reject",
+                    "feedback": "Plan is too complex"
+                },
+                {
+                    "approval_request_id": "plan-approval-abc123",
+                    "decision": "modify",
+                    "feedback": "Please add error handling"
+                }
+            ]
+        }
