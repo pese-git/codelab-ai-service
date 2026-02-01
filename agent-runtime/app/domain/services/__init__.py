@@ -19,6 +19,7 @@ from .message_processor import MessageProcessor
 from .agent_switcher import AgentSwitcher
 from .tool_result_handler import ToolResultHandler
 from .hitl_decision_handler import HITLDecisionHandler
+from .plan_approval_handler import PlanApprovalHandler
 
 __all__ = [
     # Существующие сервисы
@@ -42,4 +43,5 @@ __all__ = [
     "AgentSwitcher",
     "ToolResultHandler",
     "HITLDecisionHandler",
+    "PlanApprovalHandler",
 ]

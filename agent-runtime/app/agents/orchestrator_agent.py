@@ -74,7 +74,8 @@ class OrchestratorAgent(BaseAgent):
         task_classifier: Optional[TaskClassifier] = None,
         fsm_orchestrator: Optional[FSMOrchestrator] = None,
         architect_agent: Optional["ArchitectAgent"] = None,
-        execution_coordinator: Optional["ExecutionCoordinator"] = None
+        execution_coordinator: Optional["ExecutionCoordinator"] = None,
+        approval_manager: Optional[Any] = None
     ):
         """
         Initialize Orchestrator agent with Planning System integration.
@@ -88,6 +89,8 @@ class OrchestratorAgent(BaseAgent):
                            Required for complex task handling.
             execution_coordinator: Optional ExecutionCoordinator for plan execution (Option 2).
                                  Required for complex task handling.
+            approval_manager: Optional ApprovalManager for plan approvals.
+                            Required for user approval flow.
         """
         super().__init__(
             agent_type=AgentType.ORCHESTRATOR,
@@ -106,12 +109,14 @@ class OrchestratorAgent(BaseAgent):
         # Option 2: Plan coordination components
         self.architect_agent = architect_agent
         self.execution_coordinator = execution_coordinator
+        self.approval_manager = approval_manager
         
         logger.info(
             "Orchestrator agent initialized with Planning System "
             "(TaskClassifier + FSMOrchestrator) "
             f"and Option 2 coordination (architect={'yes' if architect_agent else 'no'}, "
-            f"executor={'yes' if execution_coordinator else 'no'})"
+            f"executor={'yes' if execution_coordinator else 'no'}, "
+            f"approval={'yes' if approval_manager else 'no'})"
         )
     
     def set_planning_dependencies(
@@ -539,18 +544,66 @@ class OrchestratorAgent(BaseAgent):
                 }
             )
             
-            # Step 3: Wait for user approval
-            # TODO: Implement proper approval mechanism
-            # For now, auto-approve for testing
-            logger.info(f"Plan {plan_id} awaiting user approval")
+            # Step 3: Request user approval for plan
+            logger.info(f"Plan {plan_id} requesting user approval")
             
-            # Simulate approval (in production, this comes from user)
-            # FSM: PLAN_REVIEW → PLAN_EXECUTION
-            await self.fsm_orchestrator.transition(
-                session_id=session_id,
-                event=FSMEvent.PLAN_APPROVED,
-                metadata={"approved_by": "user"}
-            )
+            # Create approval request if ApprovalManager available
+            if self.approval_manager:
+                approval_request_id = f"plan-approval-{plan_id}"
+                
+                # Add to pending approvals
+                await self.approval_manager.add_pending(
+                    request_id=approval_request_id,
+                    request_type="plan",
+                    subject=plan_summary['goal'][:100],  # Truncate for subject
+                    session_id=session_id,
+                    details={
+                        "plan_id": plan_id,
+                        "goal": plan_summary['goal'],
+                        "subtasks_count": plan_summary['subtasks_count'],
+                        "total_estimated_time": plan_summary['total_estimated_time'],
+                        "subtasks": plan_summary['subtasks']
+                    },
+                    reason="Complex plan requires user approval before execution"
+                )
+                
+                logger.info(
+                    f"Plan approval request created: {approval_request_id}, "
+                    f"awaiting user decision"
+                )
+                
+                # Yield approval required chunk
+                yield StreamChunk(
+                    type="plan_approval_required",
+                    content="Plan requires your approval before execution",
+                    metadata={
+                        "approval_request_id": approval_request_id,
+                        "plan_id": plan_id,
+                        "fsm_state": FSMState.PLAN_REVIEW.value
+                    }
+                )
+                
+                # NOTE: Execution will continue when user sends approval decision
+                # via POST /sessions/{session_id}/plan-decision endpoint
+                # For now, we return here and wait for user decision
+                logger.info(
+                    f"Waiting for user approval for plan {plan_id}. "
+                    f"Execution paused in PLAN_REVIEW state."
+                )
+                return
+            else:
+                # No ApprovalManager - auto-approve for backward compatibility
+                logger.warning(
+                    "ApprovalManager not configured, auto-approving plan "
+                    "(backward compatibility mode)"
+                )
+                
+                # FSM: PLAN_REVIEW → PLAN_EXECUTION
+                await self.fsm_orchestrator.transition(
+                    session_id=session_id,
+                    event=FSMEvent.PLAN_APPROVED,
+                    metadata={"approved_by": "auto"}
+                )
             
             # Step 4: Execute plan
             yield StreamChunk(
