@@ -142,7 +142,8 @@ class ArchitectAgent(BaseAgent):
         self,
         session_id: str,
         task: str,
-        context: Optional[Dict[str, Any]] = None
+        context: Optional[Dict[str, Any]] = None,
+        llm_client: Optional[Any] = None
     ) -> str:
         """
         Create execution plan for complex task.
@@ -154,6 +155,7 @@ class ArchitectAgent(BaseAgent):
             session_id: Session ID
             task: Task description to plan
             context: Additional context (optional)
+            llm_client: LLM client for task analysis (optional, uses heuristic if None)
             
         Returns:
             plan_id: ID of created and approved plan
@@ -165,7 +167,8 @@ class ArchitectAgent(BaseAgent):
             >>> architect = ArchitectAgent(plan_repository)
             >>> plan_id = await architect.create_plan(
             ...     session_id="session-123",
-            ...     task="Create Flutter login form with validation"
+            ...     task="Create Flutter login form with validation",
+            ...     llm_client=llm_client
             ... )
         """
         logger.info(f"Architect creating plan for task: {task[:100]}...")
@@ -180,7 +183,8 @@ class ArchitectAgent(BaseAgent):
             analysis = await self._analyze_task_for_planning(
                 session_id=session_id,
                 task=task,
-                context=context
+                context=context,
+                llm_client=llm_client
             )
             
             # 2. Validate analysis
@@ -198,15 +202,37 @@ class ArchitectAgent(BaseAgent):
                 }
             )
             
-            # 4. Add subtasks from analysis with generated IDs
+            # 4. Create subtasks with generated IDs first (to map indices to IDs)
+            subtask_ids = [str(uuid.uuid4()) for _ in analysis["subtasks"]]
+            
+            # 5. Add subtasks from analysis, converting dependency indices to IDs
             for i, subtask_data in enumerate(analysis["subtasks"]):
+                # Get dependency indices from LLM response
+                dep_indices = subtask_data.get("dependencies", [])
+                
+                # Convert dependency indices to subtask IDs for ExecutionEngine
+                dep_ids = []
+                for dep_idx in dep_indices:
+                    if isinstance(dep_idx, int) and 0 <= dep_idx < len(subtask_ids):
+                        dep_ids.append(subtask_ids[dep_idx])
+                    elif isinstance(dep_idx, str):
+                        # Already an ID, keep as is
+                        dep_ids.append(dep_idx)
+                    else:
+                        logger.warning(
+                            f"Invalid dependency index {dep_idx} for subtask {i}, skipping"
+                        )
+                
                 subtask = Subtask(
-                    id=str(uuid.uuid4()),
+                    id=subtask_ids[i],
                     description=subtask_data["description"],
                     agent=AgentType(subtask_data["agent"]),
-                    dependencies=subtask_data.get("dependencies", []),
+                    dependencies=dep_ids,
                     estimated_time=subtask_data.get("estimated_time", "5 min"),
-                    metadata={"index": i}
+                    metadata={
+                        "index": i,
+                        "dependency_indices": dep_indices  # Store original indices for display
+                    }
                 )
                 plan.add_subtask(subtask)
             
@@ -231,7 +257,8 @@ class ArchitectAgent(BaseAgent):
         self,
         session_id: str,
         task: str,
-        context: Dict[str, Any]
+        context: Dict[str, Any],
+        llm_client: Optional[Any] = None
     ) -> Dict[str, Any]:
         """
         Analyze task using LLM to decompose into subtasks.
@@ -240,6 +267,7 @@ class ArchitectAgent(BaseAgent):
             session_id: Session ID
             task: Task description
             context: Additional context
+            llm_client: LLM client for analysis (optional)
             
         Returns:
             Analysis dict with subtasks structure:
@@ -255,20 +283,68 @@ class ArchitectAgent(BaseAgent):
                 ]
             }
         """
-        # Construct planning prompt for LLM
-        prompt = self._build_planning_prompt(task, context)
+        # If no LLM client provided, use heuristic fallback
+        if not llm_client:
+            logger.warning(
+                "No LLM client provided for task analysis. "
+                "Using heuristic fallback."
+            )
+            return self._simple_task_decomposition(task)
         
-        # For now, return a simplified mock response
-        # TODO: Implement actual LLM call through stream_handler
-        # This will be implemented when we integrate with LLM properly
-        
-        logger.warning(
-            "Using simplified task analysis. "
-            "Full LLM integration pending."
-        )
-        
-        # Simple heuristic decomposition
-        return self._simple_task_decomposition(task)
+        try:
+            # Construct planning prompt for LLM
+            prompt = self._build_planning_prompt(task, context)
+            
+            # Call LLM for task analysis
+            logger.info(f"Calling LLM for task decomposition: {task[:100]}...")
+            
+            response = await llm_client.chat_completion(
+                model=AppConfig.LLM_MODEL,
+                messages=[
+                    {"role": "system", "content": "You are an expert software architect."},
+                    {"role": "user", "content": prompt}
+                ],
+                tools=[],  # No tools needed for planning
+                temperature=0.7  # Slightly creative for better decomposition
+            )
+            
+            # Parse JSON response
+            content = response.content.strip()
+            
+            # Try to extract JSON from response (handle markdown code blocks)
+            if "```json" in content:
+                # Extract JSON from markdown code block
+                start = content.find("```json") + 7
+                end = content.find("```", start)
+                content = content[start:end].strip()
+            elif "```" in content:
+                # Extract from generic code block
+                start = content.find("```") + 3
+                end = content.find("```", start)
+                content = content[start:end].strip()
+            
+            try:
+                analysis = json.loads(content)
+                logger.info(
+                    f"LLM task analysis successful: "
+                    f"{len(analysis.get('subtasks', []))} subtasks identified"
+                )
+                return analysis
+            except json.JSONDecodeError as e:
+                logger.error(
+                    f"Failed to parse LLM response as JSON: {e}. "
+                    f"Response: {content[:200]}..."
+                )
+                logger.warning("Falling back to heuristic decomposition")
+                return self._simple_task_decomposition(task)
+                
+        except Exception as e:
+            logger.error(
+                f"Error calling LLM for task analysis: {e}",
+                exc_info=True
+            )
+            logger.warning("Falling back to heuristic decomposition")
+            return self._simple_task_decomposition(task)
     
     def _build_planning_prompt(
         self,

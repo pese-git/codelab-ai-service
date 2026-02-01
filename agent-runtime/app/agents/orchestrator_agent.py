@@ -175,9 +175,9 @@ class OrchestratorAgent(BaseAgent):
         current_state = self.fsm_orchestrator.get_current_state(session_id)
         logger.debug(f"Current FSM state for session {session_id}: {current_state.value}")
         
-        # Reset FSM if in terminal state (COMPLETED, ERROR_HANDLING) or EXECUTION
+        # Reset FSM if in terminal state or non-IDLE states that shouldn't process new messages
         # This allows processing new messages in the same session
-        if current_state in [FSMState.COMPLETED, FSMState.ERROR_HANDLING, FSMState.EXECUTION]:
+        if current_state in [FSMState.COMPLETED, FSMState.ERROR_HANDLING, FSMState.EXECUTION, FSMState.PLAN_REVIEW, FSMState.PLAN_EXECUTION]:
             logger.info(
                 f"Resetting FSM from {current_state.value} to IDLE for new message "
                 f"in session {session_id}"
@@ -188,8 +188,16 @@ class OrchestratorAgent(BaseAgent):
                     event=FSMEvent.RESET,
                     metadata={"reason": "new_message"}
                 )
+            elif current_state == FSMState.PLAN_REVIEW:
+                # User sent new message instead of approving - treat as rejection
+                await self.fsm_orchestrator.transition(
+                    session_id=session_id,
+                    event=FSMEvent.PLAN_REJECTED,
+                    metadata={"reason": "new_message_received"}
+                )
+                self.fsm_orchestrator.reset(session_id)
             else:
-                # For EXECUTION or ERROR_HANDLING, reset directly
+                # For EXECUTION, ERROR_HANDLING, PLAN_EXECUTION - reset directly
                 self.fsm_orchestrator.reset(session_id)
             
             current_state = FSMState.IDLE
@@ -493,10 +501,19 @@ class OrchestratorAgent(BaseAgent):
                 metadata={"fsm_state": FSMState.ARCHITECT_PLANNING.value}
             )
             
+            # Get LLM client from stream_handler if available
+            llm_client = None
+            if hasattr(stream_handler, '_llm_client'):
+                llm_client = stream_handler._llm_client
+                logger.debug("Using LLM client from stream_handler for plan creation")
+            else:
+                logger.warning("No LLM client available, using heuristic decomposition")
+            
             plan_id = await self.architect_agent.create_plan(
                 session_id=session_id,
                 task=message,
-                context=context
+                context=context,
+                llm_client=llm_client
             )
             
             logger.info(f"Plan {plan_id} created by Architect")
@@ -625,7 +642,14 @@ class OrchestratorAgent(BaseAgent):
         ]
         
         for i, subtask in enumerate(plan_summary['subtasks'], 1):
-            deps = f" (depends on: {', '.join(map(str, [d+1 for d in subtask['dependencies']]))})" if subtask['dependencies'] else ""
+            # Use dependency_indices from metadata if available, otherwise empty
+            dep_indices = subtask.get('metadata', {}).get('dependency_indices', [])
+            if dep_indices:
+                # Convert 0-based indices to 1-based for display
+                deps = f" (depends on: {', '.join(str(d + 1) for d in dep_indices)})"
+            else:
+                deps = ""
+            
             lines.append(
                 f"{i}. [{subtask['agent'].upper()}] {subtask['description']} "
                 f"({subtask['estimated_time']}){deps}"

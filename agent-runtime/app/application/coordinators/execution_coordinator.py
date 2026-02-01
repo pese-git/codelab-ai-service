@@ -275,7 +275,8 @@ class ExecutionCoordinator:
                     "agent": st.agent.value,
                     "dependencies": st.dependencies,
                     "estimated_time": st.estimated_time,
-                    "status": st.status.value
+                    "status": st.status.value,
+                    "metadata": st.metadata  # Include metadata for dependency_indices
                 }
                 for st in plan.subtasks
             ],
