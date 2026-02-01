@@ -37,6 +37,9 @@ class StreamChunk(BaseModel):
         "agent_switched",
         "status",  # For progress updates
         "plan_created",  # For plan creation notification
+        "plan_approval_required",  # For plan approval request
+        "plan_rejected",  # For plan rejection
+        "plan_modification_requested",  # For plan modification request
         "execution_completed"  # For plan execution completion
     ] = Field(
         description="Type of the stream chunk"
