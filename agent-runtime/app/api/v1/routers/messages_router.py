@@ -254,6 +254,52 @@ async def message_stream_sse(
             }
         )
     
+    elif message_type == "plan_decision":
+        # Обработка Plan Approval решения пользователя
+        approval_request_id = message_data.get("approval_request_id")
+        decision = message_data.get("decision")
+        feedback = message_data.get("feedback")
+        
+        if not approval_request_id or not decision:
+            raise HTTPException(
+                status_code=400,
+                detail="approval_request_id and decision are required for plan_decision message"
+            )
+        
+        logger.info(
+            f"Processing Plan Approval decision for session {session_id}: "
+            f"approval_request_id={approval_request_id}, decision={decision}"
+        )
+        
+        async def plan_decision_generate():
+            try:
+                # Обрабатываем Plan Approval решение через MessageOrchestrationService
+                async for chunk in message_orchestration_service.process_plan_decision(
+                    session_id=session_id,
+                    approval_request_id=approval_request_id,
+                    decision=decision,
+                    feedback=feedback
+                ):
+                    yield f"data: {chunk.model_dump_json()}\n\n"
+            except Exception as e:
+                logger.error(f"Error processing Plan Approval decision: {e}", exc_info=True)
+                error_chunk = StreamChunk(
+                    type="error",
+                    error=str(e),
+                    is_final=True
+                )
+                yield f"data: {error_chunk.model_dump_json()}\n\n"
+        
+        return StreamingResponse(
+            plan_decision_generate(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no"
+            }
+        )
+    
     else:
         raise HTTPException(
             status_code=400,

@@ -74,8 +74,7 @@ class PlanApprovalHandler:
         session_id: str,
         approval_request_id: str,
         decision: str,
-        feedback: Optional[str] = None,
-        stream_handler: Optional[Any] = None
+        feedback: Optional[str] = None
     ) -> AsyncGenerator[StreamChunk, None]:
         """
         Обработать Plan Approval решение пользователя.
@@ -171,7 +170,7 @@ class PlanApprovalHandler:
                 plan_id=plan_id,
                 session_id=session_id,
                 session_service=self._session_service,
-                stream_handler=stream_handler
+                stream_handler=None  # TODO: Pass stream_handler for progress updates
             )
             
             logger.info(

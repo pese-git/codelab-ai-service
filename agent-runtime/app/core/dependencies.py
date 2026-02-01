@@ -549,11 +549,42 @@ async def ensure_orchestrator_option2_initialized(
         logger.warning("Plan creation will not be available")
 
 
+async def get_plan_approval_handler(
+    approval_manager = Depends(get_approval_manager),
+    session_service: SessionManagementService = Depends(get_session_management_service),
+    execution_coordinator = Depends(get_execution_coordinator)
+):
+    """
+    Получить handler Plan Approval решений.
+    
+    Args:
+        approval_manager: Unified approval manager (инжектируется)
+        session_service: Сервис управления сессиями (инжектируется)
+        execution_coordinator: Execution coordinator (инжектируется)
+        
+    Returns:
+        PlanApprovalHandler: Handler Plan Approval решений
+    """
+    from ..domain.services import PlanApprovalHandler
+    from ..domain.services.fsm_orchestrator import FSMOrchestrator
+    
+    # FSM Orchestrator - singleton для всех сессий
+    fsm_orchestrator = FSMOrchestrator()
+    
+    return PlanApprovalHandler(
+        approval_manager=approval_manager,
+        session_service=session_service,
+        fsm_orchestrator=fsm_orchestrator,
+        execution_coordinator=execution_coordinator
+    )
+
+
 async def get_message_orchestration_service(
     message_processor = Depends(get_message_processor),
     agent_switcher = Depends(get_agent_switcher),
     tool_result_handler = Depends(get_tool_result_handler),
     hitl_handler = Depends(get_hitl_decision_handler),
+    plan_approval_handler = Depends(get_plan_approval_handler),
     _option2_init = Depends(ensure_orchestrator_option2_initialized)
 ):
     """
@@ -564,6 +595,7 @@ async def get_message_orchestration_service(
         agent_switcher: Switcher агентов (инжектируется)
         tool_result_handler: Handler результатов инструментов (инжектируется)
         hitl_handler: Handler HITL решений (инжектируется)
+        plan_approval_handler: Handler Plan Approval решений (инжектируется)
         _option2_init: Инициализация Option 2 зависимостей (инжектируется, выполняется один раз)
         
     Returns:
@@ -580,7 +612,8 @@ async def get_message_orchestration_service(
         agent_switcher=agent_switcher,
         tool_result_handler=tool_result_handler,
         hitl_handler=hitl_handler,
-        lock_manager=session_lock_manager
+        lock_manager=session_lock_manager,
+        plan_approval_handler=plan_approval_handler
     )
 
 

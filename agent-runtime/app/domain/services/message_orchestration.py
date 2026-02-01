@@ -23,6 +23,7 @@ class MessageOrchestrationService:
     - AgentSwitcher - переключение агентов
     - ToolResultHandler - обработка результатов инструментов
     - HITLDecisionHandler - обработка HITL решений
+    - PlanApprovalHandler - обработка Plan Approval решений
     
     Обеспечивает обратную совместимость с существующим API.
     
@@ -31,6 +32,7 @@ class MessageOrchestrationService:
         _agent_switcher: Switcher агентов
         _tool_result_handler: Handler результатов инструментов
         _hitl_handler: Handler HITL решений
+        _plan_approval_handler: Handler Plan Approval решений (опционально)
         _lock_manager: Менеджер блокировок сессий
     
     Пример:
@@ -54,7 +56,8 @@ class MessageOrchestrationService:
         agent_switcher,  # AgentSwitcher
         tool_result_handler,  # ToolResultHandler
         hitl_handler,  # HITLDecisionHandler
-        lock_manager  # SessionLockManager
+        lock_manager,  # SessionLockManager
+        plan_approval_handler=None  # PlanApprovalHandler (optional)
     ):
         """
         Инициализация сервиса-фасада.
@@ -65,14 +68,19 @@ class MessageOrchestrationService:
             tool_result_handler: Handler результатов инструментов
             hitl_handler: Handler HITL решений
             lock_manager: Менеджер блокировок сессий
+            plan_approval_handler: Handler Plan Approval решений (опционально)
         """
         self._message_processor = message_processor
         self._agent_switcher = agent_switcher
         self._tool_result_handler = tool_result_handler
         self._hitl_handler = hitl_handler
+        self._plan_approval_handler = plan_approval_handler
         self._lock_manager = lock_manager
         
-        logger.info("MessageOrchestrationService (фасад) инициализирован")
+        logger.info(
+            f"MessageOrchestrationService (фасад) инициализирован "
+            f"(plan_approval={'yes' if plan_approval_handler else 'no'})"
+        )
     
     async def process_message(
         self,
@@ -276,6 +284,64 @@ class MessageOrchestrationService:
                 call_id=call_id,
                 decision=decision,
                 modified_arguments=modified_arguments,
+                feedback=feedback
+            ):
+                yield chunk
+    
+    async def process_plan_decision(
+        self,
+        session_id: str,
+        approval_request_id: str,
+        decision: str,
+        feedback: Optional[str] = None
+    ) -> AsyncGenerator[StreamChunk, None]:
+        """
+        Обработать Plan Approval решение пользователя.
+        
+        Делегирует в PlanApprovalHandler.
+        
+        Args:
+            session_id: ID сессии
+            approval_request_id: ID запроса на одобрение
+            decision: Решение пользователя (approve/reject/modify)
+            feedback: Обратная связь пользователя (для reject/modify)
+            
+        Yields:
+            StreamChunk: Чанки для SSE streaming
+            
+        Raises:
+            ValueError: Если PlanApprovalHandler не настроен
+            
+        Пример:
+            >>> async for chunk in service.process_plan_decision(
+            ...     session_id="session-1",
+            ...     approval_request_id="plan-approval-123",
+            ...     decision="approve"
+            ... ):
+            ...     print(chunk)
+        """
+        if not self._plan_approval_handler:
+            error_msg = "Plan approval not configured"
+            logger.error(error_msg)
+            yield StreamChunk(
+                type="error",
+                error=error_msg,
+                is_final=True
+            )
+            return
+        
+        logger.debug(
+            f"Делегирование process_plan_decision в PlanApprovalHandler "
+            f"для сессии {session_id}, approval_request_id={approval_request_id}, "
+            f"decision={decision}"
+        )
+        
+        # Делегировать в PlanApprovalHandler с блокировкой сессии
+        async with self._lock_manager.lock(session_id):
+            async for chunk in self._plan_approval_handler.handle(
+                session_id=session_id,
+                approval_request_id=approval_request_id,
+                decision=decision,
                 feedback=feedback
             ):
                 yield chunk
