@@ -197,6 +197,11 @@ class ExecutionEngine:
             failed_count = len(errors)
             total_count = len(plan.subtasks)
             
+            # Перезагрузить план из БД для получения актуальных статусов subtasks
+            plan = await self.plan_repository.find_by_id(plan_id)
+            if not plan:
+                raise ExecutionEngineError(f"Plan {plan_id} not found after execution")
+            
             # Обновить статус плана
             if failed_count == 0:
                 plan.complete()
@@ -361,11 +366,7 @@ class ExecutionEngine:
             }
         
         try:
-            # Начать выполнение подзадачи
-            subtask.start()
-            await self.plan_repository.save(plan)
-            
-            # Выполнить подзадачу
+            # Выполнить подзадачу (subtask_executor сам обновит статус)
             result = await self.subtask_executor.execute_subtask(
                 plan_id=plan.id,
                 subtask_id=subtask_id,
@@ -374,16 +375,6 @@ class ExecutionEngine:
                 stream_handler=stream_handler
             )
             
-            # Обновить статус подзадачи в зависимости от результата
-            if result.get("status") == "completed":
-                result_content = result.get("result", {})
-                result_str = str(result_content.get("content", "Completed"))
-                subtask.complete(result_str)
-            else:
-                error_msg = result.get("error", "Unknown error")
-                subtask.fail(error_msg)
-            
-            await self.plan_repository.save(plan)
             return result
             
         except SubtaskExecutionError as e:

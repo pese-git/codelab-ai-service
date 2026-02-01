@@ -477,7 +477,7 @@ async def get_execution_engine(
         plan_repository=plan_repository,
         subtask_executor=subtask_executor,
         dependency_resolver=dependency_resolver,
-        max_parallel_tasks=3
+        max_parallel_tasks=1  # Временно 1 для избежания race condition
     )
 
 

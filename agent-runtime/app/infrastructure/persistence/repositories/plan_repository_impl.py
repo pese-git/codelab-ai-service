@@ -115,15 +115,23 @@ class PlanRepositoryImpl(PlanRepository):
         if plan.metadata:
             existing_model.metadata_json = json.dumps(plan.metadata)
         
-        # Удалить старые subtasks
+        # Очистить коллекцию subtasks (это не удаляет из БД, только из relationship)
+        existing_model.subtasks.clear()
+        
+        # Удалить все старые subtasks из БД
         await self._db.execute(
             delete(SubtaskModel).where(SubtaskModel.plan_id == plan.id)
         )
+        
+        # Flush удаления перед добавлением новых subtasks
+        # Это критично для избежания UNIQUE constraint при повторной вставке
+        await self._db.flush()
         
         # Добавить новые subtasks
         for subtask in plan.subtasks:
             subtask_model = self._mapper._subtask_to_persistence(subtask, plan.id)
             self._db.add(subtask_model)
+            existing_model.subtasks.append(subtask_model)
         
         logger.debug(f"Updated plan {plan.id} with {len(plan.subtasks)} subtasks")
     
