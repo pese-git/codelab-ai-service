@@ -503,10 +503,23 @@ class OrchestratorAgent(BaseAgent):
             return
         
         try:
+            # Notify user about routing to Architect for planning
+            # NOTE: Using 'status' type instead of 'switch_agent' to avoid MessageProcessor
+            # intercepting and switching agents. Orchestrator coordinates the plan internally.
+            yield StreamChunk(
+                type="status",
+                content="🔄 Routing to Architect agent for planning...",
+                metadata={
+                    "routing_to": "architect",
+                    "reason": "Complex task requires planning phase",
+                    "fsm_state": FSMState.ARCHITECT_PLANNING.value
+                }
+            )
+            
             # Step 1: Create plan through Architect
             yield StreamChunk(
                 type="status",
-                content="🏗️ Creating execution plan...",
+                content="🏗️ Architect is creating execution plan...",
                 metadata={"fsm_state": FSMState.ARCHITECT_PLANNING.value}
             )
             
