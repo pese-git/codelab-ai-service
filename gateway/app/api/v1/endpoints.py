@@ -506,9 +506,20 @@ async def websocket_endpoint(
                         
                 except Exception as e:
                     logger.error(f"[{session_id}] Failed to parse message: {e}")
-                    err = WSErrorResponse.model_construct(
-                        type="error", content=f"Invalid JSON message: {str(e)}"
-                    )
+                    logger.error(f"[{session_id}] Raw message was: {raw_msg!r}")
+                    
+                    # Специальная обработка для распространенной ошибки с plan_decision
+                    error_msg = str(e)
+                    if "call_id" in error_msg and "Input should be a valid string" in error_msg:
+                        logger.error(f"[{session_id}] Detected call_id validation error - possibly incorrect plan_decision format")
+                        err = WSErrorResponse.model_construct(
+                            type="error",
+                            content=f"Invalid message format: plan_decision requires 'approval_request_id' and 'decision' fields, not 'call_id'. Error: {str(e)}"
+                        )
+                    else:
+                        err = WSErrorResponse.model_construct(
+                            type="error", content=f"Invalid JSON message: {str(e)}"
+                        )
                     await websocket.send_json(err.model_dump())
                     continue
                 
