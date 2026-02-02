@@ -67,6 +67,10 @@ class PlanRepositoryImpl(PlanRepository):
             
         Raises:
             RepositoryError: При ошибке сохранения
+            
+        Note:
+            Транзакция управляется на уровне get_db() dependency.
+            Commit происходит автоматически после успешного завершения.
         """
         try:
             # Проверить, существует ли план
@@ -82,11 +86,14 @@ class PlanRepositoryImpl(PlanRepository):
                 # Создать новый план
                 await self._create_plan(entity)
             
-            await self._db.flush()  # Flush changes within transaction
+            # Flush для получения ID и проверки constraints
+            # Commit будет выполнен автоматически в get_db()
+            await self._db.flush()
             logger.debug(f"Saved plan {entity.id}")
             
         except Exception as e:
             logger.error(f"Error saving plan {entity.id}: {e}", exc_info=True)
+            # Не делаем rollback здесь - это будет сделано в get_db()
             raise RepositoryError(
                 operation="save",
                 entity_type="Plan",
@@ -144,6 +151,9 @@ class PlanRepositoryImpl(PlanRepository):
             
         Returns:
             True если удалён, False если не найден
+            
+        Note:
+            Транзакция управляется на уровне get_db() dependency.
         """
         try:
             # Удалить subtasks (cascade должен сработать, но делаем явно)
@@ -159,6 +169,8 @@ class PlanRepositoryImpl(PlanRepository):
             deleted = result.rowcount > 0
             
             if deleted:
+                # Flush для применения изменений
+                # Commit будет выполнен автоматически в get_db()
                 await self._db.flush()
                 logger.info(f"Deleted plan {id}")
             

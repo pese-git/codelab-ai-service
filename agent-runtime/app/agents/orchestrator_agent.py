@@ -122,7 +122,8 @@ class OrchestratorAgent(BaseAgent):
     def set_planning_dependencies(
         self,
         architect_agent: "ArchitectAgent",
-        execution_coordinator: "ExecutionCoordinator"
+        execution_coordinator: "ExecutionCoordinator",
+        approval_manager: Optional[Any] = None
     ) -> None:
         """
         Set planning dependencies for Option 2 support.
@@ -133,12 +134,15 @@ class OrchestratorAgent(BaseAgent):
         Args:
             architect_agent: ArchitectAgent instance for plan creation
             execution_coordinator: ExecutionCoordinator for plan execution
+            approval_manager: Optional ApprovalManager for plan approvals
         """
         self.architect_agent = architect_agent
         self.execution_coordinator = execution_coordinator
+        if approval_manager is not None:
+            self.approval_manager = approval_manager
         logger.info(
             "Planning dependencies set for OrchestratorAgent "
-            "(Option 2 support enabled)"
+            f"(Option 2 support enabled, approval_manager={'yes' if approval_manager else 'no'})"
         )
     
     async def process(
@@ -576,11 +580,13 @@ class OrchestratorAgent(BaseAgent):
                 yield StreamChunk(
                     type="plan_approval_required",
                     content="Plan requires your approval before execution",
+                    approval_request_id=approval_request_id,
+                    plan_id=plan_id,
+                    plan_summary=plan_summary,
                     metadata={
-                        "approval_request_id": approval_request_id,
-                        "plan_id": plan_id,
                         "fsm_state": FSMState.PLAN_REVIEW.value
-                    }
+                    },
+                    is_final=True  # Orchestrator завершил обработку, ждем approval
                 )
                 
                 # NOTE: Execution will continue when user sends approval decision

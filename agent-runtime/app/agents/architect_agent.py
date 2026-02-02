@@ -236,10 +236,10 @@ class ArchitectAgent(BaseAgent):
                 )
                 plan.add_subtask(subtask)
             
-            # 5. Approve plan automatically (user approval happens in Orchestrator)
-            plan.approve()
-            
-            # 6. Save to repository
+            # 5. Save plan in DRAFT status (approval happens later via PlanApprovalHandler)
+            # NOTE: Plan is created in 'draft' status by default
+            # User approval will be requested in Orchestrator via plan_approval_required chunk
+            # After user approves, PlanApprovalHandler will call plan.approve()
             await self.plan_repository.save(plan)
             
             logger.info(

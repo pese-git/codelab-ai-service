@@ -505,7 +505,8 @@ async def get_execution_coordinator(
 
 async def ensure_orchestrator_option2_initialized(
     architect_agent = Depends(get_architect_agent_for_planning),
-    execution_coordinator = Depends(get_execution_coordinator)
+    execution_coordinator = Depends(get_execution_coordinator),
+    approval_manager = Depends(get_approval_manager)
 ):
     """
     Ensure OrchestratorAgent has Option 2 dependencies initialized.
@@ -516,6 +517,7 @@ async def ensure_orchestrator_option2_initialized(
     Args:
         architect_agent: ArchitectAgent (инжектируется)
         execution_coordinator: ExecutionCoordinator (инжектируется)
+        approval_manager: ApprovalManager (инжектируется)
     """
     from ..domain.services.agent_registry import agent_router
     from ..agents.base_agent import AgentType
@@ -533,7 +535,8 @@ async def ensure_orchestrator_option2_initialized(
         # Inject dependencies into OrchestratorAgent
         orchestrator.set_planning_dependencies(
             architect_agent=architect_agent,
-            execution_coordinator=execution_coordinator
+            execution_coordinator=execution_coordinator,
+            approval_manager=approval_manager
         )
         
         logger.info("✓ OrchestratorAgent Option 2 dependencies initialized successfully")

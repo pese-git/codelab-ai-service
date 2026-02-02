@@ -190,8 +190,16 @@ class MessageProcessor:
                         yield notification_chunk
                         break
                     else:
-                        # Переслать другие чанки (не должно происходить с Orchestrator)
+                        # Переслать другие чанки
                         yield chunk
+                        # Если Orchestrator вернул final chunk, он завершил обработку
+                        # (например, создал план и ждет approval)
+                        if chunk.is_final:
+                            logger.info(
+                                f"Orchestrator вернул final chunk для сессии {session_id}, "
+                                f"завершаем обработку"
+                            )
+                            return  # Не продолжать обработку
             
             # Получить текущего агента и обработать сообщение
             current_agent = self._agent_router.get_agent(context.current_agent)

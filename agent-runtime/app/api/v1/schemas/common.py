@@ -54,6 +54,11 @@ class StreamChunk(BaseModel):
     arguments: Optional[Dict[str, Any]] = Field(default=None, description="Tool arguments")
     requires_approval: Optional[bool] = Field(default=False, description="Whether this tool requires user approval (HITL)")
     
+    # For plan_approval_required type
+    approval_request_id: Optional[str] = Field(default=None, description="Plan approval request identifier")
+    plan_id: Optional[str] = Field(default=None, description="Plan identifier")
+    plan_summary: Optional[Dict[str, Any]] = Field(default=None, description="Plan summary with goal, subtasks, etc.")
+    
     # For error type
     error: Optional[str] = Field(default=None, description="Error message if any")
     
