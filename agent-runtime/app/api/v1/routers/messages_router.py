@@ -90,7 +90,10 @@ async def message_stream_sse(
                     agent_type=agent_type
                 ):
                     # Преобразовать в SSE формат
-                    yield f"data: {chunk.model_dump_json()}\n\n"
+                    chunk_json = chunk.model_dump_json(exclude_none=False)
+                    if chunk.type == "plan_approval_required":
+                        logger.info(f"[SSE] Sending plan_approval_required chunk: {chunk_json}")
+                    yield f"data: {chunk_json}\n\n"
             except Exception as e:
                 logger.error(f"Error processing message: {e}", exc_info=True)
                 error_chunk = StreamChunk(

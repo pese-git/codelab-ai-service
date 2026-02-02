@@ -590,7 +590,7 @@ class OrchestratorAgent(BaseAgent):
                 )
                 
                 # Yield approval required chunk
-                yield StreamChunk(
+                chunk = StreamChunk(
                     type="plan_approval_required",
                     content="Plan requires your approval before execution",
                     approval_request_id=approval_request_id,
@@ -601,6 +601,14 @@ class OrchestratorAgent(BaseAgent):
                     },
                     is_final=True  # Orchestrator завершил обработку, ждем approval
                 )
+                logger.info(
+                    f"Sending plan_approval_required chunk: "
+                    f"approval_request_id={approval_request_id}, "
+                    f"plan_id={plan_id}, "
+                    f"plan_summary keys={list(plan_summary.keys())}"
+                )
+                logger.debug(f"Full chunk data: {chunk.model_dump()}")
+                yield chunk
                 
                 # NOTE: Execution will continue when user sends approval decision
                 # via POST /sessions/{session_id}/plan-decision endpoint

@@ -571,6 +571,11 @@ async def websocket_endpoint(
                                         # Фильтруем null значения, чтобы не отправлять лишние поля
                                         filtered_data = {k: v for k, v in data.items() if v is not None}
                                         
+                                        # Логируем plan_approval_required для отладки
+                                        if msg_type == "plan_approval_required":
+                                            logger.info(f"[{session_id}] plan_approval_required BEFORE filter: {json.dumps(data)}")
+                                            logger.info(f"[{session_id}] plan_approval_required AFTER filter: {json.dumps(filtered_data)}")
+                                        
                                         logger.debug(f"[{session_id}] Sending to IDE: {json.dumps(filtered_data, indent=2)}")
                                         
                                         # Пересылаем событие в IDE через WebSocket
@@ -582,10 +587,19 @@ async def websocket_endpoint(
                                     # Для других типов событий (например error) тоже пытаемся парсить
                                     try:
                                         data = json.loads(data_str)
-                                        logger.debug(f"[{session_id}] Received SSE data for event '{current_event_type}': {data}")
+                                        msg_type = data.get('type')
+                                        logger.debug(f"[{session_id}] Received SSE data for event '{current_event_type}': type={msg_type}")
+                                        
+                                        # Фильтруем null значения для всех событий
+                                        filtered_data = {k: v for k, v in data.items() if v is not None}
+                                        
+                                        # Логируем plan_approval_required для отладки
+                                        if msg_type == "plan_approval_required":
+                                            logger.info(f"[{session_id}] plan_approval_required BEFORE filter: {json.dumps(data)}")
+                                            logger.info(f"[{session_id}] plan_approval_required AFTER filter: {json.dumps(filtered_data)}")
                                         
                                         # Пересылаем событие в IDE
-                                        await websocket.send_json(data)
+                                        await websocket.send_json(filtered_data)
                                         
                                     except json.JSONDecodeError as e:
                                         logger.warning(f"[{session_id}] Failed to parse SSE data for event '{current_event_type}': {e}")
