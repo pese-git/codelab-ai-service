@@ -166,10 +166,12 @@ class LLMProxyClient(LLMClient):
             if max_tokens is not None:
                 request_data["max_tokens"] = max_tokens
             
-            logger.debug(
+            # DIAGNOSTIC: Детальное логирование истории для диагностики tool execution
+            logger.info(
                 f"Calling LLM: model={model}, messages={len(messages)}, "
                 f"tools={len(tools)}"
             )
+            logger.debug(f"Full history before LLM call:\n{json.dumps(messages, indent=2, ensure_ascii=False)}")
             
             # Вызов API (с префиксом /v1 как в старом клиенте)
             response = await self._http_client.post(

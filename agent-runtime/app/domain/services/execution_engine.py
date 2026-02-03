@@ -12,12 +12,13 @@ ExecutionEngine - координатор исполнения планов.
 
 import logging
 import asyncio
-from typing import Dict, Any, List, Optional, Set, TYPE_CHECKING
+from typing import Dict, Any, List, Optional, Set, TYPE_CHECKING, AsyncGenerator
 from datetime import datetime, timezone
 
 from app.domain.entities.plan import Plan, PlanStatus, Subtask, SubtaskStatus
 from app.domain.services.dependency_resolver import DependencyResolver
 from app.domain.services.subtask_executor import SubtaskExecutor, SubtaskExecutionError
+from app.models.schemas import StreamChunk
 
 if TYPE_CHECKING:
     from app.domain.repositories.plan_repository import PlanRepository
@@ -124,9 +125,13 @@ class ExecutionEngine:
         session_id: str,
         session_service: "SessionManagementService",
         stream_handler: "IStreamHandler"
-    ) -> ExecutionResult:
+    ) -> AsyncGenerator[StreamChunk, None]:
         """
         Выполнить план.
+        
+        ВАЖНО: Теперь возвращает AsyncGenerator для streaming выполнения.
+        Подзадачи выполняются ПОСЛЕДОВАТЕЛЬНО (не параллельно) для поддержки
+        streaming tool_call событий к клиенту.
         
         Args:
             plan_id: ID плана
@@ -134,8 +139,8 @@ class ExecutionEngine:
             session_service: Сервис управления сессиями
             stream_handler: Handler для стриминга
             
-        Returns:
-            Результат выполнения плана
+        Yields:
+            StreamChunk: Chunks от подзадач и статусные обновления
             
         Raises:
             ExecutionEngineError: При ошибке выполнения
@@ -164,38 +169,83 @@ class ExecutionEngine:
             
             logger.info(
                 f"Execution order for plan {plan_id}: "
-                f"{len(execution_order)} batches"
+                f"{len(execution_order)} batches, executing SEQUENTIALLY for streaming support"
             )
             
-            # Выполнить подзадачи по батчам
+            # Выполнить подзадачи ПОСЛЕДОВАТЕЛЬНО (не параллельно)
+            # Это позволяет пересылать chunks (включая tool_call) через yield
             results = {}
             errors = {}
+            total_count = len(plan.subtasks)
             
-            for batch_index, batch in enumerate(execution_order):
+            # Flatten batches into sequential list
+            all_subtask_ids = []
+            for batch in execution_order:
+                all_subtask_ids.extend(batch)
+            
+            for index, subtask_id in enumerate(all_subtask_ids):
+                subtask = plan.get_subtask_by_id(subtask_id)
+                if not subtask:
+                    logger.error(f"Subtask {subtask_id} not found in plan")
+                    errors[subtask_id] = "Subtask not found"
+                    continue
+                
                 logger.info(
-                    f"Executing batch {batch_index + 1}/{len(execution_order)} "
-                    f"with {len(batch)} subtasks"
+                    f"Executing subtask {index + 1}/{len(all_subtask_ids)}: "
+                    f"{subtask.description[:50]}..."
                 )
                 
-                batch_results = await self._execute_batch(
-                    plan=plan,
-                    subtask_ids=batch,
-                    session_id=session_id,
-                    session_service=session_service,
-                    stream_handler=stream_handler
+                # Отправить статус начала подзадачи
+                yield StreamChunk(
+                    type="status",
+                    content=f"Executing subtask {index + 1}/{len(all_subtask_ids)}: {subtask.description}",
+                    metadata={
+                        "subtask_id": subtask_id,
+                        "progress": f"{index + 1}/{len(all_subtask_ids)}"
+                    }
                 )
                 
-                # Собрать результаты и ошибки
-                for subtask_id, result in batch_results.items():
-                    if result["status"] == "completed":
-                        results[subtask_id] = result
+                try:
+                    # Выполнить подзадачу и пересылать все chunks
+                    subtask_result_metadata = None
+                    async for chunk in self.subtask_executor.execute_subtask(
+                        plan_id=plan.id,
+                        subtask_id=subtask_id,
+                        session_id=session_id,
+                        session_service=session_service,
+                        stream_handler=stream_handler
+                    ):
+                        # Пересылать chunk дальше (включая tool_call!)
+                        yield chunk
+                        
+                        # Сохранить metadata из финального chunk
+                        if chunk.is_final and chunk.metadata:
+                            subtask_result_metadata = chunk.metadata
+                    
+                    # Собрать результат из metadata
+                    if subtask_result_metadata and subtask_result_metadata.get("status") == "completed":
+                        results[subtask_id] = subtask_result_metadata
                     else:
-                        errors[subtask_id] = result.get("error", "Unknown error")
+                        # Fallback: считаем успешным если нет ошибки
+                        results[subtask_id] = {
+                            "status": "completed",
+                            "subtask_id": subtask_id
+                        }
+                    
+                except SubtaskExecutionError as e:
+                    logger.error(f"Subtask {subtask_id} failed: {e}")
+                    errors[subtask_id] = str(e)
+                    
+                    # Отправить error chunk
+                    yield StreamChunk(
+                        type="error",
+                        error=f"Subtask {subtask_id} failed: {str(e)}",
+                        metadata={"subtask_id": subtask_id}
+                    )
             
             # Проверить результаты
             completed_count = len(results)
             failed_count = len(errors)
-            total_count = len(plan.subtasks)
             
             # Перезагрузить план из БД для получения актуальных статусов subtasks
             plan = await self.plan_repository.find_by_id(plan_id)
@@ -221,7 +271,8 @@ class ExecutionEngine:
             end_time = datetime.now(timezone.utc)
             duration = (end_time - start_time).total_seconds()
             
-            return ExecutionResult(
+            # Отправить финальный chunk с результатом выполнения плана
+            execution_result = ExecutionResult(
                 plan_id=plan_id,
                 status=final_status,
                 completed_subtasks=completed_count,
@@ -232,6 +283,13 @@ class ExecutionEngine:
                 duration_seconds=duration
             )
             
+            yield StreamChunk(
+                type="execution_completed",
+                content=f"Plan execution {final_status}",
+                metadata=execution_result.to_dict(),
+                is_final=True
+            )
+            
         except Exception as e:
             logger.error(f"Error executing plan {plan_id}: {e}", exc_info=True)
             
@@ -239,9 +297,13 @@ class ExecutionEngine:
             plan.fail(f"Execution error: {str(e)}")
             await self.plan_repository.save(plan)
             
-            raise ExecutionEngineError(
-                f"Failed to execute plan {plan_id}: {str(e)}"
-            ) from e
+            # Отправить error chunk
+            yield StreamChunk(
+                type="error",
+                error=f"Plan execution failed: {str(e)}",
+                metadata={"plan_id": plan_id},
+                is_final=True
+            )
     
     def _get_execution_order(self, plan: Plan) -> List[List[str]]:
         """
@@ -281,135 +343,6 @@ class ExecutionEngine:
             raise ExecutionEngineError(
                 f"Plan {plan.id} has circular dependencies: {str(e)}"
             ) from e
-    
-    async def _execute_batch(
-        self,
-        plan: Plan,
-        subtask_ids: List[str],
-        session_id: str,
-        session_service: "SessionManagementService",
-        stream_handler: "IStreamHandler"
-    ) -> Dict[str, Dict[str, Any]]:
-        """
-        Выполнить батч подзадач параллельно.
-        
-        Args:
-            plan: План
-            subtask_ids: ID подзадач для выполнения
-            session_id: ID сессии
-            session_service: Сервис управления сессиями
-            stream_handler: Handler для стриминга
-            
-        Returns:
-            Словарь результатов по ID подзадач
-        """
-        logger.info(f"Executing batch of {len(subtask_ids)} subtasks")
-        
-        # Создать задачи для параллельного выполнения
-        tasks = []
-        for subtask_id in subtask_ids:
-            task = self._execute_subtask_safe(
-                plan=plan,
-                subtask_id=subtask_id,
-                session_id=session_id,
-                session_service=session_service,
-                stream_handler=stream_handler
-            )
-            tasks.append(task)
-        
-        # Выполнить параллельно
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # Собрать результаты
-        batch_results = {}
-        for subtask_id, result in zip(subtask_ids, results):
-            if isinstance(result, Exception):
-                logger.error(
-                    f"Subtask {subtask_id} failed with exception: {result}"
-                )
-                batch_results[subtask_id] = {
-                    "status": "failed",
-                    "error": str(result)
-                }
-            else:
-                batch_results[subtask_id] = result
-        
-        return batch_results
-    
-    async def _execute_subtask_safe(
-        self,
-        plan: Plan,
-        subtask_id: str,
-        session_id: str,
-        session_service: "SessionManagementService",
-        stream_handler: "IStreamHandler"
-    ) -> Dict[str, Any]:
-        """
-        Безопасно выполнить подзадачу с обработкой ошибок.
-        
-        Args:
-            plan: План
-            subtask_id: ID подзадачи
-            session_id: ID сессии
-            session_service: Сервис управления сессиями
-            stream_handler: Handler для стриминга
-            
-        Returns:
-            Результат выполнения
-        """
-        subtask = plan.get_subtask_by_id(subtask_id)
-        if not subtask:
-            return {
-                "status": "failed",
-                "subtask_id": subtask_id,
-                "error": f"Subtask {subtask_id} not found in plan"
-            }
-        
-        try:
-            # Выполнить подзадачу (subtask_executor сам обновит статус)
-            result = await self.subtask_executor.execute_subtask(
-                plan_id=plan.id,
-                subtask_id=subtask_id,
-                session_id=session_id,
-                session_service=session_service,
-                stream_handler=stream_handler
-            )
-            
-            return result
-            
-        except SubtaskExecutionError as e:
-            logger.error(f"Subtask {subtask_id} execution error: {e}")
-            # Пометить подзадачу как failed
-            try:
-                if subtask.status == SubtaskStatus.RUNNING:
-                    subtask.fail(str(e))
-                    await self.plan_repository.save(plan)
-            except Exception as update_error:
-                logger.error(f"Failed to update subtask status: {update_error}")
-            
-            return {
-                "status": "failed",
-                "subtask_id": subtask_id,
-                "error": str(e)
-            }
-        except Exception as e:
-            logger.error(
-                f"Unexpected error executing subtask {subtask_id}: {e}",
-                exc_info=True
-            )
-            # Пометить подзадачу как failed
-            try:
-                if subtask.status == SubtaskStatus.RUNNING:
-                    subtask.fail(f"Unexpected error: {str(e)}")
-                    await self.plan_repository.save(plan)
-            except Exception as update_error:
-                logger.error(f"Failed to update subtask status: {update_error}")
-            
-            return {
-                "status": "failed",
-                "subtask_id": subtask_id,
-                "error": f"Unexpected error: {str(e)}"
-            }
     
     async def get_execution_status(
         self,

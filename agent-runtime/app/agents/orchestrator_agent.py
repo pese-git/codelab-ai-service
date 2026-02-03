@@ -648,36 +648,35 @@ class OrchestratorAgent(BaseAgent):
                 metadata={"fsm_state": FSMState.PLAN_EXECUTION.value}
             )
             
-            execution_result = await self.execution_coordinator.execute_plan(
+            # ИСПРАВЛЕНИЕ: Пересылать все chunks от ExecutionCoordinator
+            execution_result_metadata = None
+            async for chunk in self.execution_coordinator.execute_plan(
                 plan_id=plan_id,
                 session_id=session_id,
                 session_service=session_service,
                 stream_handler=stream_handler
-            )
+            ):
+                # Пересылать chunk дальше (включая tool_call!)
+                yield chunk
+                
+                # Сохранить metadata из финального chunk
+                if chunk.type == "execution_completed" and chunk.metadata:
+                    execution_result_metadata = chunk.metadata
             
-            logger.info(
-                f"Plan {plan_id} execution completed: "
-                f"{execution_result.completed_subtasks}/{execution_result.total_subtasks} successful"
-            )
-            
-            # FSM: PLAN_EXECUTION → COMPLETED
-            await self.fsm_orchestrator.transition(
-                session_id=session_id,
-                event=FSMEvent.PLAN_EXECUTION_COMPLETED,
-                metadata={"execution_result": execution_result.to_dict()}
-            )
-            
-            # Step 5: Present results
-            yield StreamChunk(
-                type="execution_completed",
-                content=self._format_execution_result(execution_result),
-                metadata={
-                    "plan_id": plan_id,
-                    "fsm_state": FSMState.COMPLETED.value,
-                    "execution_result": execution_result.to_dict()
-                },
-                is_final=True
-            )
+            # Логировать результат
+            if execution_result_metadata:
+                logger.info(
+                    f"Plan {plan_id} execution completed: "
+                    f"{execution_result_metadata.get('completed_subtasks')}/"
+                    f"{execution_result_metadata.get('total_subtasks')} successful"
+                )
+                
+                # FSM: PLAN_EXECUTION → COMPLETED
+                await self.fsm_orchestrator.transition(
+                    session_id=session_id,
+                    event=FSMEvent.PLAN_EXECUTION_COMPLETED,
+                    metadata={"execution_result": execution_result_metadata}
+                )
             
         except Exception as e:
             logger.error(

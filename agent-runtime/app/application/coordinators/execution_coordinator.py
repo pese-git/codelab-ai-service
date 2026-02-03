@@ -6,7 +6,7 @@ ExecutionCoordinator - Application-level coordinator для выполнения
 """
 
 import logging
-from typing import Dict, Any, Optional, TYPE_CHECKING
+from typing import Dict, Any, Optional, TYPE_CHECKING, AsyncGenerator
 
 from app.domain.services.execution_engine import (
     ExecutionEngine,
@@ -14,6 +14,7 @@ from app.domain.services.execution_engine import (
     ExecutionEngineError
 )
 from app.domain.entities.plan import PlanStatus
+from app.models.schemas import StreamChunk
 
 if TYPE_CHECKING:
     from app.domain.repositories.plan_repository import PlanRepository
@@ -79,16 +80,19 @@ class ExecutionCoordinator:
         session_id: str,
         session_service: "SessionManagementService",
         stream_handler: "IStreamHandler"
-    ) -> ExecutionResult:
+    ) -> AsyncGenerator[StreamChunk, None]:
         """
         Execute plan with coordination and monitoring.
         
+        ВАЖНО: Теперь возвращает AsyncGenerator для streaming выполнения.
+        Пересылает все chunks от ExecutionEngine, включая tool_call события.
+        
         Coordinates:
         1. Validate plan is ready for execution
-        2. Execute through ExecutionEngine
-        3. Monitor progress
-        4. Handle errors
-        5. Return aggregated results
+        2. Execute through ExecutionEngine (streaming)
+        3. Forward all chunks (including tool_call)
+        4. Monitor progress
+        5. Handle errors
         
         Args:
             plan_id: ID плана для выполнения
@@ -96,21 +100,12 @@ class ExecutionCoordinator:
             session_service: Сервис управления сессиями
             stream_handler: Handler для стриминга
             
-        Returns:
-            ExecutionResult с результатами выполнения
+        Yields:
+            StreamChunk: Chunks от ExecutionEngine (tool_call, status, etc.)
             
         Raises:
             ExecutionCoordinatorError: При ошибке координации
             ExecutionEngineError: При ошибке выполнения
-            
-        Example:
-            >>> result = await coordinator.execute_plan(
-            ...     plan_id="plan-123",
-            ...     session_id="session-456",
-            ...     session_service=session_service,
-            ...     stream_handler=stream_handler
-            ... )
-            >>> print(f"Completed: {result.completed_subtasks}/{result.total_subtasks}")
         """
         logger.info(
             f"ExecutionCoordinator starting execution of plan {plan_id} "
@@ -121,40 +116,57 @@ class ExecutionCoordinator:
             # 1. Validate plan exists and is ready
             await self._validate_plan_ready(plan_id)
             
-            # 2. Execute through ExecutionEngine
-            result = await self.execution_engine.execute_plan(
+            # 2. Execute through ExecutionEngine and forward all chunks
+            execution_result_metadata = None
+            async for chunk in self.execution_engine.execute_plan(
                 plan_id=plan_id,
                 session_id=session_id,
                 session_service=session_service,
                 stream_handler=stream_handler
-            )
+            ):
+                # Пересылать chunk дальше (включая tool_call!)
+                yield chunk
+                
+                # Сохранить metadata из финального chunk
+                if chunk.type == "execution_completed" and chunk.metadata:
+                    execution_result_metadata = chunk.metadata
             
             # 3. Log results
-            logger.info(
-                f"Plan {plan_id} execution completed: "
-                f"status={result.status}, "
-                f"completed={result.completed_subtasks}/{result.total_subtasks}, "
-                f"failed={result.failed_subtasks}, "
-                f"duration={result.duration_seconds:.2f}s"
-            )
-            
-            return result
+            if execution_result_metadata:
+                logger.info(
+                    f"Plan {plan_id} execution completed: "
+                    f"status={execution_result_metadata.get('status')}, "
+                    f"completed={execution_result_metadata.get('completed_subtasks')}/"
+                    f"{execution_result_metadata.get('total_subtasks')}, "
+                    f"failed={execution_result_metadata.get('failed_subtasks')}, "
+                    f"duration={execution_result_metadata.get('duration_seconds', 0):.2f}s"
+                )
             
         except ExecutionEngineError as e:
             logger.error(
                 f"ExecutionEngine error for plan {plan_id}: {e}",
                 exc_info=True
             )
-            raise
+            # Пересылать ошибку как chunk
+            yield StreamChunk(
+                type="error",
+                error=str(e),
+                metadata={"plan_id": plan_id},
+                is_final=True
+            )
         
         except Exception as e:
             logger.error(
                 f"Unexpected error executing plan {plan_id}: {e}",
                 exc_info=True
             )
-            raise ExecutionCoordinatorError(
-                f"Failed to coordinate execution of plan {plan_id}: {str(e)}"
-            ) from e
+            # Пересылать ошибку как chunk
+            yield StreamChunk(
+                type="error",
+                error=f"Failed to coordinate execution: {str(e)}",
+                metadata={"plan_id": plan_id},
+                is_final=True
+            )
     
     async def _validate_plan_ready(self, plan_id: str) -> None:
         """

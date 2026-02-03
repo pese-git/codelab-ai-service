@@ -162,6 +162,7 @@ class ToolResultHandler:
         
         logger.info(
             f"Результат инструмента добавлен в сессию {session_id}, "
+            f"call_id={call_id}, has_error={error is not None}, "
             f"продолжаем обработку с агентом {context.current_agent.value}"
         )
         

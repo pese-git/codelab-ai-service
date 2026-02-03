@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from ...agents.orchestrator_agent import OrchestratorAgent
     from ...application.coordinators.execution_coordinator import ExecutionCoordinator
     from ..repositories.plan_repository import PlanRepository
+    from ..interfaces.stream_handler import IStreamHandler
 
 logger = logging.getLogger("agent-runtime.domain.plan_approval_handler")
 
@@ -53,7 +54,8 @@ class PlanApprovalHandler:
         session_service: "SessionManagementService",
         fsm_orchestrator: "FSMOrchestrator",
         execution_coordinator: "ExecutionCoordinator",
-        plan_repository: "PlanRepository"
+        plan_repository: "PlanRepository",
+        stream_handler: "IStreamHandler"
     ):
         """
         Инициализация handler.
@@ -64,12 +66,14 @@ class PlanApprovalHandler:
             fsm_orchestrator: FSM orchestrator
             execution_coordinator: Execution coordinator
             plan_repository: Plan repository для обновления статуса плана
+            stream_handler: Stream handler для выполнения подзадач
         """
         self._approval_manager = approval_manager
         self._session_service = session_service
         self._fsm_orchestrator = fsm_orchestrator
         self._execution_coordinator = execution_coordinator
         self._plan_repository = plan_repository
+        self._stream_handler = stream_handler
         
         logger.info("PlanApprovalHandler инициализирован")
     
@@ -180,36 +184,35 @@ class PlanApprovalHandler:
                 metadata={"fsm_state": "plan_execution"}
             )
             
-            execution_result = await self._execution_coordinator.execute_plan(
+            # ИСПРАВЛЕНИЕ: Пересылать все chunks от ExecutionCoordinator
+            execution_result_metadata = None
+            async for chunk in self._execution_coordinator.execute_plan(
                 plan_id=plan_id,
                 session_id=session_id,
                 session_service=self._session_service,
-                stream_handler=None  # TODO: Pass stream_handler for progress updates
-            )
+                stream_handler=self._stream_handler
+            ):
+                # Пересылать chunk дальше (включая tool_call!)
+                yield chunk
+                
+                # Сохранить metadata из финального chunk
+                if chunk.type == "execution_completed" and chunk.metadata:
+                    execution_result_metadata = chunk.metadata
             
-            logger.info(
-                f"Plan {plan_id} execution completed: "
-                f"{execution_result.completed_subtasks}/{execution_result.total_subtasks} successful"
-            )
-            
-            # FSM: PLAN_EXECUTION → COMPLETED
-            await self._fsm_orchestrator.transition(
-                session_id=session_id,
-                event=FSMEvent.PLAN_EXECUTION_COMPLETED,
-                metadata={"execution_result": execution_result.to_dict()}
-            )
-            
-            # Present results
-            yield StreamChunk(
-                type="execution_completed",
-                content=self._format_execution_result(execution_result),
-                metadata={
-                    "plan_id": plan_id,
-                    "fsm_state": "completed",
-                    "execution_result": execution_result.to_dict()
-                },
-                is_final=True
-            )
+            # Логировать результат
+            if execution_result_metadata:
+                logger.info(
+                    f"Plan {plan_id} execution completed: "
+                    f"{execution_result_metadata.get('completed_subtasks')}/"
+                    f"{execution_result_metadata.get('total_subtasks')} successful"
+                )
+                
+                # FSM: PLAN_EXECUTION → COMPLETED
+                await self._fsm_orchestrator.transition(
+                    session_id=session_id,
+                    event=FSMEvent.PLAN_EXECUTION_COMPLETED,
+                    metadata={"execution_result": execution_result_metadata}
+                )
             
         elif decision_enum == PlanApprovalDecision.REJECT:
             yield StreamChunk(

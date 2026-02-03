@@ -11,6 +11,7 @@ Application Handler для стриминга LLM ответов.
 """
 
 import time
+import json
 import logging
 from typing import AsyncGenerator, List, Dict, Optional, Any
 
@@ -309,11 +310,20 @@ class StreamLLMResponseHandler(IStreamHandler):
             )
         
         # 5. Сохранение сообщения через доменный сервис
+        tool_call_dict = tool_call.to_dict()
+        
+        # DIAGNOSTIC: Логирование формата tool_call перед сохранением
+        logger.info(
+            f"Saving assistant message with tool_call: {tool_call.tool_name}, "
+            f"call_id={tool_call.id}"
+        )
+        logger.debug(f"Tool call dict format:\n{json.dumps(tool_call_dict, indent=2, ensure_ascii=False)}")
+        
         await self._session_service.add_message(
             session_id=session_id,
             role="assistant",
             content="",
-            tool_calls=[tool_call.to_dict()]
+            tool_calls=[tool_call_dict]
         )
         
         logger.debug(

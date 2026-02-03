@@ -9,7 +9,7 @@ SubtaskExecutor - сервис для выполнения подзадач в �
 """
 
 import logging
-from typing import Dict, Any, Optional, TYPE_CHECKING
+from typing import Dict, Any, Optional, TYPE_CHECKING, AsyncGenerator
 from datetime import datetime, timezone
 
 from app.domain.entities.plan import Subtask, SubtaskStatus
@@ -71,9 +71,12 @@ class SubtaskExecutor:
         session_id: str,
         session_service: "SessionManagementService",
         stream_handler: "IStreamHandler"
-    ) -> Dict[str, Any]:
+    ) -> AsyncGenerator[StreamChunk, None]:
         """
         Выполнить подзадачу в целевом агенте.
+        
+        ВАЖНО: Теперь возвращает AsyncGenerator для пересылки chunks от агента.
+        Это позволяет tool_call событиям доходить до клиента через SSE.
         
         Args:
             plan_id: ID плана
@@ -82,8 +85,8 @@ class SubtaskExecutor:
             session_service: Сервис управления сессиями
             stream_handler: Handler для стриминга
             
-        Returns:
-            Результат выполнения с метаданными
+        Yields:
+            StreamChunk: Chunks от агента (включая tool_call, assistant_message, etc.)
             
         Raises:
             SubtaskExecutionError: При ошибке выполнения
@@ -142,7 +145,15 @@ class SubtaskExecutor:
                 stream_handler=stream_handler
             ):
                 result_chunks.append(chunk)
-                # Можно стримить прогресс через stream_handler
+                
+                # ИСПРАВЛЕНИЕ: Пересылать chunk дальше через yield
+                # Это позволяет tool_call событиям доходить до клиента через SSE
+                yield chunk
+                
+                logger.debug(
+                    f"Forwarded chunk from agent: type={chunk.type}, "
+                    f"is_final={chunk.is_final}"
+                )
             
             # Собрать результат
             result = self._collect_result(result_chunks)
@@ -156,15 +167,21 @@ class SubtaskExecutor:
                 f"by {subtask.agent.value} agent"
             )
             
-            return {
-                "subtask_id": subtask_id,
-                "status": "completed",
-                "result": result,
-                "agent": subtask.agent.value,
-                "started_at": subtask.started_at.isoformat() if subtask.started_at else None,
-                "completed_at": subtask.completed_at.isoformat() if subtask.completed_at else None,
-                "duration_seconds": self._calculate_duration(subtask)
-            }
+            # Отправить финальный chunk с результатом выполнения подзадачи
+            yield StreamChunk(
+                type="subtask_completed",
+                content=f"Subtask {subtask_id} completed",
+                metadata={
+                    "subtask_id": subtask_id,
+                    "status": "completed",
+                    "result": result,
+                    "agent": subtask.agent.value,
+                    "started_at": subtask.started_at.isoformat() if subtask.started_at else None,
+                    "completed_at": subtask.completed_at.isoformat() if subtask.completed_at else None,
+                    "duration_seconds": self._calculate_duration(subtask)
+                },
+                is_final=True
+            )
             
         except Exception as e:
             logger.error(
@@ -177,9 +194,16 @@ class SubtaskExecutor:
             subtask.fail(error=error_message)
             await self.plan_repository.save(plan)
             
-            raise SubtaskExecutionError(
-                f"Failed to execute subtask {subtask_id}: {error_message}"
-            ) from e
+            # Отправить error chunk
+            yield StreamChunk(
+                type="error",
+                error=error_message,
+                metadata={
+                    "subtask_id": subtask_id,
+                    "status": "failed"
+                },
+                is_final=True
+            )
     
     def _get_agent_for_subtask(self, subtask: Subtask):
         """
@@ -285,7 +309,7 @@ class SubtaskExecutor:
         session_id: str,
         session_service: "SessionManagementService",
         stream_handler: "IStreamHandler"
-    ) -> Dict[str, Any]:
+    ) -> AsyncGenerator[StreamChunk, None]:
         """
         Повторить выполнение неудавшейся подзадачи.
         
@@ -296,8 +320,8 @@ class SubtaskExecutor:
             session_service: Сервис управления сессиями
             stream_handler: Handler для стриминга
             
-        Returns:
-            Результат выполнения
+        Yields:
+            StreamChunk: Chunks от агента
             
         Raises:
             SubtaskExecutionError: При ошибке
@@ -329,14 +353,15 @@ class SubtaskExecutor:
         subtask.completed_at = None
         await self.plan_repository.save(plan)
         
-        # Выполнить заново
-        return await self.execute_subtask(
+        # Выполнить заново и пересылать chunks
+        async for chunk in self.execute_subtask(
             plan_id=plan_id,
             subtask_id=subtask_id,
             session_id=session_id,
             session_service=session_service,
             stream_handler=stream_handler
-        )
+        ):
+            yield chunk
     
     async def get_subtask_status(
         self,

@@ -610,13 +610,33 @@ async def get_plan_approval_handler(
         PlanApprovalHandler: Handler Plan Approval решений
     """
     from ..domain.services import PlanApprovalHandler
+    from ..domain.interfaces.stream_handler import IStreamHandler
+    from .dependencies_llm import (
+        get_llm_client,
+        get_llm_event_publisher,
+        get_tool_registry,
+        get_tool_filter_service,
+        get_llm_response_processor
+    )
+    from ..application.handlers.stream_llm_response_handler import StreamLLMResponseHandler
+    
+    # Создать stream handler для выполнения подзадач
+    stream_handler: IStreamHandler = StreamLLMResponseHandler(
+        llm_client=get_llm_client(),
+        tool_filter=get_tool_filter_service(get_tool_registry()),
+        response_processor=get_llm_response_processor(),
+        event_publisher=get_llm_event_publisher(),
+        session_service=session_service,
+        approval_manager=approval_manager
+    )
     
     return PlanApprovalHandler(
         approval_manager=approval_manager,
         session_service=session_service,
         fsm_orchestrator=fsm_orchestrator,
         execution_coordinator=execution_coordinator,
-        plan_repository=plan_repository
+        plan_repository=plan_repository,
+        stream_handler=stream_handler
     )
 
 
