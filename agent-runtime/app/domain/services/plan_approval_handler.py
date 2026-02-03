@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from .fsm_orchestrator import FSMOrchestrator
     from ...agents.orchestrator_agent import OrchestratorAgent
     from ...application.coordinators.execution_coordinator import ExecutionCoordinator
+    from ..repositories.plan_repository import PlanRepository
 
 logger = logging.getLogger("agent-runtime.domain.plan_approval_handler")
 
@@ -51,7 +52,8 @@ class PlanApprovalHandler:
         approval_manager: "ApprovalManager",
         session_service: "SessionManagementService",
         fsm_orchestrator: "FSMOrchestrator",
-        execution_coordinator: "ExecutionCoordinator"
+        execution_coordinator: "ExecutionCoordinator",
+        plan_repository: "PlanRepository"
     ):
         """
         Инициализация handler.
@@ -61,11 +63,13 @@ class PlanApprovalHandler:
             session_service: Сервис управления сессиями
             fsm_orchestrator: FSM orchestrator
             execution_coordinator: Execution coordinator
+            plan_repository: Plan repository для обновления статуса плана
         """
         self._approval_manager = approval_manager
         self._session_service = session_service
         self._fsm_orchestrator = fsm_orchestrator
         self._execution_coordinator = execution_coordinator
+        self._plan_repository = plan_repository
         
         logger.info("PlanApprovalHandler инициализирован")
     
@@ -149,6 +153,16 @@ class PlanApprovalHandler:
             
             # Обновить статус approval
             await self._approval_manager.approve(approval_request_id)
+            
+            # Обновить статус плана на APPROVED
+            plan = await self._plan_repository.find_by_id(plan_id)
+            if plan:
+                from ..entities.plan import PlanStatus
+                plan.status = PlanStatus.APPROVED
+                await self._plan_repository.save(plan)
+                logger.info(f"Plan {plan_id} status updated to APPROVED")
+            else:
+                logger.warning(f"Plan {plan_id} not found for status update")
             
             # FSM: PLAN_REVIEW → PLAN_EXECUTION
             await self._fsm_orchestrator.transition(

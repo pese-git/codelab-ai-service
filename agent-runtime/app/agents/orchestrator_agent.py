@@ -181,7 +181,7 @@ class OrchestratorAgent(BaseAgent):
             logger.debug(f"Message: None (continuing after tool_result)")
         
         # Get current FSM state
-        current_state = self.fsm_orchestrator.get_current_state(session_id)
+        current_state = await self.fsm_orchestrator.get_current_state(session_id)
         logger.debug(f"Current FSM state for session {session_id}: {current_state.value}")
         
         # Reset FSM if in terminal state or non-IDLE states that shouldn't process new messages
@@ -204,10 +204,10 @@ class OrchestratorAgent(BaseAgent):
                     event=FSMEvent.PLAN_REJECTED,
                     metadata={"reason": "new_message_received"}
                 )
-                self.fsm_orchestrator.reset(session_id)
+                await self.fsm_orchestrator.reset(session_id)
             else:
                 # For EXECUTION, ERROR_HANDLING, PLAN_EXECUTION - reset directly
-                self.fsm_orchestrator.reset(session_id)
+                await self.fsm_orchestrator.reset(session_id)
             
             current_state = FSMState.IDLE
         
@@ -299,7 +299,7 @@ class OrchestratorAgent(BaseAgent):
                     return
         
         # Get final FSM state after transitions
-        final_state = self.fsm_orchestrator.get_current_state(session_id)
+        final_state = await self.fsm_orchestrator.get_current_state(session_id)
         
         logger.info(
             f"Orchestrator routing to {target_agent.value} agent "
@@ -564,12 +564,21 @@ class OrchestratorAgent(BaseAgent):
             # Step 3: Request user approval for plan
             logger.info(f"Plan {plan_id} requesting user approval")
             
+            # Get approval_manager from stream_handler (uses DI, not singleton)
+            approval_manager = None
+            if hasattr(stream_handler, '_approval_manager'):
+                approval_manager = stream_handler._approval_manager
+                logger.debug("Using ApprovalManager from stream_handler (DI)")
+            elif self.approval_manager:
+                approval_manager = self.approval_manager
+                logger.warning("Using singleton ApprovalManager (deprecated)")
+            
             # Create approval request if ApprovalManager available
-            if self.approval_manager:
+            if approval_manager:
                 approval_request_id = f"plan-approval-{plan_id}"
                 
                 # Add to pending approvals
-                await self.approval_manager.add_pending(
+                await approval_manager.add_pending(
                     request_id=approval_request_id,
                     request_type="plan",
                     subject=plan_summary['goal'][:100],  # Truncate for subject
@@ -678,7 +687,7 @@ class OrchestratorAgent(BaseAgent):
             
             # FSM: * → ERROR_HANDLING
             try:
-                current_state = self.fsm_orchestrator.get_current_state(session_id)
+                current_state = await self.fsm_orchestrator.get_current_state(session_id)
                 if current_state == FSMState.PLAN_EXECUTION:
                     await self.fsm_orchestrator.transition(
                         session_id=session_id,

@@ -105,6 +105,38 @@ async def get_plan_repository(
     return PlanRepositoryImpl(db)
 
 
+async def get_fsm_state_repository(
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Получить репозиторий FSM states.
+    
+    Args:
+        db: Сессия БД (инжектируется)
+        
+    Returns:
+        FSMStateRepositoryImpl: Реализация репозитория FSM states
+    """
+    from ..infrastructure.persistence.repositories.fsm_state_repository_impl import FSMStateRepositoryImpl
+    return FSMStateRepositoryImpl(db)
+
+
+async def get_fsm_orchestrator(
+    fsm_repository = Depends(get_fsm_state_repository)
+):
+    """
+    Получить FSM Orchestrator с repository.
+    
+    Args:
+        fsm_repository: FSM state repository (инжектируется)
+        
+    Returns:
+        FSMOrchestrator: FSM orchestrator с персистентным хранилищем
+    """
+    from ..domain.services.fsm_orchestrator import FSMOrchestrator
+    return FSMOrchestrator(repository=fsm_repository)
+
+
 # ==================== Event Publisher Dependencies ====================
 
 # Singleton instance of EventPublisherAdapter
@@ -506,7 +538,8 @@ async def get_execution_coordinator(
 async def ensure_orchestrator_option2_initialized(
     architect_agent = Depends(get_architect_agent_for_planning),
     execution_coordinator = Depends(get_execution_coordinator),
-    approval_manager = Depends(get_approval_manager)
+    approval_manager = Depends(get_approval_manager),
+    fsm_orchestrator = Depends(get_fsm_orchestrator)
 ):
     """
     Ensure OrchestratorAgent has Option 2 dependencies initialized.
@@ -518,6 +551,7 @@ async def ensure_orchestrator_option2_initialized(
         architect_agent: ArchitectAgent (инжектируется)
         execution_coordinator: ExecutionCoordinator (инжектируется)
         approval_manager: ApprovalManager (инжектируется)
+        fsm_orchestrator: FSMOrchestrator (инжектируется)
     """
     from ..domain.services.agent_registry import agent_router
     from ..agents.base_agent import AgentType
@@ -525,6 +559,9 @@ async def ensure_orchestrator_option2_initialized(
     try:
         # Get OrchestratorAgent from router using correct method
         orchestrator = agent_router.get_agent(AgentType.ORCHESTRATOR)
+        
+        # Always update FSM orchestrator to use the one with repository
+        orchestrator.fsm_orchestrator = fsm_orchestrator
         
         # Check if already initialized
         if orchestrator.architect_agent is not None:
@@ -555,7 +592,9 @@ async def ensure_orchestrator_option2_initialized(
 async def get_plan_approval_handler(
     approval_manager = Depends(get_approval_manager),
     session_service: SessionManagementService = Depends(get_session_management_service),
-    execution_coordinator = Depends(get_execution_coordinator)
+    execution_coordinator = Depends(get_execution_coordinator),
+    fsm_orchestrator = Depends(get_fsm_orchestrator),
+    plan_repository = Depends(get_plan_repository)
 ):
     """
     Получить handler Plan Approval решений.
@@ -564,21 +603,20 @@ async def get_plan_approval_handler(
         approval_manager: Unified approval manager (инжектируется)
         session_service: Сервис управления сессиями (инжектируется)
         execution_coordinator: Execution coordinator (инжектируется)
+        fsm_orchestrator: FSM orchestrator (инжектируется)
+        plan_repository: Plan repository (инжектируется)
         
     Returns:
         PlanApprovalHandler: Handler Plan Approval решений
     """
     from ..domain.services import PlanApprovalHandler
-    from ..domain.services.fsm_orchestrator import FSMOrchestrator
-    
-    # FSM Orchestrator - singleton для всех сессий
-    fsm_orchestrator = FSMOrchestrator()
     
     return PlanApprovalHandler(
         approval_manager=approval_manager,
         session_service=session_service,
         fsm_orchestrator=fsm_orchestrator,
-        execution_coordinator=execution_coordinator
+        execution_coordinator=execution_coordinator,
+        plan_repository=plan_repository
     )
 
 

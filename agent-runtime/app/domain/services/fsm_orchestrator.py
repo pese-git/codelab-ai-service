@@ -2,10 +2,11 @@
 FSM Orchestrator для управления состоянием задачи.
 
 Координирует переходы между состояниями и управляет жизненным циклом.
+UPDATED: Now uses Repository pattern for persistent storage.
 """
 
 import logging
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, TYPE_CHECKING
 
 from app.domain.entities.fsm_state import (
     FSMState,
@@ -14,6 +15,9 @@ from app.domain.entities.fsm_state import (
     FSMTransitionRules
 )
 
+if TYPE_CHECKING:
+    from app.domain.repositories.fsm_state_repository import FSMStateRepository
+
 logger = logging.getLogger("agent-runtime.fsm_orchestrator")
 
 
@@ -21,26 +25,42 @@ class FSMOrchestrator:
     """
     Orchestrator для управления FSM состоянием задачи.
     
+    UPDATED: Now uses Repository pattern for persistent storage.
+    FSM states are stored in database to survive across HTTP requests.
+    
     Управляет переходами между состояниями, валидирует их,
     и логирует все изменения для отладки и мониторинга.
     
     Атрибуты:
-        _contexts: Словарь контекстов FSM по session_id
+        _contexts: In-memory cache контекстов FSM по session_id
+        _repository: Repository для персистентного хранения (optional)
     
     Пример:
-        >>> orchestrator = FSMOrchestrator()
-        >>> context = orchestrator.get_or_create_context("session-123")
+        >>> orchestrator = FSMOrchestrator(repository=fsm_repo)
+        >>> context = await orchestrator.get_or_create_context("session-123")
         >>> await orchestrator.transition("session-123", FSMEvent.RECEIVE_MESSAGE)
     """
     
-    def __init__(self):
-        """Инициализация FSM Orchestrator"""
+    def __init__(self, repository: Optional["FSMStateRepository"] = None):
+        """
+        Инициализация FSM Orchestrator.
+        
+        Args:
+            repository: Optional repository для персистентного хранения.
+                       Если None, использует только in-memory storage (backward compatibility).
+        """
         self._contexts: Dict[str, FSMContext] = {}
-        logger.info("FSM Orchestrator initialized")
+        self._repository = repository
+        logger.info(
+            f"FSM Orchestrator initialized "
+            f"(persistence={'enabled' if repository else 'disabled'})"
+        )
     
-    def get_or_create_context(self, session_id: str) -> FSMContext:
+    async def get_or_create_context(self, session_id: str) -> FSMContext:
         """
         Получить или создать контекст FSM для сессии.
+        
+        Сначала проверяет in-memory cache, затем БД (если repository доступен).
         
         Args:
             session_id: ID сессии
@@ -48,13 +68,54 @@ class FSMOrchestrator:
         Returns:
             FSMContext для сессии
         """
-        if session_id not in self._contexts:
-            self._contexts[session_id] = FSMContext(session_id=session_id)
-            logger.debug(f"Created new FSM context for session {session_id}")
+        # Check in-memory cache first
+        if session_id in self._contexts:
+            return self._contexts[session_id]
         
-        return self._contexts[session_id]
+        # Try to load from DB if repository available
+        if self._repository:
+            try:
+                db_state = await self._repository.get_state(session_id)
+                db_metadata = await self._repository.get_metadata(session_id)
+                
+                if db_state:
+                    # Restore from DB
+                    context = FSMContext(
+                        session_id=session_id,
+                        current_state=db_state,
+                        metadata=db_metadata
+                    )
+                    self._contexts[session_id] = context
+                    logger.debug(
+                        f"Restored FSM context from DB for session {session_id}: "
+                        f"state={db_state.value}"
+                    )
+                    return context
+            except Exception as e:
+                logger.warning(
+                    f"Failed to load FSM state from DB for session {session_id}: {e}. "
+                    f"Creating new context."
+                )
+        
+        # Create new context
+        context = FSMContext(session_id=session_id)
+        self._contexts[session_id] = context
+        logger.debug(f"Created new FSM context for session {session_id}")
+        
+        # Save to DB if repository available
+        if self._repository:
+            try:
+                await self._repository.save_state(
+                    session_id=session_id,
+                    current_state=context.current_state,
+                    metadata=context.metadata
+                )
+            except Exception as e:
+                logger.warning(f"Failed to save new FSM state to DB: {e}")
+        
+        return context
     
-    def get_current_state(self, session_id: str) -> FSMState:
+    async def get_current_state(self, session_id: str) -> FSMState:
         """
         Получить текущее состояние FSM для сессии.
         
@@ -64,10 +125,7 @@ class FSMOrchestrator:
         Returns:
             Текущее состояние (IDLE если контекст не существует)
         """
-        context = self._contexts.get(session_id)
-        if not context:
-            return FSMState.IDLE
-        
+        context = await self.get_or_create_context(session_id)
         return context.current_state
     
     async def transition(
@@ -98,7 +156,7 @@ class FSMOrchestrator:
             >>> print(new_state)  # FSMState.CLASSIFY
         """
         # Получить или создать контекст
-        context = self.get_or_create_context(session_id)
+        context = await self.get_or_create_context(session_id)
         
         # Запомнить старое состояние для логирования
         old_state = context.current_state
@@ -129,9 +187,21 @@ class FSMOrchestrator:
             f"(event: {event.value})"
         )
         
+        # Save to DB if repository available
+        if self._repository:
+            try:
+                await self._repository.save_state(
+                    session_id=session_id,
+                    current_state=new_state,
+                    metadata=context.metadata
+                )
+                logger.debug(f"Saved FSM state to DB for session {session_id}")
+            except Exception as e:
+                logger.warning(f"Failed to save FSM state to DB: {e}")
+        
         return new_state
     
-    def validate_transition(
+    async def validate_transition(
         self,
         session_id: str,
         event: FSMEvent
@@ -146,10 +216,10 @@ class FSMOrchestrator:
         Returns:
             True если переход допустим
         """
-        context = self.get_or_create_context(session_id)
+        context = await self.get_or_create_context(session_id)
         return context.can_transition(event)
     
-    def reset(self, session_id: str) -> None:
+    async def reset(self, session_id: str) -> None:
         """
         Сбросить FSM в начальное состояние.
         
@@ -164,23 +234,42 @@ class FSMOrchestrator:
                 f"FSM reset for session {session_id}: "
                 f"{old_state.value} -> {FSMState.IDLE.value}"
             )
+            
+            # Save to DB if repository available
+            if self._repository:
+                try:
+                    await self._repository.save_state(
+                        session_id=session_id,
+                        current_state=FSMState.IDLE,
+                        metadata=context.metadata
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to save reset FSM state to DB: {e}")
         else:
             logger.debug(f"No FSM context to reset for session {session_id}")
     
-    def remove_context(self, session_id: str) -> None:
+    async def remove_context(self, session_id: str) -> None:
         """
         Удалить контекст FSM для сессии.
         
-        Используется при завершении сессии для освобождения памяти.
+        Используется при завершении сессии для освобождения памяти и БД.
         
         Args:
             session_id: ID сессии
         """
         if session_id in self._contexts:
             del self._contexts[session_id]
-            logger.debug(f"Removed FSM context for session {session_id}")
+            logger.debug(f"Removed FSM context from memory for session {session_id}")
+        
+        # Delete from DB if repository available
+        if self._repository:
+            try:
+                await self._repository.delete_state(session_id)
+                logger.debug(f"Deleted FSM state from DB for session {session_id}")
+            except Exception as e:
+                logger.warning(f"Failed to delete FSM state from DB: {e}")
     
-    def get_context_metadata(self, session_id: str) -> Dict:
+    async def get_context_metadata(self, session_id: str) -> Dict:
         """
         Получить metadata контекста.
         
@@ -190,13 +279,10 @@ class FSMOrchestrator:
         Returns:
             Словарь с metadata (пустой если контекст не существует)
         """
-        context = self._contexts.get(session_id)
-        if not context:
-            return {}
-        
+        context = await self.get_or_create_context(session_id)
         return context.metadata.copy()
     
-    def set_context_metadata(
+    async def set_context_metadata(
         self,
         session_id: str,
         key: str,
@@ -210,9 +296,16 @@ class FSMOrchestrator:
             key: Ключ metadata
             value: Значение
         """
-        context = self.get_or_create_context(session_id)
+        context = await self.get_or_create_context(session_id)
         context.metadata[key] = value
         logger.debug(f"Set FSM metadata for session {session_id}: {key}={value}")
+        
+        # Save to DB if repository available
+        if self._repository:
+            try:
+                await self._repository.update_metadata(session_id, {key: value})
+            except Exception as e:
+                logger.warning(f"Failed to save FSM metadata to DB: {e}")
     
     def get_all_contexts(self) -> Dict[str, FSMContext]:
         """
