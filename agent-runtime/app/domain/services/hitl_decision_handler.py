@@ -84,7 +84,7 @@ class HITLDecisionHandler:
         Raises:
             ValueError: Если решение невалидно или pending state не найден
         """
-        from ...models.hitl_models import HITLDecision
+        from ..entities.hitl import HITLDecision
         
         logger.info(
             f"Обработка HITL решения для сессии {session_id}: "
@@ -187,7 +187,7 @@ class HITLDecisionHandler:
         Returns:
             Словарь с результатом решения
         """
-        from ...models.hitl_models import HITLDecision
+        from ..entities.hitl import HITLDecision
         
         if decision_enum == HITLDecision.APPROVE:
             # Выполнить инструмент с оригинальными аргументами
