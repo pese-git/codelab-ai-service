@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 
 from app.api.v1.endpoints import router as v1_router
-from app.core.config import AppConfig
+from app.core.config import config
 from app.middleware.internal_auth import InternalAuthMiddleware
 from app.middleware.jwt_auth import HybridAuthMiddleware
 from app.models.rest import HealthResponse
@@ -14,7 +14,7 @@ app = FastAPI(title="Gateway Service")
 async def health_check():
     """Health check endpoint в корне приложения для Docker healthcheck"""
     return HealthResponse.model_construct(
-        status="healthy", service="gateway", version=AppConfig.VERSION
+        status="healthy", service="gateway", version=config.version
     )
 
 
@@ -59,15 +59,14 @@ def custom_openapi():
 app.openapi = custom_openapi  # type: ignore[assignment]
 
 # Подключение middleware авторизации
-config = AppConfig()
-if config.USE_JWT_AUTH:
+if config.use_jwt_auth:
     # Use hybrid middleware (JWT + X-Internal-Auth)
     app.add_middleware(
         HybridAuthMiddleware,
-        jwks_url=config.JWKS_URL,
-        issuer=config.JWT_ISSUER,
-        audience=config.JWT_AUDIENCE,
-        internal_api_key=config.INTERNAL_API_KEY,
+        jwks_url=config.jwks_url,
+        issuer=config.jwt_issuer,
+        audience=config.jwt_audience,
+        internal_api_key=config.internal_api_key,
     )
 else:
     # Use only X-Internal-Auth (legacy)

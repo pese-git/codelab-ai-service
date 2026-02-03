@@ -12,6 +12,7 @@ dependencies = [
     "python-dotenv==1.0.0",
     "httpx==0.25.1",
     "pydantic==2.5.1",
+    "pydantic-settings==2.1.0",
     "sse-starlette==1.6.5",
     "python-jose[cryptography]==3.3.0",
 ]
