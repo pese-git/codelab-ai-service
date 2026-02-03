@@ -1,45 +1,11 @@
-import json
+"""
+Старые интеграционные тесты удалены.
 
-import httpx
-import pytest
-import websockets
+Новые интеграционные тесты находятся в:
+- test_websocket_integration.py - WebSocket protocol тесты
+- test_proxy_endpoints_integration.py - REST endpoints тесты
 
+Эти тесты не требуют запущенного сервера и используют моки.
+"""
 
-@pytest.mark.asyncio
-async def test_health():
-    async with httpx.AsyncClient() as client:
-        r = await client.get("http://localhost:8000/health")
-        assert r.status_code == 200
-        data = r.json()
-        assert data["status"] == "healthy"
-        assert data["service"] == "gateway"
-
-
-@pytest.mark.asyncio
-async def test_gateway_websocket_stream():
-    session_id = "test_py_gateway"
-    uri = f"ws://localhost:8000/ws/{session_id}"
-    async with websockets.connect(uri) as ws:
-        await ws.send(json.dumps({"type": "user_message", "content": "pytest streaming websocket"}))
-        tokens, got_final = [], False
-        while True:
-            msg = json.loads(await ws.recv())
-            if msg.get("type") == "assistant_message":
-                tokens.append(msg.get("token", ""))
-                if msg.get("is_final"):
-                    got_final = True
-                    break
-    assert any(t and t.strip() for t in tokens if t is not None)
-    assert got_final
-
-
-@pytest.mark.asyncio
-async def test_gateway_websocket_error():
-    # Отправляем некорректный JSON — ожидаем ошибку
-    session_id = "test_py_gateway_err"
-    uri = f"ws://localhost:8000/ws/{session_id}"
-    async with websockets.connect(uri) as ws:
-        await ws.send("not a json")
-        msg = json.loads(await ws.recv())
-        assert msg.get("type") == "error"
-        assert "Invalid JSON message" in msg.get("content")
+# Файл оставлен для обратной совместимости, но может быть удален
