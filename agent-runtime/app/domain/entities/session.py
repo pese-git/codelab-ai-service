@@ -289,6 +289,121 @@ class Session(Entity):
         """
         return (self.last_activity - self.created_at).total_seconds()
     
+    def create_snapshot(self) -> Dict[str, Any]:
+        """
+        Создать snapshot текущего состояния сессии.
+        
+        Snapshot содержит полную копию сообщений и метаданных.
+        Используется для изоляции контекста между subtasks:
+        - Сохраняет базовую историю перед subtask
+        - Позволяет восстановить чистое состояние после subtask
+        
+        Returns:
+            Словарь с snapshot данными
+            
+        Пример:
+            >>> snapshot = session.create_snapshot()
+            >>> len(snapshot['messages']) == len(session.messages)
+            True
+        """
+        return {
+            "messages": [msg.model_dump() for msg in self.messages],
+            "metadata": self.metadata.copy(),
+            "title": self.title,
+            "description": self.description,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "message_count": len(self.messages)
+        }
+    
+    def restore_from_snapshot(self, snapshot: Dict[str, Any]) -> None:
+        """
+        Восстановить состояние сессии из snapshot.
+        
+        Заменяет текущие сообщения и метаданные данными из snapshot.
+        Используется после выполнения subtask для восстановления
+        базовой истории без tool_call/tool_result.
+        
+        Args:
+            snapshot: Snapshot данные из create_snapshot()
+            
+        Пример:
+            >>> snapshot = session.create_snapshot()
+            >>> session.add_message(Message(...))  # изменения
+            >>> session.restore_from_snapshot(snapshot)
+            >>> # Состояние восстановлено
+        """
+        # Восстановить сообщения
+        self.messages = [
+            Message(**msg_dict)
+            for msg_dict in snapshot["messages"]
+        ]
+        
+        # Восстановить метаданные
+        self.metadata = snapshot.get("metadata", {}).copy()
+        
+        # Восстановить title и description если есть
+        if "title" in snapshot:
+            self.title = snapshot["title"]
+        if "description" in snapshot:
+            self.description = snapshot["description"]
+        
+        self.mark_updated()
+    
+    def clear_tool_messages(self) -> int:
+        """
+        Очистить tool-related messages из сессии.
+        
+        Удаляет assistant messages с tool_calls и tool result messages.
+        Сохраняет user, system и обычные assistant messages.
+        
+        Используется для изоляции контекста между subtasks:
+        - Убирает tool_call_id от предыдущих subtasks
+        - Предотвращает LiteLLM 403 ошибки дублирования
+        
+        Returns:
+            Количество удаленных сообщений
+            
+        Пример:
+            >>> count = session.clear_tool_messages()
+            >>> # Все tool_call и tool_result удалены
+        """
+        original_count = len(self.messages)
+        
+        self.messages = [
+            msg for msg in self.messages
+            if not (
+                (msg.role == "assistant" and msg.tool_calls) or
+                msg.role == "tool"
+            )
+        ]
+        
+        removed_count = original_count - len(self.messages)
+        
+        if removed_count > 0:
+            self.mark_updated()
+        
+        return removed_count
+    
+    def get_last_assistant_message(self) -> Optional[Message]:
+        """
+        Получить последнее assistant message без tool_calls.
+        
+        Полезно для сохранения результата subtask после
+        очистки tool messages.
+        
+        Returns:
+            Последнее assistant message или None
+            
+        Пример:
+            >>> last_msg = session.get_last_assistant_message()
+            >>> if last_msg and not last_msg.tool_calls:
+            ...     print(last_msg.content)
+        """
+        for msg in reversed(self.messages):
+            if msg.role == "assistant" and not msg.tool_calls:
+                return msg
+        return None
+    
     def __repr__(self) -> str:
         """Строковое представление сессии"""
         title_preview = self.title[:30] + "..." if self.title and len(self.title) > 30 else self.title

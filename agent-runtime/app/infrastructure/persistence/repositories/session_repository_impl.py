@@ -5,7 +5,7 @@
 """
 
 import logging
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, delete
@@ -29,11 +29,16 @@ class SessionRepositoryImpl(SessionRepository):
     Атрибуты:
         _db: Сессия БД
         _mapper: Маппер для преобразований
+        _snapshots: In-memory хранилище snapshots (TODO: заменить на Redis)
     
     Пример:
         >>> repository = SessionRepositoryImpl(db_session)
         >>> session = await repository.find_by_id("session-1")
     """
+    
+    # Class-level хранилище snapshots (shared между instances)
+    # TODO: Заменить на Redis для production
+    _snapshots: Dict[str, Dict[str, Any]] = {}
     
     def __init__(self, db: AsyncSession):
         """
@@ -440,3 +445,91 @@ class SessionRepositoryImpl(SessionRepository):
         except Exception as e:
             logger.error(f"Error counting active sessions: {e}")
             return 0
+    
+    async def save_snapshot(
+        self,
+        snapshot_id: str,
+        snapshot: Dict[str, Any]
+    ) -> None:
+        """
+        Сохранить snapshot сессии в in-memory хранилище.
+        
+        Args:
+            snapshot_id: Уникальный ID snapshot
+            snapshot: Данные snapshot
+        """
+        try:
+            # Добавить timestamp для возможной очистки старых snapshots
+            snapshot_with_meta = {
+                **snapshot,
+                "_saved_at": datetime.now(timezone.utc).isoformat()
+            }
+            
+            SessionRepositoryImpl._snapshots[snapshot_id] = snapshot_with_meta
+            
+            logger.debug(
+                f"Saved snapshot {snapshot_id} "
+                f"(messages: {snapshot.get('message_count', 0)})"
+            )
+            
+        except Exception as e:
+            logger.error(f"Error saving snapshot {snapshot_id}: {e}")
+            raise RepositoryError(
+                operation="save_snapshot",
+                entity_type="SessionSnapshot",
+                reason=str(e),
+                details={"snapshot_id": snapshot_id}
+            )
+    
+    async def get_snapshot(
+        self,
+        snapshot_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Получить snapshot сессии из in-memory хранилища.
+        
+        Args:
+            snapshot_id: Уникальный ID snapshot
+            
+        Returns:
+            Данные snapshot или None
+        """
+        try:
+            snapshot = SessionRepositoryImpl._snapshots.get(snapshot_id)
+            
+            if snapshot:
+                logger.debug(f"Retrieved snapshot {snapshot_id}")
+            else:
+                logger.warning(f"Snapshot {snapshot_id} not found")
+            
+            return snapshot
+            
+        except Exception as e:
+            logger.error(f"Error getting snapshot {snapshot_id}: {e}")
+            return None
+    
+    async def delete_snapshot(
+        self,
+        snapshot_id: str
+    ) -> bool:
+        """
+        Удалить snapshot сессии из in-memory хранилища.
+        
+        Args:
+            snapshot_id: Уникальный ID snapshot
+            
+        Returns:
+            True если удален, False если не найден
+        """
+        try:
+            if snapshot_id in SessionRepositoryImpl._snapshots:
+                del SessionRepositoryImpl._snapshots[snapshot_id]
+                logger.debug(f"Deleted snapshot {snapshot_id}")
+                return True
+            else:
+                logger.warning(f"Snapshot {snapshot_id} not found for deletion")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error deleting snapshot {snapshot_id}: {e}")
+            return False

@@ -7,7 +7,7 @@
 
 import uuid
 import logging
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 
 from ..entities.session import Session
@@ -363,3 +363,186 @@ class SessionManagementService:
         logger.info(f"Очищено {count} старых сессий (старше {max_age_hours} часов)")
         
         return count
+    
+    async def create_subtask_context(
+        self,
+        session_id: str,
+        subtask_id: str,
+        dependency_results: Dict[str, Any]
+    ) -> str:
+        """
+        Создать изолированный контекст для выполнения subtask.
+        
+        Процесс:
+        1. Сохранить snapshot текущей истории сессии
+        2. Очистить tool-related messages (tool_call и tool_result)
+        3. Добавить результаты зависимостей как system message
+        
+        Это обеспечивает изоляцию между subtasks и предотвращает
+        дублирование tool_call_id, которое вызывает LiteLLM 403 ошибки.
+        
+        Args:
+            session_id: ID основной сессии
+            subtask_id: ID subtask для изоляции
+            dependency_results: Результаты зависимостей subtask
+            
+        Returns:
+            snapshot_id для восстановления после subtask
+            
+        Пример:
+            >>> snapshot_id = await service.create_subtask_context(
+            ...     session_id="session-123",
+            ...     subtask_id="subtask-1",
+            ...     dependency_results={"subtask-0": {"result": "..."}}
+            ... )
+        """
+        session = await self.get_session(session_id)
+        
+        # 1. Создать snapshot текущего состояния
+        snapshot_id = f"{session_id}_snapshot_{subtask_id}"
+        snapshot = session.create_snapshot()
+        await self._repository.save_snapshot(snapshot_id, snapshot)
+        
+        logger.info(
+            f"Created snapshot {snapshot_id} "
+            f"(messages: {snapshot.get('message_count', 0)})"
+        )
+        
+        # 2. Очистить tool-related messages
+        cleared_count = session.clear_tool_messages()
+        
+        logger.info(
+            f"Cleared {cleared_count} tool messages from session {session_id} "
+            f"for subtask {subtask_id}"
+        )
+        
+        # 3. Добавить dependency results как system context
+        if dependency_results:
+            context_message = self._format_dependency_context(dependency_results)
+            await self.add_message(
+                session_id=session_id,
+                role="system",
+                content=context_message
+            )
+            
+            logger.debug(
+                f"Added dependency context for subtask {subtask_id} "
+                f"({len(dependency_results)} dependencies)"
+            )
+        
+        # Сохранить изменения
+        await self._repository.save(session)
+        
+        logger.info(
+            f"Subtask context created for {subtask_id} "
+            f"(snapshot: {snapshot_id}, remaining messages: {len(session.messages)})"
+        )
+        
+        return snapshot_id
+    
+    async def restore_from_snapshot(
+        self,
+        session_id: str,
+        snapshot_id: str,
+        preserve_last_result: bool = True
+    ) -> None:
+        """
+        Восстановить сессию из snapshot после выполнения subtask.
+        
+        Процесс:
+        1. Получить snapshot
+        2. Опционально сохранить последний assistant message (результат subtask)
+        3. Восстановить базовую историю из snapshot
+        4. Добавить сохраненный результат обратно
+        5. Удалить snapshot
+        
+        Args:
+            session_id: ID сессии
+            snapshot_id: ID snapshot для восстановления
+            preserve_last_result: Сохранить последний assistant message
+            
+        Пример:
+            >>> await service.restore_from_snapshot(
+            ...     session_id="session-123",
+            ...     snapshot_id="session-123_snapshot_subtask-1",
+            ...     preserve_last_result=True
+            ... )
+        """
+        session = await self.get_session(session_id)
+        snapshot = await self._repository.get_snapshot(snapshot_id)
+        
+        if not snapshot:
+            logger.warning(
+                f"Snapshot {snapshot_id} not found, skipping restore "
+                f"for session {session_id}"
+            )
+            return
+        
+        # 1. Сохранить последний результат если нужно
+        last_result = None
+        if preserve_last_result:
+            last_result = session.get_last_assistant_message()
+            if last_result:
+                logger.debug(
+                    f"Preserved last assistant message "
+                    f"(length: {len(last_result.content)})"
+                )
+        
+        # 2. Восстановить из snapshot
+        session.restore_from_snapshot(snapshot)
+        
+        logger.info(
+            f"Restored session {session_id} from snapshot {snapshot_id} "
+            f"(messages: {len(session.messages)})"
+        )
+        
+        # 3. Добавить последний результат обратно
+        if last_result:
+            session.add_message(last_result)
+            logger.debug(
+                f"Re-added last assistant message to session {session_id}"
+            )
+        
+        # 4. Сохранить изменения
+        await self._repository.save(session)
+        
+        # 5. Удалить snapshot
+        await self._repository.delete_snapshot(snapshot_id)
+        
+        logger.info(
+            f"Session {session_id} restored and snapshot {snapshot_id} deleted "
+            f"(final messages: {len(session.messages)})"
+        )
+    
+    def _format_dependency_context(
+        self,
+        dependency_results: Dict[str, Any]
+    ) -> str:
+        """
+        Форматировать результаты зависимостей в system message.
+        
+        Преобразует результаты предыдущих subtasks в читаемый
+        контекст для текущей subtask.
+        
+        Args:
+            dependency_results: Словарь с результатами зависимостей
+            
+        Returns:
+            Отформатированный текст для system message
+            
+        Пример:
+            >>> context = service._format_dependency_context({
+            ...     "subtask-1": {
+            ...         "description": "Create file",
+            ...         "result": "File created successfully"
+            ...     }
+            ... })
+        """
+        lines = ["Previous subtask results:"]
+        
+        for dep_id, result in dependency_results.items():
+            lines.append(f"\n## Subtask: {result.get('description', dep_id)}")
+            lines.append(f"Agent: {result.get('agent', 'unknown')}")
+            lines.append(f"Result: {result.get('result', 'No result')}")
+        
+        return "\n".join(lines)

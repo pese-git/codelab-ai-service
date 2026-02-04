@@ -118,6 +118,22 @@ class SubtaskExecutor:
         subtask.start()
         await self.plan_repository.save(plan)
         
+        # Подготовить контекст для агента
+        context = self._prepare_agent_context(subtask, plan)
+        
+        # ✅ НОВОЕ: Создать изолированный контекст для subtask
+        # Это предотвращает дублирование tool_call_id между subtasks
+        snapshot_id = await session_service.create_subtask_context(
+            session_id=session_id,
+            subtask_id=subtask_id,
+            dependency_results=context.get("dependencies", {})
+        )
+        
+        logger.info(
+            f"Created isolated context for subtask {subtask_id} "
+            f"(snapshot: {snapshot_id})"
+        )
+        
         try:
             # Получить целевого агента
             agent = self._get_agent_for_subtask(subtask)
@@ -126,13 +142,10 @@ class SubtaskExecutor:
                 f"Routing subtask {subtask_id} to {subtask.agent.value} agent"
             )
             
-            # Получить сессию
+            # Получить сессию (уже с очищенной историей)
             session = await session_service.get_session(session_id)
             if not session:
                 raise SubtaskExecutionError(f"Session {session_id} not found")
-            
-            # Подготовить контекст для агента
-            context = self._prepare_agent_context(subtask, plan)
             
             # Выполнить подзадачу через агента
             result_chunks = []
@@ -229,7 +242,7 @@ class SubtaskExecutor:
                     },
                     is_final=True
                 )
-            
+        
         except Exception as e:
             logger.error(
                 f"Error executing subtask {subtask_id}: {e}",
@@ -264,6 +277,27 @@ class SubtaskExecutor:
                 },
                 is_final=True
             )
+        
+        finally:
+            # ✅ НОВОЕ: Восстановить сессию из snapshot
+            # Это восстанавливает базовую историю и сохраняет результат subtask
+            try:
+                await session_service.restore_from_snapshot(
+                    session_id=session_id,
+                    snapshot_id=snapshot_id,
+                    preserve_last_result=True
+                )
+                
+                logger.info(
+                    f"Restored session {session_id} from snapshot {snapshot_id} "
+                    f"after subtask {subtask_id}"
+                )
+            except Exception as restore_error:
+                logger.error(
+                    f"Error restoring snapshot {snapshot_id}: {restore_error}",
+                    exc_info=True
+                )
+                # Не прерываем выполнение, так как subtask уже завершена
     
     def _get_agent_for_subtask(self, subtask: Subtask):
         """

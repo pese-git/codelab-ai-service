@@ -5,7 +5,7 @@
 """
 
 from abc import abstractmethod
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 
 from .base import Repository
@@ -138,5 +138,69 @@ class SessionRepository(Repository[Session]):
         Пример:
             >>> active_count = await repository.count_active()
             >>> print(f"Active sessions: {active_count}")
+        """
+        pass
+    
+    @abstractmethod
+    async def save_snapshot(
+        self,
+        snapshot_id: str,
+        snapshot: Dict[str, Any]
+    ) -> None:
+        """
+        Сохранить snapshot сессии.
+        
+        Snapshot используется для изоляции контекста между subtasks.
+        Хранится временно (in-memory или Redis) для быстрого доступа.
+        
+        Args:
+            snapshot_id: Уникальный ID snapshot
+            snapshot: Данные snapshot из session.create_snapshot()
+            
+        Пример:
+            >>> snapshot = session.create_snapshot()
+            >>> await repository.save_snapshot("session-123_snapshot_subtask-1", snapshot)
+        """
+        pass
+    
+    @abstractmethod
+    async def get_snapshot(
+        self,
+        snapshot_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Получить snapshot сессии.
+        
+        Args:
+            snapshot_id: Уникальный ID snapshot
+            
+        Returns:
+            Данные snapshot или None если не найден
+            
+        Пример:
+            >>> snapshot = await repository.get_snapshot("session-123_snapshot_subtask-1")
+            >>> if snapshot:
+            ...     session.restore_from_snapshot(snapshot)
+        """
+        pass
+    
+    @abstractmethod
+    async def delete_snapshot(
+        self,
+        snapshot_id: str
+    ) -> bool:
+        """
+        Удалить snapshot сессии.
+        
+        Вызывается после успешного восстановления или при ошибке.
+        
+        Args:
+            snapshot_id: Уникальный ID snapshot
+            
+        Returns:
+            True если snapshot был удален, False если не найден
+            
+        Пример:
+            >>> deleted = await repository.delete_snapshot("session-123_snapshot_subtask-1")
         """
         pass
