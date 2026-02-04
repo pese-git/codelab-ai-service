@@ -119,10 +119,16 @@ class AgentSwitchHelper:
         confidence: str = "medium"
     ) -> AgentContext:
         """
-        Выполнить переключение агента.
+        Выполнить переключение агента с селективной очисткой контекста.
         
-        Делегирует переключение AgentOrchestrationService и возвращает
-        обновленный контекст агента.
+        Процесс:
+        1. Получить текущий контекст агента
+        2. Подготовить контекст сессии (очистить tool messages)
+        3. Выполнить переключение через AgentOrchestrationService
+        4. Вернуть обновленный контекст
+        
+        Селективная очистка предотвращает дублирование tool_call_id
+        между агентами и сохраняет результаты работы.
         
         Args:
             session_id: ID сессии
@@ -138,6 +144,41 @@ class AgentSwitchHelper:
             f"target={target_agent.value}, reason={reason}, confidence={confidence}"
         )
         
+        # 1. Получить текущий контекст для определения from_agent
+        try:
+            current_context = await self._agent_service.get_or_create_context(
+                session_id=session_id,
+                initial_agent=AgentType.ORCHESTRATOR
+            )
+            from_agent = current_context.current_agent.value
+        except Exception as e:
+            logger.warning(
+                f"Не удалось получить текущий контекст для {session_id}: {e}, "
+                "используем 'unknown' как from_agent"
+            )
+            from_agent = "unknown"
+        
+        # 2. Подготовить контекст сессии (селективная очистка tool messages)
+        try:
+            cleanup_info = await self._session_service.prepare_agent_switch_context(
+                session_id=session_id,
+                from_agent=from_agent,
+                to_agent=target_agent.value
+            )
+            
+            logger.info(
+                f"Session context prepared for agent switch: "
+                f"removed {cleanup_info['removed_count']} tool messages, "
+                f"preserved result: {bool(cleanup_info.get('preserved_result'))}"
+            )
+        except Exception as e:
+            logger.error(
+                f"Ошибка при подготовке контекста сессии для переключения: {e}",
+                exc_info=True
+            )
+            # Продолжаем переключение даже если очистка не удалась
+        
+        # 3. Выполнить переключение агента
         context = await self._agent_service.switch_agent(
             session_id=session_id,
             target_agent=target_agent,

@@ -404,6 +404,92 @@ class Session(Entity):
                 return msg
         return None
     
+    def clear_tool_messages_with_context(
+        self,
+        from_agent: str,
+        to_agent: str
+    ) -> Dict[str, Any]:
+        """
+        Селективная очистка tool messages при переключении агентов.
+        
+        Выполняет:
+        1. Сохраняет последний assistant message с результатом (если есть)
+        2. Очищает tool_calls и tool_result messages
+        3. Добавляет system message о переключении агента
+        
+        Это предотвращает дублирование tool_call_id между агентами
+        и сохраняет контекст выполненной работы.
+        
+        Args:
+            from_agent: Исходный агент (для контекста)
+            to_agent: Целевой агент (для контекста)
+            
+        Returns:
+            Словарь с информацией об очистке:
+            - removed_count: количество удаленных сообщений
+            - preserved_result: последний результат (если есть)
+            - context_message: добавленное system сообщение
+            
+        Пример:
+            >>> info = session.clear_tool_messages_with_context(
+            ...     from_agent="orchestrator",
+            ...     to_agent="coder"
+            ... )
+            >>> print(f"Removed {info['removed_count']} tool messages")
+        """
+        # 1. Сохранить последний assistant message без tool_calls
+        last_result = self.get_last_assistant_message()
+        preserved_content = last_result.content if last_result else None
+        
+        # 2. Очистить tool messages (включая assistant messages с tool_calls)
+        removed_count = self.clear_tool_messages()
+        
+        # 3. Создать system message о переключении
+        context_message = (
+            f"Agent switched: {from_agent} → {to_agent}\n"
+            f"Previous context preserved. Tool history cleared to prevent conflicts."
+        )
+        
+        # 4. Добавить context message как system message
+        from datetime import datetime, timezone
+        context_msg = Message(
+            id=str(__import__('uuid').uuid4()),
+            role="system",
+            content=context_message,
+            created_at=datetime.now(timezone.utc)
+        )
+        self.messages.append(context_msg)
+        
+        # 5. Восстановить последний результат если был и он не уже в истории
+        # (clear_tool_messages сохраняет assistant messages без tool_calls)
+        if preserved_content:
+            # Проверить, есть ли уже этот результат в истории
+            has_result = any(
+                msg.role == "assistant" and
+                msg.content == preserved_content and
+                not msg.tool_calls
+                for msg in self.messages
+            )
+            
+            if not has_result:
+                # Создать новый message без tool_calls
+                result_msg = Message(
+                    id=str(__import__('uuid').uuid4()),
+                    role="assistant",
+                    content=preserved_content,
+                    created_at=datetime.now(timezone.utc)
+                )
+                self.messages.append(result_msg)
+        
+        self.mark_updated()
+        
+        return {
+            "removed_count": removed_count,
+            "preserved_result": preserved_content,
+            "context_message": context_message,
+            "final_message_count": len(self.messages)
+        }
+    
     def __repr__(self) -> str:
         """Строковое представление сессии"""
         title_preview = self.title[:30] + "..." if self.title and len(self.title) > 30 else self.title

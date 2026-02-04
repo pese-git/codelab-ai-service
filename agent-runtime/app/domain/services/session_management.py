@@ -514,6 +514,66 @@ class SessionManagementService:
             f"(final messages: {len(session.messages)})"
         )
     
+    async def prepare_agent_switch_context(
+        self,
+        session_id: str,
+        from_agent: str,
+        to_agent: str
+    ) -> Dict[str, Any]:
+        """
+        Подготовить контекст сессии для переключения агента.
+        
+        Выполняет селективную очистку tool messages при переключении
+        агентов вне плана, чтобы:
+        1. Очистить tool_calls и tool_results от предыдущего агента
+        2. Предотвратить дублирование tool_call_id
+        3. Сохранить результаты работы предыдущего агента
+        4. Добавить system message о переключении
+        
+        Это обеспечивает изоляцию контекста между агентами и
+        предотвращает LiteLLM 403 ошибки дублирования.
+        
+        Args:
+            session_id: ID сессии
+            from_agent: Исходный агент
+            to_agent: Целевой агент
+            
+        Returns:
+            Информация об очистке контекста
+            
+        Пример:
+            >>> info = await service.prepare_agent_switch_context(
+            ...     session_id="session-123",
+            ...     from_agent="orchestrator",
+            ...     to_agent="coder"
+            ... )
+            >>> print(f"Cleared {info['removed_count']} tool messages")
+        """
+        session = await self.get_session(session_id)
+        
+        logger.info(
+            f"Preparing agent switch context for session {session_id}: "
+            f"{from_agent} -> {to_agent}"
+        )
+        
+        # Выполнить селективную очистку
+        cleanup_info = session.clear_tool_messages_with_context(
+            from_agent=from_agent,
+            to_agent=to_agent
+        )
+        
+        # Сохранить изменения
+        await self._repository.save(session)
+        
+        logger.info(
+            f"Agent switch context prepared for session {session_id}: "
+            f"removed {cleanup_info['removed_count']} tool messages, "
+            f"preserved result: {bool(cleanup_info['preserved_result'])}, "
+            f"final messages: {cleanup_info['final_message_count']}"
+        )
+        
+        return cleanup_info
+    
     def _format_dependency_context(
         self,
         dependency_results: Dict[str, Any]
