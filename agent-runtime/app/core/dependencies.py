@@ -359,7 +359,8 @@ async def get_tool_result_handler(
     session_service: SessionManagementService = Depends(get_session_management_service),
     agent_service: AgentOrchestrationService = Depends(get_agent_orchestration_service),
     switch_helper = Depends(get_agent_switch_helper),
-    approval_manager = Depends(get_approval_manager)
+    approval_manager = Depends(get_approval_manager),
+    plan_repository = Depends(get_plan_repository)
 ):
     """
     Получить handler результатов инструментов.
@@ -369,9 +370,10 @@ async def get_tool_result_handler(
         agent_service: Сервис оркестрации агентов (инжектируется)
         switch_helper: Helper для переключения агентов (инжектируется)
         approval_manager: Unified approval manager (инжектируется)
+        plan_repository: Plan repository для проверки активных планов (инжектируется)
         
     Returns:
-        ToolResultHandler: Handler результатов инструментов
+        ToolResultHandler: Handler результатов инструментов с resumable execution
     """
     from ..domain.services import ToolResultHandler
     from ..domain.interfaces.stream_handler import IStreamHandler
@@ -401,7 +403,8 @@ async def get_tool_result_handler(
         agent_router=agent_router,
         stream_handler=stream_handler,
         switch_helper=switch_helper,
-        approval_manager=approval_manager  # Передаем approval_manager для удаления pending approvals
+        approval_manager=approval_manager,  # Передаем approval_manager для удаления pending approvals
+        plan_repository=plan_repository  # ✅ НОВОЕ: Для проверки активных планов (resumable execution)
     )
 
 
@@ -410,7 +413,8 @@ async def get_tool_result_handler(
 async def get_hitl_decision_handler(
     approval_manager = Depends(get_approval_manager),
     session_service: SessionManagementService = Depends(get_session_management_service),
-    message_processor = Depends(get_message_processor)
+    message_processor = Depends(get_message_processor),
+    tool_result_handler = Depends(get_tool_result_handler)
 ):
     """
     Получить handler HITL решений.
@@ -419,6 +423,7 @@ async def get_hitl_decision_handler(
         approval_manager: Unified approval manager (инжектируется)
         session_service: Сервис управления сессиями (инжектируется)
         message_processor: Процессор сообщений (инжектируется)
+        tool_result_handler: Handler результатов инструментов (инжектируется)
         
     Returns:
         HITLDecisionHandler: Handler HITL решений
@@ -427,7 +432,8 @@ async def get_hitl_decision_handler(
     return HITLDecisionHandler(
         approval_manager=approval_manager,
         session_service=session_service,
-        message_processor=message_processor
+        message_processor=message_processor,
+        tool_result_handler=tool_result_handler
     )
 
 
@@ -482,16 +488,18 @@ async def get_architect_agent_for_planning(
 
 
 async def get_execution_engine(
-    plan_repository = Depends(get_plan_repository)
+    plan_repository = Depends(get_plan_repository),
+    approval_manager = Depends(get_approval_manager)
 ):
     """
     Получить ExecutionEngine для выполнения планов.
     
     Args:
         plan_repository: Репозиторий планов (инжектируется)
+        approval_manager: Approval manager для HITL (инжектируется)
         
     Returns:
-        ExecutionEngine: Engine для выполнения планов
+        ExecutionEngine: Engine для выполнения планов с State Machine
     """
     from ..domain.services.execution_engine import ExecutionEngine
     from ..domain.services.subtask_executor import SubtaskExecutor
@@ -509,6 +517,7 @@ async def get_execution_engine(
         plan_repository=plan_repository,
         subtask_executor=subtask_executor,
         dependency_resolver=dependency_resolver,
+        approval_manager=approval_manager,  # ✅ НОВОЕ: Передаем ApprovalManager
         max_parallel_tasks=1  # Временно 1 для избежания race condition
     )
 
@@ -646,6 +655,10 @@ async def get_message_orchestration_service(
     tool_result_handler = Depends(get_tool_result_handler),
     hitl_handler = Depends(get_hitl_decision_handler),
     plan_approval_handler = Depends(get_plan_approval_handler),
+    plan_repository = Depends(get_plan_repository),
+    execution_coordinator = Depends(get_execution_coordinator),
+    session_service = Depends(get_session_management_service),
+    approval_manager = Depends(get_approval_manager),
     _option2_init = Depends(ensure_orchestrator_option2_initialized)
 ):
     """
@@ -657,16 +670,39 @@ async def get_message_orchestration_service(
         tool_result_handler: Handler результатов инструментов (инжектируется)
         hitl_handler: Handler HITL решений (инжектируется)
         plan_approval_handler: Handler Plan Approval решений (инжектируется)
+        plan_repository: Repository планов для resumable execution (инжектируется)
+        execution_coordinator: Coordinator для resumable execution (инжектируется)
+        session_service: Session service для execution (инжектируется)
+        approval_manager: Approval manager для stream handler (инжектируется)
         _option2_init: Инициализация Option 2 зависимостей (инжектируется, выполняется один раз)
         
     Returns:
-        MessageOrchestrationService: Доменный сервис (фасад)
+        MessageOrchestrationService: Доменный сервис (фасад) с resumable execution
     """
     from ..domain.services import MessageOrchestrationService
     from ..infrastructure.concurrency import session_lock_manager
+    from ..domain.interfaces.stream_handler import IStreamHandler
+    from .dependencies_llm import (
+        get_llm_client,
+        get_llm_event_publisher,
+        get_tool_registry,
+        get_tool_filter_service,
+        get_llm_response_processor
+    )
+    from ..application.handlers.stream_llm_response_handler import StreamLLMResponseHandler
     
     # Note: _option2_init dependency ensures OrchestratorAgent has planning capabilities
     # before processing any messages. This runs once on first request.
+    
+    # Создать stream handler для resumable execution
+    stream_handler: IStreamHandler = StreamLLMResponseHandler(
+        llm_client=get_llm_client(),
+        tool_filter=get_tool_filter_service(get_tool_registry()),
+        response_processor=get_llm_response_processor(),
+        event_publisher=get_llm_event_publisher(),
+        session_service=session_service,
+        approval_manager=approval_manager
+    )
     
     return MessageOrchestrationService(
         message_processor=message_processor,
@@ -674,7 +710,11 @@ async def get_message_orchestration_service(
         tool_result_handler=tool_result_handler,
         hitl_handler=hitl_handler,
         lock_manager=session_lock_manager,
-        plan_approval_handler=plan_approval_handler
+        plan_approval_handler=plan_approval_handler,
+        plan_repository=plan_repository,  # ✅ НОВОЕ: Для resumable execution
+        execution_coordinator=execution_coordinator,  # ✅ НОВОЕ: Для resumable execution
+        session_service=session_service,  # ✅ НОВОЕ: Для execution
+        stream_handler=stream_handler  # ✅ НОВОЕ: Для execution
     )
 
 

@@ -57,7 +57,11 @@ class MessageOrchestrationService:
         tool_result_handler,  # ToolResultHandler
         hitl_handler,  # HITLDecisionHandler
         lock_manager,  # SessionLockManager
-        plan_approval_handler=None  # PlanApprovalHandler (optional)
+        plan_approval_handler=None,  # PlanApprovalHandler (optional)
+        plan_repository=None,  # PlanRepository (optional)
+        execution_coordinator=None,  # ExecutionCoordinator (optional)
+        session_service=None,  # SessionManagementService (optional)
+        stream_handler=None  # IStreamHandler (optional)
     ):
         """
         Инициализация сервиса-фасада.
@@ -69,6 +73,10 @@ class MessageOrchestrationService:
             hitl_handler: Handler HITL решений
             lock_manager: Менеджер блокировок сессий
             plan_approval_handler: Handler Plan Approval решений (опционально)
+            plan_repository: Repository для поиска активных планов (опционально)
+            execution_coordinator: Coordinator для продолжения execution (опционально)
+            session_service: Session service для execution (опционально)
+            stream_handler: Stream handler для execution (опционально)
         """
         self._message_processor = message_processor
         self._agent_switcher = agent_switcher
@@ -76,10 +84,15 @@ class MessageOrchestrationService:
         self._hitl_handler = hitl_handler
         self._plan_approval_handler = plan_approval_handler
         self._lock_manager = lock_manager
+        self._plan_repository = plan_repository
+        self._execution_coordinator = execution_coordinator
+        self._session_service = session_service
+        self._stream_handler = stream_handler
         
         logger.info(
             f"MessageOrchestrationService (фасад) инициализирован "
-            f"(plan_approval={'yes' if plan_approval_handler else 'no'})"
+            f"(plan_approval={'yes' if plan_approval_handler else 'no'}, "
+            f"resumable_execution={'yes' if (plan_repository and execution_coordinator) else 'no'})"
         )
     
     async def process_message(
@@ -229,6 +242,7 @@ class MessageOrchestrationService:
         )
         
         # Делегировать в ToolResultHandler с блокировкой сессии
+        # ToolResultHandler проверит активный план и пропустит agent.process() если нужно
         async with self._lock_manager.lock(session_id):
             async for chunk in self._tool_result_handler.handle(
                 session_id=session_id,
@@ -237,6 +251,30 @@ class MessageOrchestrationService:
                 error=error
             ):
                 yield chunk
+            
+            # ✅ НОВОЕ: После обработки tool_result проверить активный plan
+            # Если есть IN_PROGRESS plan - продолжить execution (следующая subtask)
+            if self._plan_repository and self._execution_coordinator and self._session_service and self._stream_handler:
+                active_plan = await self._get_active_plan_for_session(session_id)
+                
+                if active_plan:
+                    logger.info(
+                        f"Found active plan {active_plan.id} for session {session_id}, "
+                        f"resuming execution"
+                    )
+                    
+                    # Продолжить execution (следующая subtask)
+                    async for chunk in self._execution_coordinator.execute_plan(
+                        plan_id=active_plan.id,
+                        session_id=session_id,
+                        session_service=self._session_service,
+                        stream_handler=self._stream_handler
+                    ):
+                        yield chunk
+                    
+                    logger.info(f"Plan execution resumed for plan {active_plan.id}")
+                else:
+                    logger.debug(f"No active plan found for session {session_id}")
     
     async def process_hitl_decision(
         self,
@@ -364,3 +402,31 @@ class MessageOrchestrationService:
         )
         
         await self._agent_switcher.reset_to_orchestrator(session_id)
+    
+    async def _get_active_plan_for_session(self, session_id: str):
+        """
+        Получить активный plan для сессии.
+        
+        Args:
+            session_id: ID сессии
+            
+        Returns:
+            Plan со статусом IN_PROGRESS или None
+        """
+        from ..entities.plan import PlanStatus
+        
+        try:
+            # Использовать существующий метод find_by_session_id
+            # Он возвращает последний план в статусе IN_PROGRESS или APPROVED
+            plan = await self._plan_repository.find_by_session_id(session_id)
+            
+            if plan and plan.status == PlanStatus.IN_PROGRESS:
+                logger.debug(f"Found active plan {plan.id} for session {session_id}")
+                return plan
+            else:
+                logger.debug(f"No active plan (IN_PROGRESS) found for session {session_id}")
+                return None
+            
+        except Exception as e:
+            logger.warning(f"Error finding active plan: {e}")
+            return None

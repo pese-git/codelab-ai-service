@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from .helpers.agent_switch_helper import AgentSwitchHelper
     from ..interfaces.stream_handler import IStreamHandler
     from .approval_management import ApprovalManager
+    from ...infrastructure.repositories.plan_repository import PlanRepository
 
 logger = logging.getLogger("agent-runtime.domain.tool_result_handler")
 
@@ -29,6 +30,7 @@ class ToolResultHandler:
     - Продолжение обработки с текущим агентом
     - Обработка переключений агента при tool_result
     - Извлечение последнего user message для нового агента
+    - Пропуск agent.process() если есть активный план (resumable execution)
     
     Атрибуты:
         _session_service: Сервис управления сессиями
@@ -37,6 +39,7 @@ class ToolResultHandler:
         _stream_handler: Handler для стриминга LLM ответов
         _switch_helper: Helper для переключения агентов
         _approval_manager: Unified approval manager
+        _plan_repository: Repository для проверки активных планов (опционально)
     """
     
     def __init__(
@@ -46,7 +49,8 @@ class ToolResultHandler:
         agent_router,  # AgentRouter
         stream_handler: Optional["IStreamHandler"],
         switch_helper: "AgentSwitchHelper",
-        approval_manager: Optional["ApprovalManager"] = None
+        approval_manager: Optional["ApprovalManager"] = None,
+        plan_repository: Optional["PlanRepository"] = None
     ):
         """
         Инициализация handler.
@@ -58,6 +62,7 @@ class ToolResultHandler:
             stream_handler: Handler для стриминга LLM ответов
             switch_helper: Helper для переключения агентов
             approval_manager: Unified approval manager для удаления pending approvals
+            plan_repository: Repository для проверки активных планов (опционально)
         """
         self._session_service = session_service
         self._agent_service = agent_service
@@ -65,10 +70,12 @@ class ToolResultHandler:
         self._stream_handler = stream_handler
         self._switch_helper = switch_helper
         self._approval_manager = approval_manager
+        self._plan_repository = plan_repository
         
         logger.debug(
             f"ToolResultHandler инициализирован с stream_handler={stream_handler is not None}, "
-            f"approval_manager={approval_manager is not None}"
+            f"approval_manager={approval_manager is not None}, "
+            f"plan_repository={plan_repository is not None}"
         )
     
     async def handle(
@@ -165,6 +172,20 @@ class ToolResultHandler:
             f"call_id={call_id}, has_error={error is not None}, "
             f"продолжаем обработку с агентом {context.current_agent.value}"
         )
+        
+        # ✅ КРИТИЧЕСКОЕ: Проверить активный план перед вызовом agent.process()
+        # Если есть IN_PROGRESS план, НЕ вызываем agent.process(), так как
+        # MessageOrchestrationService продолжит execution через ExecutionCoordinator
+        # Это предотвращает переключение агента и дублирование обработки
+        if self._plan_repository:
+            active_plan = await self._get_active_plan_for_session(session_id)
+            if active_plan:
+                logger.info(
+                    f"⚠️ Найден активный план {active_plan.id} для сессии {session_id}. "
+                    f"Пропускаем agent.process() - execution продолжится через ExecutionCoordinator"
+                )
+                # Возвращаем пустой генератор - обработка продолжится в MessageOrchestrationService
+                return
         
         # Получить текущего агента и продолжить обработку
         current_agent = self._agent_router.get_agent(context.current_agent)
@@ -264,3 +285,31 @@ class ToolResultHandler:
                 for switch in context.switch_history
             ]
         }
+    
+    async def _get_active_plan_for_session(self, session_id: str):
+        """
+        Получить активный план для сессии.
+        
+        Args:
+            session_id: ID сессии
+            
+        Returns:
+            Plan со статусом IN_PROGRESS или None
+        """
+        from ..entities.plan import PlanStatus
+        
+        try:
+            # Использовать существующий метод find_by_session_id
+            # Он возвращает последний план в статусе IN_PROGRESS или APPROVED
+            plan = await self._plan_repository.find_by_session_id(session_id)
+            
+            if plan and plan.status == PlanStatus.IN_PROGRESS:
+                logger.debug(f"Found active plan {plan.id} for session {session_id}")
+                return plan
+            else:
+                logger.debug(f"No active plan (IN_PROGRESS) found for session {session_id}")
+                return None
+            
+        except Exception as e:
+            logger.warning(f"Error finding active plan: {e}")
+            return None
