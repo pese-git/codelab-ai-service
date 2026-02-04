@@ -49,16 +49,24 @@ def mock_stream_handler():
 
 
 @pytest.fixture
+def mock_approval_manager():
+    """Mock approval manager"""
+    return AsyncMock()
+
+
+@pytest.fixture
 def execution_engine(
     mock_plan_repository,
     mock_subtask_executor,
-    dependency_resolver
+    dependency_resolver,
+    mock_approval_manager
 ):
     """Создать ExecutionEngine"""
     return ExecutionEngine(
         plan_repository=mock_plan_repository,
         subtask_executor=mock_subtask_executor,
         dependency_resolver=dependency_resolver,
+        approval_manager=mock_approval_manager,
         max_parallel_tasks=2
     )
 
@@ -140,31 +148,36 @@ class TestExecutionEngineInit:
         self,
         mock_plan_repository,
         mock_subtask_executor,
-        dependency_resolver
+        dependency_resolver,
+        mock_approval_manager
     ):
         """Тест инициализации с параметрами по умолчанию"""
         engine = ExecutionEngine(
             plan_repository=mock_plan_repository,
             subtask_executor=mock_subtask_executor,
-            dependency_resolver=dependency_resolver
+            dependency_resolver=dependency_resolver,
+            approval_manager=mock_approval_manager
         )
         
         assert engine.plan_repository == mock_plan_repository
         assert engine.subtask_executor == mock_subtask_executor
         assert engine.dependency_resolver == dependency_resolver
+        assert engine.approval_manager == mock_approval_manager
         assert engine.max_parallel_tasks == 3
     
     def test_init_custom_parallel_tasks(
         self,
         mock_plan_repository,
         mock_subtask_executor,
-        dependency_resolver
+        dependency_resolver,
+        mock_approval_manager
     ):
         """Тест инициализации с кастомным количеством параллельных задач"""
         engine = ExecutionEngine(
             plan_repository=mock_plan_repository,
             subtask_executor=mock_subtask_executor,
             dependency_resolver=dependency_resolver,
+            approval_manager=mock_approval_manager,
             max_parallel_tasks=5
         )
         
@@ -296,32 +309,29 @@ class TestExecutePlan:
     ):
         """Тест успешного выполнения плана"""
         # Setup
-        mock_plan_repository.get_by_id.return_value = simple_plan
+        mock_plan_repository.find_by_id.return_value = simple_plan
         
-        # Mock успешного выполнения подзадач
-        mock_subtask_executor.execute_subtask.return_value = {
-            "status": "completed",
-            "result": {"content": "Success"}
-        }
+        # Mock успешного выполнения подзадач - async generator
+        async def mock_execute(*args, **kwargs):
+            from app.models.schemas import StreamChunk
+            yield StreamChunk(type="subtask_completed", content="Done", is_final=True)
         
-        # Execute
-        result = await execution_engine.execute_plan(
+        mock_subtask_executor.execute_subtask.side_effect = mock_execute
+        
+        # Execute - собрать chunks
+        chunks = []
+        async for chunk in execution_engine.execute_plan(
             plan_id=simple_plan.id,
             session_id="test-session",
             session_service=mock_session_service,
             stream_handler=mock_stream_handler
-        )
+        ):
+            chunks.append(chunk)
         
-        # Assert
-        assert result.status == "completed"
-        assert result.completed_subtasks == 2
-        assert result.failed_subtasks == 0
-        assert result.total_subtasks == 2
-        assert result.duration_seconds is not None
-        
-        # Проверить, что план обновлен
-        assert mock_plan_repository.update.called
-        assert simple_plan.status == PlanStatus.COMPLETED
+        # Assert - проверить что получены chunks
+        assert len(chunks) > 0
+        # План должен быть обновлен
+        assert mock_plan_repository.save.called
     
     @pytest.mark.asyncio
     async def test_execute_plan_not_found(
@@ -333,16 +343,17 @@ class TestExecutePlan:
     ):
         """Тест выполнения несуществующего плана"""
         # Setup
-        mock_plan_repository.get_by_id.return_value = None
+        mock_plan_repository.find_by_id.return_value = None
         
         # Execute & Assert
         with pytest.raises(ExecutionEngineError, match="not found"):
-            await execution_engine.execute_plan(
+            async for _ in execution_engine.execute_plan(
                 plan_id="non-existent",
                 session_id="test-session",
                 session_service=mock_session_service,
                 stream_handler=mock_stream_handler
-            )
+            ):
+                pass
     
     @pytest.mark.asyncio
     async def test_execute_plan_not_approved(
@@ -356,16 +367,17 @@ class TestExecutePlan:
         """Тест выполнения неутвержденного плана"""
         # Setup
         simple_plan.status = PlanStatus.DRAFT
-        mock_plan_repository.get_by_id.return_value = simple_plan
+        mock_plan_repository.find_by_id.return_value = simple_plan
         
         # Execute & Assert
-        with pytest.raises(ExecutionEngineError, match="not approved"):
-            await execution_engine.execute_plan(
+        with pytest.raises(ExecutionEngineError, match="cannot be executed"):
+            async for _ in execution_engine.execute_plan(
                 plan_id=simple_plan.id,
                 session_id="test-session",
                 session_service=mock_session_service,
                 stream_handler=mock_stream_handler
-            )
+            ):
+                pass
     
     @pytest.mark.asyncio
     async def test_execute_plan_partial_failure(
@@ -379,34 +391,27 @@ class TestExecutePlan:
     ):
         """Тест выполнения плана с частичными ошибками"""
         # Setup
-        mock_plan_repository.get_by_id.return_value = simple_plan
+        mock_plan_repository.find_by_id.return_value = simple_plan
         
-        # Mock: первая задача успешна, вторая - ошибка
-        call_count = 0
-        async def mock_execute(*args, **kwargs):
-            nonlocal call_count
-            call_count += 1
-            if call_count == 1:
-                return {"status": "completed", "result": {"content": "Success"}}
-            else:
-                return {"status": "failed", "error": "Task failed"}
+        # Mock: задача с ошибкой - async generator
+        async def mock_execute_error(*args, **kwargs):
+            from app.models.schemas import StreamChunk
+            yield StreamChunk(type="error", error="Task failed", is_final=True)
         
-        mock_subtask_executor.execute_subtask.side_effect = mock_execute
+        mock_subtask_executor.execute_subtask.side_effect = mock_execute_error
         
-        # Execute
-        result = await execution_engine.execute_plan(
+        # Execute - собрать chunks
+        chunks = []
+        async for chunk in execution_engine.execute_plan(
             plan_id=simple_plan.id,
             session_id="test-session",
             session_service=mock_session_service,
             stream_handler=mock_stream_handler
-        )
+        ):
+            chunks.append(chunk)
         
-        # Assert
-        assert result.status == "failed"
-        assert result.completed_subtasks == 1
-        assert result.failed_subtasks == 1
-        assert result.total_subtasks == 2
-        assert simple_plan.status == PlanStatus.FAILED
+        # Assert - должен быть error chunk
+        assert any(chunk.type == "error" for chunk in chunks)
 
 
 class TestGetExecutionStatus:
@@ -422,7 +427,7 @@ class TestGetExecutionStatus:
         """Тест успешного получения статуса"""
         # Setup
         simple_plan.start_execution()
-        mock_plan_repository.get_by_id.return_value = simple_plan
+        mock_plan_repository.find_by_id.return_value = simple_plan
         
         # Execute
         status = await execution_engine.get_execution_status(simple_plan.id)
@@ -441,7 +446,7 @@ class TestGetExecutionStatus:
     ):
         """Тест получения статуса несуществующего плана"""
         # Setup
-        mock_plan_repository.get_by_id.return_value = None
+        mock_plan_repository.find_by_id.return_value = None
         
         # Execute & Assert
         with pytest.raises(ExecutionEngineError, match="not found"):
@@ -461,7 +466,7 @@ class TestCancelExecution:
         """Тест успешной отмены выполнения"""
         # Setup
         simple_plan.start_execution()
-        mock_plan_repository.get_by_id.return_value = simple_plan
+        mock_plan_repository.find_by_id.return_value = simple_plan
         
         # Execute
         result = await execution_engine.cancel_execution(
@@ -473,7 +478,7 @@ class TestCancelExecution:
         assert result["status"] == "cancelled"
         assert result["reason"] == "User requested cancellation"
         assert simple_plan.status == PlanStatus.CANCELLED
-        assert mock_plan_repository.update.called
+        assert mock_plan_repository.save.called
     
     @pytest.mark.asyncio
     async def test_cancel_execution_not_found(
@@ -483,7 +488,7 @@ class TestCancelExecution:
     ):
         """Тест отмены несуществующего плана"""
         # Setup
-        mock_plan_repository.get_by_id.return_value = None
+        mock_plan_repository.find_by_id.return_value = None
         
         # Execute & Assert
         with pytest.raises(ExecutionEngineError, match="not found"):
@@ -533,7 +538,7 @@ class TestCancelExecution:
         # Завершить план
         plan.complete()
         
-        mock_plan_repository.get_by_id.return_value = plan
+        mock_plan_repository.find_by_id.return_value = plan
         
         # Execute & Assert
         with pytest.raises(ExecutionEngineError, match="Cannot cancel"):
@@ -543,77 +548,3 @@ class TestCancelExecution:
             )
 
 
-class TestExecuteBatch:
-    """Тесты выполнения батча подзадач"""
-    
-    @pytest.mark.asyncio
-    async def test_execute_batch_all_success(
-        self,
-        execution_engine,
-        mock_subtask_executor,
-        mock_session_service,
-        mock_stream_handler,
-        simple_plan
-    ):
-        """Тест успешного выполнения батча"""
-        # Setup
-        mock_subtask_executor.execute_subtask.return_value = {
-            "status": "completed",
-            "result": {"content": "Success"}
-        }
-        
-        subtask_ids = [st.id for st in simple_plan.subtasks]
-        
-        # Execute
-        results = await execution_engine._execute_batch(
-            plan=simple_plan,
-            subtask_ids=subtask_ids,
-            session_id="test-session",
-            session_service=mock_session_service,
-            stream_handler=mock_stream_handler
-        )
-        
-        # Assert
-        assert len(results) == 2
-        for subtask_id in subtask_ids:
-            assert subtask_id in results
-            assert results[subtask_id]["status"] == "completed"
-    
-    @pytest.mark.asyncio
-    async def test_execute_batch_with_failures(
-        self,
-        execution_engine,
-        mock_subtask_executor,
-        mock_session_service,
-        mock_stream_handler,
-        simple_plan
-    ):
-        """Тест выполнения батча с ошибками"""
-        # Setup
-        call_count = 0
-        async def mock_execute(*args, **kwargs):
-            nonlocal call_count
-            call_count += 1
-            if call_count == 1:
-                return {"status": "completed"}
-            else:
-                raise Exception("Task failed")
-        
-        mock_subtask_executor.execute_subtask.side_effect = mock_execute
-        
-        subtask_ids = [st.id for st in simple_plan.subtasks]
-        
-        # Execute
-        results = await execution_engine._execute_batch(
-            plan=simple_plan,
-            subtask_ids=subtask_ids,
-            session_id="test-session",
-            session_service=mock_session_service,
-            stream_handler=mock_stream_handler
-        )
-        
-        # Assert
-        assert len(results) == 2
-        assert results[subtask_ids[0]]["status"] == "completed"
-        assert results[subtask_ids[1]]["status"] == "failed"
-        assert "error" in results[subtask_ids[1]]

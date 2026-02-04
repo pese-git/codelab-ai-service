@@ -114,7 +114,7 @@ class TestExecuteSubtask:
         """Тест успешного выполнения подзадачи"""
         # Setup
         subtask = sample_plan.subtasks[0]
-        mock_plan_repository.get_by_id.return_value = sample_plan
+        mock_plan_repository.find_by_id.return_value = sample_plan
         
         # Mock агента с async generator
         async def mock_process(*args, **kwargs):
@@ -131,27 +131,30 @@ class TestExecuteSubtask:
             'app.domain.services.subtask_executor.agent_registry.get_agent',
             return_value=mock_agent
         ):
-            # Execute
-            result = await subtask_executor.execute_subtask(
+            # Execute - собрать все chunks
+            chunks = []
+            async for chunk in subtask_executor.execute_subtask(
                 plan_id=sample_plan.id,
                 subtask_id=subtask.id,
                 session_id="test-session",
                 session_service=mock_session_service,
                 stream_handler=mock_stream_handler
-            )
+            ):
+                chunks.append(chunk)
         
-        # Assert
-        assert result["status"] == "completed"
-        assert result["subtask_id"] == subtask.id
-        assert result["agent"] == AgentType.CODER.value
-        assert "result" in result
+        # Assert - проверить финальный chunk
+        final_chunk = chunks[-1]
+        assert final_chunk.type == "subtask_completed"
+        assert final_chunk.metadata["subtask_id"] == subtask.id
+        assert final_chunk.metadata["agent"] == AgentType.CODER.value
+        assert final_chunk.metadata["status"] == "completed"
         
         # Проверить, что статус обновлен
         assert subtask.status == SubtaskStatus.DONE
         assert subtask.result is not None
         
         # Проверить, что план обновлен в репозитории
-        assert mock_plan_repository.update.call_count >= 2  # start + complete
+        assert mock_plan_repository.save.call_count >= 2  # start + complete
     
     @pytest.mark.asyncio
     async def test_execute_subtask_plan_not_found(
@@ -163,17 +166,18 @@ class TestExecuteSubtask:
     ):
         """Тест выполнения подзадачи когда план не найден"""
         # Setup
-        mock_plan_repository.get_by_id.return_value = None
+        mock_plan_repository.find_by_id.return_value = None
         
         # Execute & Assert
         with pytest.raises(SubtaskExecutionError, match="Plan .* not found"):
-            await subtask_executor.execute_subtask(
+            async for _ in subtask_executor.execute_subtask(
                 plan_id="non-existent-plan",
                 subtask_id="some-subtask",
                 session_id="test-session",
                 session_service=mock_session_service,
                 stream_handler=mock_stream_handler
-            )
+            ):
+                pass
     
     @pytest.mark.asyncio
     async def test_execute_subtask_not_found(
@@ -186,17 +190,18 @@ class TestExecuteSubtask:
     ):
         """Тест выполнения несуществующей подзадачи"""
         # Setup
-        mock_plan_repository.get_by_id.return_value = sample_plan
+        mock_plan_repository.find_by_id.return_value = sample_plan
         
         # Execute & Assert
         with pytest.raises(SubtaskExecutionError, match="Subtask .* not found"):
-            await subtask_executor.execute_subtask(
+            async for _ in subtask_executor.execute_subtask(
                 plan_id=sample_plan.id,
                 subtask_id="non-existent-subtask",
                 session_id="test-session",
                 session_service=mock_session_service,
                 stream_handler=mock_stream_handler
-            )
+            ):
+                pass
     
     @pytest.mark.asyncio
     async def test_execute_subtask_wrong_status(
@@ -211,20 +216,21 @@ class TestExecuteSubtask:
         # Setup
         subtask = sample_plan.subtasks[0]
         subtask.status = SubtaskStatus.DONE  # Уже выполнена
-        mock_plan_repository.get_by_id.return_value = sample_plan
+        mock_plan_repository.find_by_id.return_value = sample_plan
         
         # Execute & Assert
         with pytest.raises(
             SubtaskExecutionError,
             match="not in PENDING status"
         ):
-            await subtask_executor.execute_subtask(
+            async for _ in subtask_executor.execute_subtask(
                 plan_id=sample_plan.id,
                 subtask_id=subtask.id,
                 session_id="test-session",
                 session_service=mock_session_service,
                 stream_handler=mock_stream_handler
-            )
+            ):
+                pass
     
     @pytest.mark.asyncio
     async def test_execute_subtask_agent_error(
@@ -238,7 +244,7 @@ class TestExecuteSubtask:
         """Тест обработки ошибки агента"""
         # Setup
         subtask = sample_plan.subtasks[0]
-        mock_plan_repository.get_by_id.return_value = sample_plan
+        mock_plan_repository.find_by_id.return_value = sample_plan
         
         # Mock агента с ошибкой в async generator
         async def mock_process_error(*args, **kwargs):
@@ -252,15 +258,22 @@ class TestExecuteSubtask:
             'app.domain.services.subtask_executor.agent_registry.get_agent',
             return_value=mock_agent
         ):
-            # Execute & Assert
-            with pytest.raises(SubtaskExecutionError, match="Failed to execute"):
-                await subtask_executor.execute_subtask(
-                    plan_id=sample_plan.id,
-                    subtask_id=subtask.id,
-                    session_id="test-session",
-                    session_service=mock_session_service,
-                    stream_handler=mock_stream_handler
-                )
+            # Execute - собрать chunks (включая error chunk)
+            chunks = []
+            async for chunk in subtask_executor.execute_subtask(
+                plan_id=sample_plan.id,
+                subtask_id=subtask.id,
+                session_id="test-session",
+                session_service=mock_session_service,
+                stream_handler=mock_stream_handler
+            ):
+                chunks.append(chunk)
+        
+        # Проверить, что получен error chunk
+        assert len(chunks) > 0
+        error_chunk = chunks[-1]
+        assert error_chunk.type == "error"
+        assert "RuntimeError" in error_chunk.error
         
         # Проверить, что подзадача помечена как failed
         assert subtask.status == SubtaskStatus.FAILED
@@ -279,24 +292,28 @@ class TestExecuteSubtask:
         """Тест выполнения когда агент недоступен"""
         # Setup
         subtask = sample_plan.subtasks[0]
-        mock_plan_repository.get_by_id.return_value = sample_plan
+        mock_plan_repository.find_by_id.return_value = sample_plan
         
         with patch(
             'app.domain.services.subtask_executor.agent_registry.get_agent',
             side_effect=ValueError("Agent not found")
         ):
-            # Execute & Assert
-            with pytest.raises(
-                SubtaskExecutionError,
-                match="Agent .* not available"
+            # Execute & Assert - собрать chunks (должен быть error chunk)
+            chunks = []
+            async for chunk in subtask_executor.execute_subtask(
+                plan_id=sample_plan.id,
+                subtask_id=subtask.id,
+                session_id="test-session",
+                session_service=mock_session_service,
+                stream_handler=mock_stream_handler
             ):
-                await subtask_executor.execute_subtask(
-                    plan_id=sample_plan.id,
-                    subtask_id=subtask.id,
-                    session_id="test-session",
-                    session_service=mock_session_service,
-                    stream_handler=mock_stream_handler
-                )
+                chunks.append(chunk)
+            
+            # Проверить error chunk
+            assert len(chunks) > 0
+            error_chunk = chunks[-1]
+            assert error_chunk.type == "error"
+            assert "not available" in error_chunk.error or "Agent not found" in error_chunk.error
 
 
 class TestPrepareAgentContext:
@@ -447,7 +464,7 @@ class TestRetryFailedSubtask:
         subtask = sample_plan.subtasks[0]
         subtask.status = SubtaskStatus.FAILED
         subtask.error = "Previous error"
-        mock_plan_repository.get_by_id.return_value = sample_plan
+        mock_plan_repository.find_by_id.return_value = sample_plan
         
         # Mock агента с async generator
         async def mock_process(*args, **kwargs):
@@ -460,17 +477,21 @@ class TestRetryFailedSubtask:
             'app.domain.services.subtask_executor.agent_registry.get_agent',
             return_value=mock_agent
         ):
-            # Execute
-            result = await subtask_executor.retry_failed_subtask(
+            # Execute - собрать chunks
+            chunks = []
+            async for chunk in subtask_executor.retry_failed_subtask(
                 plan_id=sample_plan.id,
                 subtask_id=subtask.id,
                 session_id="test-session",
                 session_service=mock_session_service,
                 stream_handler=mock_stream_handler
-            )
+            ):
+                chunks.append(chunk)
         
         # Assert
-        assert result["status"] == "completed"
+        final_chunk = chunks[-1]
+        assert final_chunk.type == "subtask_completed"
+        assert final_chunk.metadata["status"] == "completed"
         assert subtask.status == SubtaskStatus.DONE
         assert subtask.error is None
     
@@ -487,20 +508,21 @@ class TestRetryFailedSubtask:
         # Setup - подзадача не в статусе FAILED
         subtask = sample_plan.subtasks[0]
         subtask.status = SubtaskStatus.DONE
-        mock_plan_repository.get_by_id.return_value = sample_plan
+        mock_plan_repository.find_by_id.return_value = sample_plan
         
         # Execute & Assert
         with pytest.raises(
             SubtaskExecutionError,
             match="not in FAILED status"
         ):
-            await subtask_executor.retry_failed_subtask(
+            async for _ in subtask_executor.retry_failed_subtask(
                 plan_id=sample_plan.id,
                 subtask_id=subtask.id,
                 session_id="test-session",
                 session_service=mock_session_service,
                 stream_handler=mock_stream_handler
-            )
+            ):
+                pass
 
 
 class TestGetSubtaskStatus:
@@ -516,7 +538,7 @@ class TestGetSubtaskStatus:
         """Тест успешного получения статуса подзадачи"""
         # Setup
         subtask = sample_plan.subtasks[0]
-        mock_plan_repository.get_by_id.return_value = sample_plan
+        mock_plan_repository.find_by_id.return_value = sample_plan
         
         # Execute
         status = await subtask_executor.get_subtask_status(
@@ -539,7 +561,7 @@ class TestGetSubtaskStatus:
     ):
         """Тест получения статуса когда план не найден"""
         # Setup
-        mock_plan_repository.get_by_id.return_value = None
+        mock_plan_repository.find_by_id.return_value = None
         
         # Execute & Assert
         with pytest.raises(SubtaskExecutionError, match="Plan .* not found"):
@@ -557,7 +579,7 @@ class TestGetSubtaskStatus:
     ):
         """Тест получения статуса несуществующей подзадачи"""
         # Setup
-        mock_plan_repository.get_by_id.return_value = sample_plan
+        mock_plan_repository.find_by_id.return_value = sample_plan
         
         # Execute & Assert
         with pytest.raises(SubtaskExecutionError, match="Subtask .* not found"):
