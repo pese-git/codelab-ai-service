@@ -157,7 +157,7 @@ class TestFSMOrchestrator:
         """Тест: получение или создание контекста"""
         orchestrator = FSMOrchestrator()
         
-        context = orchestrator.get_or_create_context("session-1")
+        context = await orchestrator.get_or_create_context("session-1")
         
         assert context.session_id == "session-1"
         assert context.current_state == FSMState.IDLE
@@ -166,17 +166,17 @@ class TestFSMOrchestrator:
         """Тест: повторный вызов возвращает тот же контекст"""
         orchestrator = FSMOrchestrator()
         
-        context1 = orchestrator.get_or_create_context("session-1")
-        context2 = orchestrator.get_or_create_context("session-1")
+        context1 = await orchestrator.get_or_create_context("session-1")
+        context2 = await orchestrator.get_or_create_context("session-1")
         
         assert context1 is context2
     
     async def test_get_current_state_existing(self):
         """Тест: получение текущего состояния для существующего контекста"""
         orchestrator = FSMOrchestrator()
-        orchestrator.get_or_create_context("session-1")
+        await orchestrator.get_or_create_context("session-1")
         
-        state = orchestrator.get_current_state("session-1")
+        state = await orchestrator.get_current_state("session-1")
         
         assert state == FSMState.IDLE
     
@@ -184,7 +184,7 @@ class TestFSMOrchestrator:
         """Тест: получение IDLE для несуществующего контекста"""
         orchestrator = FSMOrchestrator()
         
-        state = orchestrator.get_current_state("non-existing")
+        state = await orchestrator.get_current_state("non-existing")
         
         assert state == FSMState.IDLE
     
@@ -198,7 +198,7 @@ class TestFSMOrchestrator:
         )
         
         assert new_state == FSMState.CLASSIFY
-        assert orchestrator.get_current_state("session-1") == FSMState.CLASSIFY
+        assert await orchestrator.get_current_state("session-1") == FSMState.CLASSIFY
     
     async def test_transition_with_metadata(self):
         """Тест: переход с metadata"""
@@ -210,7 +210,7 @@ class TestFSMOrchestrator:
             metadata={"plan_id": "plan-123"}
         )
         
-        metadata = orchestrator.get_context_metadata("session-1")
+        metadata = await orchestrator.get_context_metadata("session-1")
         assert metadata["plan_id"] == "plan-123"
     
     async def test_transition_invalid_raises_error(self):
@@ -228,32 +228,32 @@ class TestFSMOrchestrator:
     async def test_validate_transition(self):
         """Тест: валидация перехода без выполнения"""
         orchestrator = FSMOrchestrator()
-        orchestrator.get_or_create_context("session-1")
+        await orchestrator.get_or_create_context("session-1")
         
-        is_valid = orchestrator.validate_transition(
+        is_valid = await orchestrator.validate_transition(
             "session-1",
             FSMEvent.RECEIVE_MESSAGE
         )
         
         assert is_valid is True
         # Состояние не должно измениться
-        assert orchestrator.get_current_state("session-1") == FSMState.IDLE
+        assert await orchestrator.get_current_state("session-1") == FSMState.IDLE
     
     async def test_reset(self):
         """Тест: сброс FSM"""
         orchestrator = FSMOrchestrator()
         await orchestrator.transition("session-1", FSMEvent.RECEIVE_MESSAGE)
         
-        orchestrator.reset("session-1")
+        await orchestrator.reset("session-1")
         
-        assert orchestrator.get_current_state("session-1") == FSMState.IDLE
+        assert await orchestrator.get_current_state("session-1") == FSMState.IDLE
     
     async def test_remove_context(self):
         """Тест: удаление контекста"""
         orchestrator = FSMOrchestrator()
-        orchestrator.get_or_create_context("session-1")
+        await orchestrator.get_or_create_context("session-1")
         
-        orchestrator.remove_context("session-1")
+        await orchestrator.remove_context("session-1")
         
         assert "session-1" not in orchestrator._contexts
     
@@ -261,16 +261,16 @@ class TestFSMOrchestrator:
         """Тест: установка и получение metadata"""
         orchestrator = FSMOrchestrator()
         
-        orchestrator.set_context_metadata("session-1", "key", "value")
-        metadata = orchestrator.get_context_metadata("session-1")
+        await orchestrator.set_context_metadata("session-1", "key", "value")
+        metadata = await orchestrator.get_context_metadata("session-1")
         
         assert metadata["key"] == "value"
     
     async def test_get_all_contexts(self):
         """Тест: получение всех контекстов"""
         orchestrator = FSMOrchestrator()
-        orchestrator.get_or_create_context("session-1")
-        orchestrator.get_or_create_context("session-2")
+        await orchestrator.get_or_create_context("session-1")
+        await orchestrator.get_or_create_context("session-2")
         
         contexts = orchestrator.get_all_contexts()
         
@@ -282,7 +282,7 @@ class TestFSMOrchestrator:
         """Тест: получение контекстов по состоянию"""
         orchestrator = FSMOrchestrator()
         await orchestrator.transition("session-1", FSMEvent.RECEIVE_MESSAGE)
-        orchestrator.get_or_create_context("session-2")  # Остаётся в IDLE
+        await orchestrator.get_or_create_context("session-2")  # Остаётся в IDLE
         
         classify_contexts = orchestrator.get_contexts_by_state(FSMState.CLASSIFY)
         idle_contexts = orchestrator.get_contexts_by_state(FSMState.IDLE)
@@ -326,23 +326,23 @@ class TestFSMWorkflows:
         
         # CLASSIFY -> PLAN_REQUIRED (complex)
         await orchestrator.transition("s1", FSMEvent.IS_ATOMIC_FALSE)
-        assert orchestrator.get_current_state("s1") == FSMState.PLAN_REQUIRED
+        assert await orchestrator.get_current_state("s1") == FSMState.PLAN_REQUIRED
         
         # PLAN_REQUIRED -> ARCHITECT_PLANNING
         await orchestrator.transition("s1", FSMEvent.ROUTE_TO_ARCHITECT)
-        assert orchestrator.get_current_state("s1") == FSMState.ARCHITECT_PLANNING
+        assert await orchestrator.get_current_state("s1") == FSMState.ARCHITECT_PLANNING
         
         # ARCHITECT_PLANNING -> PLAN_REVIEW (Option 2: plan created, awaiting approval)
         await orchestrator.transition("s1", FSMEvent.PLAN_CREATED)
-        assert orchestrator.get_current_state("s1") == FSMState.PLAN_REVIEW
+        assert await orchestrator.get_current_state("s1") == FSMState.PLAN_REVIEW
         
         # PLAN_REVIEW -> PLAN_EXECUTION (user approved)
         await orchestrator.transition("s1", FSMEvent.PLAN_APPROVED)
-        assert orchestrator.get_current_state("s1") == FSMState.PLAN_EXECUTION
+        assert await orchestrator.get_current_state("s1") == FSMState.PLAN_EXECUTION
         
         # PLAN_EXECUTION -> COMPLETED
         await orchestrator.transition("s1", FSMEvent.PLAN_EXECUTION_COMPLETED)
-        assert orchestrator.get_current_state("s1") == FSMState.COMPLETED
+        assert await orchestrator.get_current_state("s1") == FSMState.COMPLETED
     
     async def test_error_handling_workflow(self):
         """Тест: workflow с обработкой ошибки"""
@@ -354,11 +354,11 @@ class TestFSMWorkflows:
         
         # EXECUTION -> ERROR_HANDLING
         await orchestrator.transition("s1", FSMEvent.SUBTASK_FAILED)
-        assert orchestrator.get_current_state("s1") == FSMState.ERROR_HANDLING
+        assert await orchestrator.get_current_state("s1") == FSMState.ERROR_HANDLING
         
         # ERROR_HANDLING -> EXECUTION (retry)
         await orchestrator.transition("s1", FSMEvent.RETRY_SUBTASK)
-        assert orchestrator.get_current_state("s1") == FSMState.EXECUTION
+        assert await orchestrator.get_current_state("s1") == FSMState.EXECUTION
     
     async def test_replanning_workflow(self):
         """Тест: workflow с replanning (Option 2)"""
@@ -370,15 +370,15 @@ class TestFSMWorkflows:
         await orchestrator.transition("s1", FSMEvent.ROUTE_TO_ARCHITECT)
         await orchestrator.transition("s1", FSMEvent.PLAN_CREATED)
         await orchestrator.transition("s1", FSMEvent.PLAN_APPROVED)
-        assert orchestrator.get_current_state("s1") == FSMState.PLAN_EXECUTION
+        assert await orchestrator.get_current_state("s1") == FSMState.PLAN_EXECUTION
         
         # PLAN_EXECUTION -> ERROR_HANDLING (execution failed)
         await orchestrator.transition("s1", FSMEvent.PLAN_EXECUTION_FAILED)
-        assert orchestrator.get_current_state("s1") == FSMState.ERROR_HANDLING
+        assert await orchestrator.get_current_state("s1") == FSMState.ERROR_HANDLING
         
         # ERROR_HANDLING -> ARCHITECT_PLANNING (replanning)
         await orchestrator.transition("s1", FSMEvent.REQUIRES_REPLANNING)
-        assert orchestrator.get_current_state("s1") == FSMState.ARCHITECT_PLANNING
+        assert await orchestrator.get_current_state("s1") == FSMState.ARCHITECT_PLANNING
     
     async def test_plan_cancellation_workflow(self):
         """Тест: workflow с отменой плана"""
@@ -391,7 +391,7 @@ class TestFSMWorkflows:
         
         # ERROR_HANDLING -> COMPLETED (cancel)
         await orchestrator.transition("s1", FSMEvent.PLAN_CANCELLED)
-        assert orchestrator.get_current_state("s1") == FSMState.COMPLETED
+        assert await orchestrator.get_current_state("s1") == FSMState.COMPLETED
 
 
 class TestFSMOrchestratorMultipleSessions:
@@ -406,19 +406,19 @@ class TestFSMOrchestratorMultipleSessions:
         await orchestrator.transition("s1", FSMEvent.RECEIVE_MESSAGE)
         
         # Session 2: остаётся в IDLE
-        orchestrator.get_or_create_context("s2")
+        await orchestrator.get_or_create_context("s2")
         
-        assert orchestrator.get_current_state("s1") == FSMState.CLASSIFY
-        assert orchestrator.get_current_state("s2") == FSMState.IDLE
+        assert await orchestrator.get_current_state("s1") == FSMState.CLASSIFY
+        assert await orchestrator.get_current_state("s2") == FSMState.IDLE
     
     @pytest.mark.asyncio
     async def test_remove_one_session_keeps_others(self):
         """Тест: удаление одной сессии не влияет на другие"""
         orchestrator = FSMOrchestrator()
-        orchestrator.get_or_create_context("s1")
-        orchestrator.get_or_create_context("s2")
+        await orchestrator.get_or_create_context("s1")
+        await orchestrator.get_or_create_context("s2")
         
-        orchestrator.remove_context("s1")
+        await orchestrator.remove_context("s1")
         
         assert "s1" not in orchestrator._contexts
         assert "s2" in orchestrator._contexts

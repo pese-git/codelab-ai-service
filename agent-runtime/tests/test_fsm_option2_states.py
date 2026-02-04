@@ -177,7 +177,7 @@ class TestOption2CompleteWorkflow:
         await orchestrator.transition("s1", FSMEvent.IS_ATOMIC_FALSE)
         await orchestrator.transition("s1", FSMEvent.ROUTE_TO_ARCHITECT)
         await orchestrator.transition("s1", FSMEvent.PLAN_CREATED)
-        assert orchestrator.get_current_state("s1") == FSMState.PLAN_REVIEW
+        assert await orchestrator.get_current_state("s1") == FSMState.PLAN_REVIEW
         
         # User rejects plan → IDLE
         state = await orchestrator.transition("s1", FSMEvent.PLAN_REJECTED)
@@ -192,7 +192,7 @@ class TestOption2CompleteWorkflow:
         await orchestrator.transition("s1", FSMEvent.IS_ATOMIC_FALSE)
         await orchestrator.transition("s1", FSMEvent.ROUTE_TO_ARCHITECT)
         await orchestrator.transition("s1", FSMEvent.PLAN_CREATED)
-        assert orchestrator.get_current_state("s1") == FSMState.PLAN_REVIEW
+        assert await orchestrator.get_current_state("s1") == FSMState.PLAN_REVIEW
         
         # User requests modifications → back to ARCHITECT_PLANNING
         state = await orchestrator.transition("s1", FSMEvent.PLAN_MODIFICATION_REQUESTED)
@@ -212,7 +212,7 @@ class TestOption2CompleteWorkflow:
         await orchestrator.transition("s1", FSMEvent.ROUTE_TO_ARCHITECT)
         await orchestrator.transition("s1", FSMEvent.PLAN_CREATED)
         await orchestrator.transition("s1", FSMEvent.PLAN_APPROVED)
-        assert orchestrator.get_current_state("s1") == FSMState.PLAN_EXECUTION
+        assert await orchestrator.get_current_state("s1") == FSMState.PLAN_EXECUTION
         
         # Execution fails → ERROR_HANDLING
         state = await orchestrator.transition("s1", FSMEvent.PLAN_EXECUTION_FAILED)
@@ -241,7 +241,7 @@ class TestOption2StateMetadata:
             metadata={"plan_id": "plan-123", "subtasks_count": 5}
         )
         
-        metadata = orchestrator.get_context_metadata("s1")
+        metadata = await orchestrator.get_context_metadata("s1")
         assert metadata["plan_id"] == "plan-123"
         assert metadata["subtasks_count"] == 5
     
@@ -260,7 +260,7 @@ class TestOption2StateMetadata:
             metadata={"approved_by": "user", "approved_at": "2026-01-31T12:00:00Z"}
         )
         
-        metadata = orchestrator.get_context_metadata("s1")
+        metadata = await orchestrator.get_context_metadata("s1")
         assert metadata["plan_id"] == "plan-123"
         assert metadata["approved_by"] == "user"
         assert metadata["approved_at"] == "2026-01-31T12:00:00Z"
@@ -317,15 +317,15 @@ class TestOption2EdgeCases:
         
         # First modification request
         await orchestrator.transition("s1", FSMEvent.PLAN_MODIFICATION_REQUESTED)
-        assert orchestrator.get_current_state("s1") == FSMState.ARCHITECT_PLANNING
+        assert await orchestrator.get_current_state("s1") == FSMState.ARCHITECT_PLANNING
         
         # Create new plan
         await orchestrator.transition("s1", FSMEvent.PLAN_CREATED)
-        assert orchestrator.get_current_state("s1") == FSMState.PLAN_REVIEW
+        assert await orchestrator.get_current_state("s1") == FSMState.PLAN_REVIEW
         
         # Second modification request
         await orchestrator.transition("s1", FSMEvent.PLAN_MODIFICATION_REQUESTED)
-        assert orchestrator.get_current_state("s1") == FSMState.ARCHITECT_PLANNING
+        assert await orchestrator.get_current_state("s1") == FSMState.ARCHITECT_PLANNING
     
     async def test_plan_execution_failure_then_replan(self):
         """Тест: ошибка выполнения → replanning → успех"""
@@ -340,20 +340,20 @@ class TestOption2EdgeCases:
         
         # Execution fails
         await orchestrator.transition("s1", FSMEvent.PLAN_EXECUTION_FAILED)
-        assert orchestrator.get_current_state("s1") == FSMState.ERROR_HANDLING
+        assert await orchestrator.get_current_state("s1") == FSMState.ERROR_HANDLING
         
         # Replan
         await orchestrator.transition("s1", FSMEvent.REQUIRES_REPLANNING)
-        assert orchestrator.get_current_state("s1") == FSMState.ARCHITECT_PLANNING
+        assert await orchestrator.get_current_state("s1") == FSMState.ARCHITECT_PLANNING
         
         # New plan created and approved
         await orchestrator.transition("s1", FSMEvent.PLAN_CREATED)
         await orchestrator.transition("s1", FSMEvent.PLAN_APPROVED)
-        assert orchestrator.get_current_state("s1") == FSMState.PLAN_EXECUTION
+        assert await orchestrator.get_current_state("s1") == FSMState.PLAN_EXECUTION
         
         # Success this time
         await orchestrator.transition("s1", FSMEvent.PLAN_EXECUTION_COMPLETED)
-        assert orchestrator.get_current_state("s1") == FSMState.COMPLETED
+        assert await orchestrator.get_current_state("s1") == FSMState.COMPLETED
 
 
 @pytest.mark.asyncio
@@ -367,10 +367,10 @@ class TestOption2VsOption1Compatibility:
         # Atomic task flow не изменился
         await orchestrator.transition("s1", FSMEvent.RECEIVE_MESSAGE)
         await orchestrator.transition("s1", FSMEvent.IS_ATOMIC_TRUE)
-        assert orchestrator.get_current_state("s1") == FSMState.EXECUTION
+        assert await orchestrator.get_current_state("s1") == FSMState.EXECUTION
         
         await orchestrator.transition("s1", FSMEvent.ALL_SUBTASKS_DONE)
-        assert orchestrator.get_current_state("s1") == FSMState.COMPLETED
+        assert await orchestrator.get_current_state("s1") == FSMState.COMPLETED
     
     async def test_error_handling_still_works(self):
         """Тест: error handling работает для обоих вариантов"""
@@ -380,8 +380,8 @@ class TestOption2VsOption1Compatibility:
         await orchestrator.transition("s1", FSMEvent.RECEIVE_MESSAGE)
         await orchestrator.transition("s1", FSMEvent.IS_ATOMIC_TRUE)
         await orchestrator.transition("s1", FSMEvent.SUBTASK_FAILED)
-        assert orchestrator.get_current_state("s1") == FSMState.ERROR_HANDLING
+        assert await orchestrator.get_current_state("s1") == FSMState.ERROR_HANDLING
         
         # Can retry
         await orchestrator.transition("s1", FSMEvent.RETRY_SUBTASK)
-        assert orchestrator.get_current_state("s1") == FSMState.EXECUTION
+        assert await orchestrator.get_current_state("s1") == FSMState.EXECUTION
