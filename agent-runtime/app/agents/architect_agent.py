@@ -240,10 +240,13 @@ class ArchitectAgent(BaseAgent):
             # NOTE: Plan is created in 'draft' status by default
             # User approval will be requested in Orchestrator via plan_approval_required chunk
             # After user approves, PlanApprovalHandler will call plan.approve()
-            await self.plan_repository.save(plan)
+            #
+            # ВАЖНО: Используем commit=True для немедленной видимости в других транзакциях
+            # Это критично, т.к. план будет читаться в другой транзакции при approval
+            await self.plan_repository.save(plan, commit=True)
             
             logger.info(
-                f"Plan {plan.id} created successfully with "
+                f"Plan {plan.id} created and committed successfully with "
                 f"{len(plan.subtasks)} subtasks"
             )
             

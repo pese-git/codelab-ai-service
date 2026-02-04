@@ -40,7 +40,9 @@ class StreamChunk(BaseModel):
         "plan_approval_required",  # For plan approval request
         "plan_rejected",  # For plan rejection
         "plan_modification_requested",  # For plan modification request
-        "execution_completed"  # For plan execution completion
+        "execution_completed",  # For plan execution completion
+        "subtask_completed",  # For subtask completion
+        "tool_result"  # For tool result after HITL approval
     ] = Field(
         description="Type of the stream chunk"
     )

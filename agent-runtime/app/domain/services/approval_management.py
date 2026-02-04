@@ -252,6 +252,44 @@ class ApprovalManager:
             logger.error(f"Failed to get pending approvals: {e}", exc_info=True)
             raise
     
+    async def get_pending_by_session(
+        self,
+        session_id: str
+    ) -> List[PendingApprovalState]:
+        """
+        Получить все pending approvals для сессии (только со статусом 'pending').
+        
+        Используется ExecutionEngine для проверки, есть ли ожидающие approvals.
+        
+        Args:
+            session_id: ID сессии
+            
+        Returns:
+            Список pending approvals со статусом 'pending'
+        """
+        try:
+            # Получить все approvals для сессии
+            all_approvals = await self._repository.get_all_pending(
+                session_id=session_id,
+                request_type=None
+            )
+            
+            # Фильтровать только pending (не approved/rejected)
+            pending_only = [
+                approval for approval in all_approvals
+                if approval.status == "pending"
+            ]
+            
+            logger.debug(
+                f"Found {len(pending_only)} pending approvals for session {session_id}"
+            )
+            
+            return pending_only
+        
+        except Exception as e:
+            logger.error(f"Failed to get pending approvals by session: {e}", exc_info=True)
+            raise
+    
     async def approve(
         self,
         request_id: str

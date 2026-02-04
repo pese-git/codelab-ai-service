@@ -56,7 +56,7 @@ class PlanRepositoryImpl(PlanRepository):
         """
         return await self.find_by_id(id)
     
-    async def save(self, entity: Plan) -> None:
+    async def save(self, entity: Plan, commit: bool = False) -> None:
         """
         Сохранить план.
         
@@ -64,13 +64,14 @@ class PlanRepositoryImpl(PlanRepository):
         
         Args:
             entity: Доменная сущность плана
+            commit: Если True, выполнить commit сразу (для межтранзакционной видимости)
             
         Raises:
             RepositoryError: При ошибке сохранения
             
         Note:
-            Транзакция управляется на уровне get_db() dependency.
-            Commit происходит автоматически после успешного завершения.
+            По умолчанию транзакция управляется на уровне get_db() dependency.
+            Используйте commit=True когда нужна немедленная видимость в других транзакциях.
         """
         try:
             # Проверить, существует ли план
@@ -87,9 +88,14 @@ class PlanRepositoryImpl(PlanRepository):
                 await self._create_plan(entity)
             
             # Flush для получения ID и проверки constraints
-            # Commit будет выполнен автоматически в get_db()
             await self._db.flush()
-            logger.debug(f"Saved plan {entity.id}")
+            
+            # Явный commit если требуется межтранзакционная видимость
+            if commit:
+                await self._db.commit()
+                logger.debug(f"Saved and committed plan {entity.id}")
+            else:
+                logger.debug(f"Saved plan {entity.id} (commit deferred)")
             
         except Exception as e:
             logger.error(f"Error saving plan {entity.id}: {e}", exc_info=True)

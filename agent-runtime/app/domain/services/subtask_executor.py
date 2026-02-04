@@ -158,30 +158,77 @@ class SubtaskExecutor:
             # Собрать результат
             result = self._collect_result(result_chunks)
             
-            # Завершить подзадачу успешно
-            subtask.complete(result=result["content"])
-            await self.plan_repository.save(plan)
-            
-            logger.info(
-                f"Subtask {subtask_id} completed successfully "
-                f"by {subtask.agent.value} agent"
+            # Проверить наличие ошибок в chunks
+            has_error = any(
+                chunk.type == "error"
+                for chunk in result_chunks
+                if isinstance(chunk, StreamChunk)
             )
             
-            # Отправить финальный chunk с результатом выполнения подзадачи
-            yield StreamChunk(
-                type="subtask_completed",
-                content=f"Subtask {subtask_id} completed",
-                metadata={
-                    "subtask_id": subtask_id,
-                    "status": "completed",
-                    "result": result,
-                    "agent": subtask.agent.value,
-                    "started_at": subtask.started_at.isoformat() if subtask.started_at else None,
-                    "completed_at": subtask.completed_at.isoformat() if subtask.completed_at else None,
-                    "duration_seconds": self._calculate_duration(subtask)
-                },
-                is_final=True
+            # Также проверить, содержит ли результат текст ошибки LLM
+            has_llm_error = (
+                "[Error]" in result.get("content", "") or
+                "LiteLLM proxy unavailable" in result.get("content", "") or
+                "No tool output found" in result.get("content", "")
             )
+            
+            if has_error or has_llm_error:
+                # Найти error chunk или извлечь ошибку из content
+                if has_error:
+                    error_chunk = next(
+                        (chunk for chunk in result_chunks
+                         if isinstance(chunk, StreamChunk) and chunk.type == "error"),
+                        None
+                    )
+                    error_message = error_chunk.error if error_chunk else "Subtask failed with error"
+                else:
+                    # Ошибка LLM в assistant message
+                    error_message = result.get("content", "Subtask failed with LLM error")[:500]  # Ограничить длину
+                
+                # Завершить подзадачу с ошибкой
+                subtask.fail(error=error_message)
+                await self.plan_repository.save(plan)
+                
+                logger.error(
+                    f"Subtask {subtask_id} failed: {error_message[:200]}..."
+                )
+                
+                # Отправить финальный chunk с ошибкой
+                yield StreamChunk(
+                    type="error",
+                    error=error_message,
+                    metadata={
+                        "subtask_id": subtask_id,
+                        "status": "failed",
+                        "agent": subtask.agent.value
+                    },
+                    is_final=True
+                )
+            else:
+                # Завершить подзадачу успешно
+                subtask.complete(result=result["content"])
+                await self.plan_repository.save(plan)
+                
+                logger.info(
+                    f"Subtask {subtask_id} completed successfully "
+                    f"by {subtask.agent.value} agent"
+                )
+                
+                # Отправить финальный chunk с результатом выполнения подзадачи
+                yield StreamChunk(
+                    type="subtask_completed",
+                    content=f"Subtask {subtask_id} completed",
+                    metadata={
+                        "subtask_id": subtask_id,
+                        "status": "completed",
+                        "result": result,
+                        "agent": subtask.agent.value,
+                        "started_at": subtask.started_at.isoformat() if subtask.started_at else None,
+                        "completed_at": subtask.completed_at.isoformat() if subtask.completed_at else None,
+                        "duration_seconds": self._calculate_duration(subtask)
+                    },
+                    is_final=True
+                )
             
         except Exception as e:
             logger.error(
@@ -189,10 +236,23 @@ class SubtaskExecutor:
                 exc_info=True
             )
             
-            # Завершить подзадачу с ошибкой
+            # Завершить подзадачу с ошибкой только если она еще не завершена
             error_message = f"{type(e).__name__}: {str(e)}"
-            subtask.fail(error=error_message)
-            await self.plan_repository.save(plan)
+            
+            # Перезагрузить план для получения актуального статуса
+            plan = await self.plan_repository.find_by_id(plan_id)
+            if plan:
+                subtask = plan.get_subtask_by_id(subtask_id)
+                if subtask and subtask.status not in [SubtaskStatus.DONE, SubtaskStatus.FAILED]:
+                    subtask.fail(error=error_message)
+                    await self.plan_repository.save(plan)
+                    logger.info(f"Subtask {subtask_id} marked as failed")
+                else:
+                    logger.warning(
+                        f"Subtask {subtask_id} already in terminal status "
+                        f"({subtask.status.value if subtask else 'not found'}), "
+                        f"skipping fail() call"
+                    )
             
             # Отправить error chunk
             yield StreamChunk(

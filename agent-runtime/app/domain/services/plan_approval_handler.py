@@ -149,6 +149,29 @@ class PlanApprovalHandler:
         
         # Обработать решение
         if decision_enum == PlanApprovalDecision.APPROVE:
+            # Проверить текущее состояние FSM перед approval
+            from ..entities.fsm_state import FSMState
+            current_state = await self._fsm_orchestrator.get_current_state(session_id)
+            
+            if current_state != FSMState.PLAN_REVIEW:
+                error_msg = (
+                    f"Cannot approve plan: invalid FSM state. "
+                    f"Expected PLAN_REVIEW, got {current_state.value}. "
+                    f"Plan approval is only allowed from PLAN_REVIEW state."
+                )
+                logger.error(error_msg)
+                yield StreamChunk(
+                    type="error",
+                    error=error_msg,
+                    metadata={
+                        "expected_state": FSMState.PLAN_REVIEW.value,
+                        "actual_state": current_state.value,
+                        "plan_id": plan_id
+                    },
+                    is_final=True
+                )
+                return
+            
             yield StreamChunk(
                 type="status",
                 content="✅ Plan approved by user. Starting execution...",
@@ -163,8 +186,9 @@ class PlanApprovalHandler:
             if plan:
                 from ..entities.plan import PlanStatus
                 plan.status = PlanStatus.APPROVED
-                await self._plan_repository.save(plan)
-                logger.info(f"Plan {plan_id} status updated to APPROVED")
+                # Используем commit=True для немедленной видимости в других транзакциях
+                await self._plan_repository.save(plan, commit=True)
+                logger.info(f"Plan {plan_id} status updated to APPROVED and committed")
             else:
                 logger.warning(f"Plan {plan_id} not found for status update")
             
@@ -215,6 +239,28 @@ class PlanApprovalHandler:
                 )
             
         elif decision_enum == PlanApprovalDecision.REJECT:
+            # Проверить текущее состояние FSM перед rejection
+            from ..entities.fsm_state import FSMState
+            current_state = await self._fsm_orchestrator.get_current_state(session_id)
+            
+            if current_state != FSMState.PLAN_REVIEW:
+                error_msg = (
+                    f"Cannot reject plan: invalid FSM state. "
+                    f"Expected PLAN_REVIEW, got {current_state.value}"
+                )
+                logger.error(error_msg)
+                yield StreamChunk(
+                    type="error",
+                    error=error_msg,
+                    metadata={
+                        "expected_state": FSMState.PLAN_REVIEW.value,
+                        "actual_state": current_state.value,
+                        "plan_id": plan_id
+                    },
+                    is_final=True
+                )
+                return
+            
             yield StreamChunk(
                 type="status",
                 content=f"❌ Plan rejected by user: {feedback or 'No reason provided'}",
@@ -241,6 +287,28 @@ class PlanApprovalHandler:
             )
             
         elif decision_enum == PlanApprovalDecision.MODIFY:
+            # Проверить текущее состояние FSM перед modification request
+            from ..entities.fsm_state import FSMState
+            current_state = await self._fsm_orchestrator.get_current_state(session_id)
+            
+            if current_state != FSMState.PLAN_REVIEW:
+                error_msg = (
+                    f"Cannot modify plan: invalid FSM state. "
+                    f"Expected PLAN_REVIEW, got {current_state.value}"
+                )
+                logger.error(error_msg)
+                yield StreamChunk(
+                    type="error",
+                    error=error_msg,
+                    metadata={
+                        "expected_state": FSMState.PLAN_REVIEW.value,
+                        "actual_state": current_state.value,
+                        "plan_id": plan_id
+                    },
+                    is_final=True
+                )
+                return
+            
             yield StreamChunk(
                 type="status",
                 content=f"🔄 Plan modification requested: {feedback or 'No feedback provided'}",

@@ -183,10 +183,11 @@ class ExecutionCoordinator:
         if not plan:
             raise ExecutionCoordinatorError(f"Plan {plan_id} not found")
         
-        if plan.status != PlanStatus.APPROVED:
+        # ✅ ИСПРАВЛЕНИЕ: Разрешить APPROVED и IN_PROGRESS (для resumable execution)
+        if plan.status not in [PlanStatus.APPROVED, PlanStatus.IN_PROGRESS]:
             raise ExecutionCoordinatorError(
-                f"Plan {plan_id} is not approved (status: {plan.status.value}). "
-                "Only approved plans can be executed."
+                f"Plan {plan_id} cannot be executed (status: {plan.status.value}). "
+                "Only approved or in-progress plans can be executed."
             )
         
         if not plan.subtasks:
@@ -194,7 +195,7 @@ class ExecutionCoordinator:
                 f"Plan {plan_id} has no subtasks"
             )
         
-        logger.debug(f"Plan {plan_id} validated and ready for execution")
+        logger.debug(f"Plan {plan_id} validated and ready for execution (status: {plan.status.value})")
     
     async def get_execution_status(
         self,

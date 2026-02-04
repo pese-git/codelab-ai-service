@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from .session_management import SessionManagementService
     from .message_processor import MessageProcessor
     from .approval_management import ApprovalManager
+    from .tool_result_handler import ToolResultHandler
 
 logger = logging.getLogger("agent-runtime.domain.hitl_decision_handler")
 
@@ -39,7 +40,8 @@ class HITLDecisionHandler:
         self,
         approval_manager: "ApprovalManager",
         session_service: "SessionManagementService",
-        message_processor: "MessageProcessor"
+        message_processor: "MessageProcessor",
+        tool_result_handler: "ToolResultHandler"
     ):
         """
         Инициализация handler.
@@ -48,12 +50,14 @@ class HITLDecisionHandler:
             approval_manager: Unified approval manager
             session_service: Сервис управления сессиями
             message_processor: Процессор сообщений для продолжения
+            tool_result_handler: Handler для обработки tool results
         """
         self._approval_manager = approval_manager
         self._session_service = session_service
         self._message_processor = message_processor
+        self._tool_result_handler = tool_result_handler
         
-        logger.debug("HITLDecisionHandler инициализирован с ApprovalManager")
+        logger.debug("HITLDecisionHandler инициализирован с ApprovalManager и ToolResultHandler")
     
     async def handle(
         self,
@@ -141,30 +145,33 @@ class HITLDecisionHandler:
             await self._approval_manager.approve(call_id)
             logger.info(f"[DEBUG] approval_manager.approve() completed for call_id={call_id}")
         
-        logger.info(f"[DEBUG] Approval status updated, now adding result to session history")
+        logger.info(f"[DEBUG] Approval status updated")
         
-        # Добавить результат в историю сессии
-        result_str = json.dumps(result)
-        await self._session_service.add_message(
-            session_id=session_id,
-            role="tool",
-            content=result_str,
-            name=tool_name,
-            tool_call_id=call_id
+        # ИСПРАВЛЕНИЕ: НЕ добавлять tool message и НЕ вызывать ToolResultHandler!
+        # Клиент сам отправит tool_result обратно через отдельный запрос.
+        # Мы просто возвращаем информацию о решении.
+        
+        logger.info(
+            f"HITL decision processed for session {session_id}, "
+            f"returning decision info to client"
+        )
+        
+        # Вернуть информацию о решении клиенту
+        yield StreamChunk(
+            type="status",
+            content=f"✅ Tool {tool_name} {'approved' if result.get('status') in ['approved', 'approved_with_edits'] else 'rejected'} by user",
+            metadata={
+                "call_id": call_id,
+                "tool_name": tool_name,
+                "decision": decision,
+                "status": result.get("status")
+            },
+            is_final=True
         )
         
         logger.info(
-            f"HITL результат добавлен в сессию {session_id}, "
-            f"продолжаем обработку с текущим агентом"
+            f"HITL decision processed and execution continued for session {session_id}"
         )
-        
-        # Продолжить обработку с текущим агентом (пустое сообщение)
-        # Используем MessageProcessor для продолжения после tool_result
-        async for chunk in self._message_processor.process(
-            session_id=session_id,
-            message=""  # Пустое сообщение = продолжить после tool_result
-        ):
-            yield chunk
     
     async def _process_decision(
         self,
