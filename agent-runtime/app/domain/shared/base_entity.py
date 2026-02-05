@@ -4,13 +4,12 @@ Base Entity class for Domain-Driven Design.
 This module provides the foundation for all domain entities following DDD principles.
 """
 
-from abc import ABC
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-from uuid import uuid4
+from pydantic import BaseModel, Field
 
 
-class Entity(ABC):
+class Entity(BaseModel):
     """
     Base class for all domain entities.
     
@@ -21,44 +20,55 @@ class Entity(ABC):
     - Identity: Each entity has a unique identifier
     - Lifecycle: Entities have a lifecycle (created, modified, etc.)
     - Equality: Based on identity, not attributes
+    
+    Attributes:
+        id: Unique identifier
+        created_at: Creation timestamp (UTC)
+        updated_at: Last update timestamp (UTC)
     """
     
-    def __init__(self, id: Optional[str] = None):
+    id: str = Field(..., description="Unique identifier")
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Creation timestamp (UTC)"
+    )
+    updated_at: Optional[datetime] = Field(
+        None,
+        description="Last update timestamp (UTC)"
+    )
+    
+    class Config:
+        """Pydantic configuration."""
+        arbitrary_types_allowed = True
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+    
+    def mark_updated(self) -> None:
+        """Mark entity as updated (sets updated_at to current time)."""
+        self.updated_at = datetime.now(timezone.utc)
+    
+    def add_domain_event(self, event: Any) -> None:
         """
-        Initialize entity with unique identifier.
+        Add domain event to entity.
         
         Args:
-            id: Optional unique identifier. If not provided, generates UUID.
+            event: Domain event to add
         """
-        self._id: str = id or str(uuid4())
-        self._created_at: datetime = datetime.now(timezone.utc)
-        self._updated_at: datetime = datetime.now(timezone.utc)
-        self._version: int = 1
+        if not hasattr(self, '_domain_events'):
+            self._domain_events: List[Any] = []
+        self._domain_events.append(event)
+    
+    def clear_domain_events(self) -> None:
+        """Clear all domain events."""
+        self._domain_events = []
     
     @property
-    def id(self) -> str:
-        """Get entity identifier."""
-        return self._id
-    
-    @property
-    def created_at(self) -> datetime:
-        """Get creation timestamp."""
-        return self._created_at
-    
-    @property
-    def updated_at(self) -> datetime:
-        """Get last update timestamp."""
-        return self._updated_at
-    
-    @property
-    def version(self) -> int:
-        """Get entity version for optimistic locking."""
-        return self._version
-    
-    def _mark_updated(self) -> None:
-        """Mark entity as updated (internal use)."""
-        self._updated_at = datetime.now(timezone.utc)
-        self._version += 1
+    def domain_events(self) -> List[Any]:
+        """Get list of domain events."""
+        if not hasattr(self, '_domain_events'):
+            self._domain_events = []
+        return self._domain_events.copy()
     
     def __eq__(self, other: Any) -> bool:
         """
@@ -100,10 +110,9 @@ class Entity(ABC):
             Dictionary with entity data
         """
         return {
-            "id": self._id,
-            "created_at": self._created_at.isoformat(),
-            "updated_at": self._updated_at.isoformat(),
-            "version": self._version
+            "id": self.id,
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
 
 
