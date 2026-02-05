@@ -82,7 +82,7 @@ class Entity(BaseModel):
         """
         if not isinstance(other, Entity):
             return False
-        return self._id == other._id and type(self) == type(other)
+        return self.id == other.id and type(self) == type(other)
     
     def __hash__(self) -> int:
         """
@@ -91,7 +91,7 @@ class Entity(BaseModel):
         Returns:
             Hash of entity ID and type
         """
-        return hash((self._id, type(self)))
+        return hash((self.id, type(self)))
     
     def __repr__(self) -> str:
         """
@@ -100,7 +100,7 @@ class Entity(BaseModel):
         Returns:
             String with entity type and ID
         """
-        return f"{self.__class__.__name__}(id={self._id})"
+        return f"{self.__class__.__name__}(id={self.id})"
     
     def to_dict(self) -> Dict[str, Any]:
         """

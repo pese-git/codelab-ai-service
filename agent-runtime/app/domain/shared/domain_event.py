@@ -4,13 +4,13 @@ Base Domain Event class for Domain-Driven Design.
 This module provides the foundation for all domain events following DDD principles.
 """
 
-from abc import ABC
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 from uuid import uuid4
+from pydantic import BaseModel, Field, ConfigDict
 
 
-class DomainEvent(ABC):
+class DomainEvent(BaseModel):
     """
     Base class for all domain events.
     
@@ -24,120 +24,45 @@ class DomainEvent(ABC):
     - Timestamp: Events should record when they occurred
     
     Usage:
+        from pydantic import Field
+        
         class ConversationStarted(DomainEvent):
-            def __init__(self, conversation_id: str, user_id: str):
-                super().__init__()
-                self._conversation_id = conversation_id
-                self._user_id = user_id
-            
-            @property
-            def conversation_id(self) -> str:
-                return self._conversation_id
-            
-            @property
-            def user_id(self) -> str:
-                return self._user_id
-            
-            def to_dict(self) -> Dict[str, Any]:
-                data = super().to_dict()
-                data.update({
-                    "conversation_id": self._conversation_id,
-                    "user_id": self._user_id
-                })
-                return data
+            conversation_id: str = Field(..., description="ID разговора")
+            user_id: str = Field(..., description="ID пользователя")
     """
     
-    def __init__(self, event_id: Optional[str] = None, occurred_at: Optional[datetime] = None):
-        """
-        Initialize domain event.
-        
-        Args:
-            event_id: Optional unique event identifier. If not provided, generates UUID.
-            occurred_at: Optional timestamp. If not provided, uses current UTC time.
-        """
-        self._event_id: str = event_id or str(uuid4())
-        self._occurred_at: datetime = occurred_at or datetime.now(timezone.utc)
-        self._event_type: str = self.__class__.__name__
+    model_config = ConfigDict(
+        frozen=True,  # Immutability
+        validate_assignment=True,
+        arbitrary_types_allowed=True,
+    )
     
-    @property
-    def event_id(self) -> str:
-        """Get event unique identifier."""
-        return self._event_id
+    event_id: str = Field(
+        default_factory=lambda: str(uuid4()),
+        description="Уникальный идентификатор события"
+    )
     
-    @property
-    def occurred_at(self) -> datetime:
-        """Get event occurrence timestamp."""
-        return self._occurred_at
+    event_type: str = Field(
+        default="",
+        description="Тип события (имя класса)"
+    )
     
-    @property
-    def event_type(self) -> str:
-        """Get event type (class name)."""
-        return self._event_type
+    occurred_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Время возникновения события"
+    )
     
-    def __eq__(self, other: Any) -> bool:
-        """
-        Compare events by identity.
-        
-        Args:
-            other: Object to compare with
-            
-        Returns:
-            True if events have the same ID and type
-        """
-        if not isinstance(other, DomainEvent):
-            return False
-        return self._event_id == other._event_id and type(self) == type(other)
-    
-    def __hash__(self) -> int:
-        """
-        Generate hash based on identity.
-        
-        Returns:
-            Hash of event ID and type
-        """
-        return hash((self._event_id, type(self)))
-    
-    def __repr__(self) -> str:
-        """
-        String representation of event.
-        
-        Returns:
-            String with event type and ID
-        """
-        return f"{self._event_type}(id={self._event_id}, occurred_at={self._occurred_at.isoformat()})"
-    
-    def __setattr__(self, name: str, value: Any) -> None:
-        """
-        Prevent modification after initialization.
-        
-        Args:
-            name: Attribute name
-            value: Attribute value
-            
-        Raises:
-            AttributeError: If trying to modify after initialization
-        """
-        # Allow setting during __init__ (when object.__getattribute__ raises)
-        try:
-            object.__getattribute__(self, name)
-            raise AttributeError(
-                f"Cannot modify immutable domain event {self.__class__.__name__}"
-            )
-        except AttributeError:
-            # Attribute doesn't exist yet, allow setting
-            object.__setattr__(self, name, value)
+    def model_post_init(self, __context: Any) -> None:
+        """Post-initialization hook to set event_type."""
+        # Set event_type to class name if not provided
+        if not self.event_type:
+            object.__setattr__(self, 'event_type', self.__class__.__name__)
     
     def to_dict(self) -> Dict[str, Any]:
         """
         Convert event to dictionary representation.
         
-        Subclasses should override this method to include their specific data.
-        
         Returns:
             Dictionary with event data
         """
-        return {
-            "event_id": self._event_id,
-            "event_type": self._event_type,
-            "occurred_at": self._occurred_at.isoformat()
-        }
+        return self.model_dump()
