@@ -5,7 +5,7 @@ PolicyAction Value Object.
 """
 
 from enum import Enum
-from typing import Any
+from typing import Any, ClassVar
 
 from app.domain.shared.value_object import ValueObject
 
@@ -18,9 +18,9 @@ class PolicyActionEnum(str, Enum):
     - REJECT: Автоматически отклонить запрос
     - ASK_USER: Запросить решение у пользователя
     """
-    APPROVE = "approve"
-    REJECT = "reject"
-    ASK_USER = "ask_user"
+    APPROVE: ClassVar = "approve"
+    REJECT: ClassVar = "reject"
+    ASK_USER: ClassVar = "ask_user"
 
 
 class PolicyAction(ValueObject):

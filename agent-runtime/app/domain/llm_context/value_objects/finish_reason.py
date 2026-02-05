@@ -8,17 +8,18 @@ from enum import Enum
 from pydantic import Field, field_validator
 
 from ...shared.value_object import ValueObject
+from typing import ClassVar
 
 
 class FinishReasonType(str, Enum):
     """Типы причин завершения генерации."""
     
-    STOP = "stop"  # Нормальное завершение
-    LENGTH = "length"  # Достигнут лимит токенов
-    TOOL_CALLS = "tool_calls"  # Вызов инструментов
-    CONTENT_FILTER = "content_filter"  # Фильтр контента
-    ERROR = "error"  # Ошибка
-    UNKNOWN = "unknown"  # Неизвестная причина
+    STOP: ClassVar = "stop"  # Нормальное завершение
+    LENGTH: ClassVar = "length"  # Достигнут лимит токенов
+    TOOL_CALLS: ClassVar = "tool_calls"  # Вызов инструментов
+    CONTENT_FILTER: ClassVar = "content_filter"  # Фильтр контента
+    ERROR: ClassVar = "error"  # Ошибка
+    UNKNOWN: ClassVar = "unknown"  # Неизвестная причина
 
 
 class FinishReason(ValueObject):

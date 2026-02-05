@@ -5,7 +5,7 @@ Represents a unique identifier for a conversation with validation.
 """
 
 import re
-from typing import Optional
+from typing import Optional, ClassVar
 
 from app.domain.shared.value_object import ValueObject
 
@@ -33,9 +33,9 @@ class ConversationId(ValueObject):
     """
     
     # Validation constants
-    MIN_LENGTH = 1
-    MAX_LENGTH = 255
-    VALID_PATTERN = re.compile(r'^[a-zA-Z0-9_-]+$')
+    MIN_LENGTH: ClassVar[int] = 1
+    MAX_LENGTH: ClassVar[int] = 255
+    VALID_PATTERN: ClassVar[re.Pattern] = re.compile(r'^[a-zA-Z0-9_-]+$')
     
     def __init__(self, value: str):
         """

@@ -5,7 +5,7 @@ Value Object для статуса плана выполнения.
 """
 
 from enum import Enum
-from typing import Set
+from typing import Set, ClassVar, Dict
 
 from app.domain.shared.value_object import ValueObject
 
@@ -14,13 +14,13 @@ class PlanStatusEnum(str, Enum):
     """
     Возможные статусы плана выполнения.
     """
-    PENDING = "pending"       # Ожидает выполнения (alias для DRAFT)
-    DRAFT = "draft"           # Черновик, не утвержден
-    APPROVED = "approved"     # Утвержден, готов к выполнению
-    IN_PROGRESS = "in_progress"  # В процессе выполнения
-    COMPLETED = "completed"   # Успешно завершен
-    FAILED = "failed"         # Завершен с ошибкой
-    CANCELLED = "cancelled"   # Отменен
+    PENDING: ClassVar = "pending"       # Ожидает выполнения (alias для DRAFT)
+    DRAFT: ClassVar = "draft"           # Черновик, не утвержден
+    APPROVED: ClassVar = "approved"     # Утвержден, готов к выполнению
+    IN_PROGRESS: ClassVar = "in_progress"  # В процессе выполнения
+    COMPLETED: ClassVar = "completed"   # Успешно завершен
+    FAILED: ClassVar = "failed"         # Завершен с ошибкой
+    CANCELLED: ClassVar = "cancelled"   # Отменен
 
 
 class PlanStatus(ValueObject):
@@ -49,7 +49,7 @@ class PlanStatus(ValueObject):
     """
     
     # Допустимые переходы между статусами
-    _VALID_TRANSITIONS: dict[PlanStatusEnum, Set[PlanStatusEnum]] = {
+    _VALID_TRANSITIONS: ClassVar[Dict[PlanStatusEnum, Set[PlanStatusEnum]]] = {
         PlanStatusEnum.PENDING: {PlanStatusEnum.IN_PROGRESS, PlanStatusEnum.CANCELLED},
         PlanStatusEnum.DRAFT: {PlanStatusEnum.APPROVED, PlanStatusEnum.CANCELLED},
         PlanStatusEnum.APPROVED: {
@@ -68,11 +68,13 @@ class PlanStatus(ValueObject):
     }
     
     # Константы для удобного использования
-    PENDING = None  # Будет инициализировано после определения класса
-    IN_PROGRESS = None
-    COMPLETED = None
-    FAILED = None
-    CANCELLED = None
+    PENDING: 'PlanStatus | None' = None  # Будет инициализировано после определения класса
+    DRAFT: 'PlanStatus | None' = None
+    APPROVED: 'PlanStatus | None' = None
+    IN_PROGRESS: 'PlanStatus | None' = None
+    COMPLETED: 'PlanStatus | None' = None
+    FAILED: 'PlanStatus | None' = None
+    CANCELLED: 'PlanStatus | None' = None
     
     def __init__(self, value: PlanStatusEnum):
         """
@@ -237,6 +239,8 @@ class PlanStatus(ValueObject):
 
 # Инициализация констант
 PlanStatus.PENDING = PlanStatus.pending()
+PlanStatus.DRAFT = PlanStatus.draft()
+PlanStatus.APPROVED = PlanStatus.approved()
 PlanStatus.IN_PROGRESS = PlanStatus.in_progress()
 PlanStatus.COMPLETED = PlanStatus.completed()
 PlanStatus.FAILED = PlanStatus.failed()

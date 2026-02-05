@@ -5,7 +5,7 @@ ApprovalStatus Value Object.
 """
 
 from enum import Enum
-from typing import Any, Set
+from typing import Any, Set, ClassVar
 
 from app.domain.shared.value_object import ValueObject
 
@@ -20,10 +20,10 @@ class ApprovalStatusEnum(str, Enum):
     - REJECTED: Отклонено пользователем
     - EXPIRED: Истек таймаут ожидания
     """
-    PENDING = "pending"
-    APPROVED = "approved"
-    REJECTED = "rejected"
-    EXPIRED = "expired"
+    PENDING: ClassVar = "pending"
+    APPROVED: ClassVar = "approved"
+    REJECTED: ClassVar = "rejected"
+    EXPIRED: ClassVar = "expired"
 
 
 class ApprovalStatus(ValueObject):

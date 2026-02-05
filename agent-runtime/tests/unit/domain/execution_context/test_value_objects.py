@@ -17,6 +17,8 @@ from app.domain.execution_context.value_objects import (
     PlanStatus,
     SubtaskStatus
 )
+from app.domain.session_context.value_objects import ConversationId
+from app.domain.agent_context.value_objects import AgentId
 
 
 class TestPlanId:
@@ -174,21 +176,21 @@ class TestSubtaskStatus:
     def test_all_subtask_statuses_exist(self):
         """Все статусы подзадачи определены."""
         assert SubtaskStatus.PENDING.value == "pending"
-        assert SubtaskStatus.IN_PROGRESS.value == "in_progress"
+        assert SubtaskStatus.RUNNING.value == "in_progress"
         assert SubtaskStatus.DONE.value == "done"
         assert SubtaskStatus.FAILED.value == "failed"
     
     def test_can_transition_from_pending_to_in_progress(self):
         """Можно перейти из PENDING в IN_PROGRESS."""
-        assert SubtaskStatus.PENDING.can_transition_to(SubtaskStatus.IN_PROGRESS)
+        assert SubtaskStatus.PENDING.can_transition_to(SubtaskStatus.RUNNING)
     
     def test_can_transition_from_in_progress_to_done(self):
         """Можно перейти из IN_PROGRESS в DONE."""
-        assert SubtaskStatus.IN_PROGRESS.can_transition_to(SubtaskStatus.DONE)
+        assert SubtaskStatus.RUNNING.can_transition_to(SubtaskStatus.DONE)
     
     def test_can_transition_from_in_progress_to_failed(self):
         """Можно перейти из IN_PROGRESS в FAILED."""
-        assert SubtaskStatus.IN_PROGRESS.can_transition_to(SubtaskStatus.FAILED)
+        assert SubtaskStatus.RUNNING.can_transition_to(SubtaskStatus.FAILED)
     
     def test_can_transition_from_failed_to_pending(self):
         """Можно перейти из FAILED в PENDING (retry)."""
@@ -196,7 +198,7 @@ class TestSubtaskStatus:
     
     def test_cannot_transition_from_done_to_in_progress(self):
         """Нельзя перейти из DONE в IN_PROGRESS."""
-        assert not SubtaskStatus.DONE.can_transition_to(SubtaskStatus.IN_PROGRESS)
+        assert not SubtaskStatus.DONE.can_transition_to(SubtaskStatus.RUNNING)
     
     def test_cannot_transition_from_pending_to_done(self):
         """Нельзя перейти из PENDING в DONE напрямую."""
@@ -216,7 +218,7 @@ class TestSubtaskStatus:
     
     def test_is_not_terminal_for_in_progress(self):
         """IN_PROGRESS не является терминальным статусом."""
-        assert not SubtaskStatus.IN_PROGRESS.is_terminal()
+        assert not SubtaskStatus.RUNNING.is_terminal()
 
 
 class TestStatusTransitions:
@@ -257,7 +259,7 @@ class TestStatusTransitions:
         status = SubtaskStatus.PENDING
         
         # PENDING -> IN_PROGRESS
-        status = SubtaskStatus.IN_PROGRESS
+        status = SubtaskStatus.RUNNING
         
         # IN_PROGRESS -> FAILED
         status = SubtaskStatus.FAILED
@@ -267,7 +269,7 @@ class TestStatusTransitions:
         status = SubtaskStatus.PENDING
         
         # PENDING -> IN_PROGRESS -> DONE
-        status = SubtaskStatus.IN_PROGRESS
+        status = SubtaskStatus.RUNNING
         status = SubtaskStatus.DONE
         
         # DONE - терминальный статус

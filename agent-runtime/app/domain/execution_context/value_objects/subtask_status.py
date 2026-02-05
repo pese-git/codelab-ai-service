@@ -5,7 +5,7 @@ Value Object для статуса подзадачи.
 """
 
 from enum import Enum
-from typing import Set
+from typing import Set, ClassVar, Dict
 
 from app.domain.shared.value_object import ValueObject
 
@@ -14,12 +14,12 @@ class SubtaskStatusEnum(str, Enum):
     """
     Возможные статусы подзадачи.
     """
-    PENDING = "pending"          # Ожидает выполнения
-    IN_PROGRESS = "in_progress"  # В процессе выполнения
-    RUNNING = "running"          # В процессе выполнения (alias)
-    DONE = "done"               # Успешно завершена
-    FAILED = "failed"           # Завершена с ошибкой
-    BLOCKED = "blocked"         # Заблокирована зависимостями
+    PENDING: ClassVar = "pending"          # Ожидает выполнения
+    IN_PROGRESS: ClassVar = "in_progress"  # В процессе выполнения
+    RUNNING: ClassVar = "running"          # В процессе выполнения (alias)
+    DONE: ClassVar = "done"               # Успешно завершена
+    FAILED: ClassVar = "failed"           # Завершена с ошибкой
+    BLOCKED: ClassVar = "blocked"         # Заблокирована зависимостями
 
 
 class SubtaskStatus(ValueObject):
@@ -47,7 +47,7 @@ class SubtaskStatus(ValueObject):
     """
     
     # Допустимые переходы между статусами
-    _VALID_TRANSITIONS: dict[SubtaskStatusEnum, Set[SubtaskStatusEnum]] = {
+    _VALID_TRANSITIONS: ClassVar[Dict[SubtaskStatusEnum, Set[SubtaskStatusEnum]]] = {
         SubtaskStatusEnum.PENDING: {
             SubtaskStatusEnum.IN_PROGRESS,
             SubtaskStatusEnum.RUNNING,
@@ -61,10 +61,11 @@ class SubtaskStatus(ValueObject):
     }
     
     # Константы для удобного использования
-    PENDING = None  # Будет инициализировано после определения класса
-    IN_PROGRESS = None
-    DONE = None
-    FAILED = None
+    PENDING: 'SubtaskStatus | None' = None  # Будет инициализировано после определения класса
+    IN_PROGRESS: 'SubtaskStatus | None' = None
+    RUNNING: 'SubtaskStatus | None' = None  # Alias для IN_PROGRESS
+    DONE: 'SubtaskStatus | None' = None
+    FAILED: 'SubtaskStatus | None' = None
     
     def __init__(self, value: SubtaskStatusEnum):
         """
@@ -221,5 +222,6 @@ class SubtaskStatus(ValueObject):
 # Инициализация констант
 SubtaskStatus.PENDING = SubtaskStatus.pending()
 SubtaskStatus.IN_PROGRESS = SubtaskStatus.in_progress()
+SubtaskStatus.RUNNING = SubtaskStatus.running()  # Alias для IN_PROGRESS
 SubtaskStatus.DONE = SubtaskStatus.done()
 SubtaskStatus.FAILED = SubtaskStatus.failed()

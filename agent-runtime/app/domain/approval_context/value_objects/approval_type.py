@@ -5,7 +5,7 @@ ApprovalType Value Object.
 """
 
 from enum import Enum
-from typing import Any
+from typing import Any, ClassVar
 
 from app.domain.shared.value_object import ValueObject
 
@@ -19,10 +19,10 @@ class ApprovalTypeEnum(str, Enum):
     - AGENT_SWITCH: Переключение между агентами
     - FILE_OPERATION: Операция с файловой системой
     """
-    TOOL_CALL = "tool_call"
-    PLAN_EXECUTION = "plan_execution"
-    AGENT_SWITCH = "agent_switch"
-    FILE_OPERATION = "file_operation"
+    TOOL_CALL: ClassVar = "tool_call"
+    PLAN_EXECUTION: ClassVar = "plan_execution"
+    AGENT_SWITCH: ClassVar = "agent_switch"
+    FILE_OPERATION: ClassVar = "file_operation"
 
 
 class ApprovalType(ValueObject):

@@ -4,7 +4,7 @@ MessageContent Value Object.
 Represents message content with validation and sanitization.
 """
 
-from typing import Optional
+from typing import Optional, ClassVar
 
 from app.domain.shared.value_object import ValueObject
 
@@ -32,7 +32,7 @@ class MessageContent(ValueObject):
     """
     
     # Validation constants
-    MAX_LENGTH = 100000  # 100KB of text
+    MAX_LENGTH: ClassVar = 100000  # 100KB of text
     
     def __init__(self, text: str, max_length: Optional[int] = None):
         """

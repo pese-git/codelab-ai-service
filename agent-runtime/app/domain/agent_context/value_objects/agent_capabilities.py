@@ -4,7 +4,7 @@ AgentCapabilities Value Object.
 Инкапсулирует возможности и ограничения агента.
 """
 
-from typing import List, Set, Optional
+from typing import List, Set, Optional, ClassVar
 from enum import Enum
 
 from ...shared.value_object import ValueObject
@@ -16,12 +16,12 @@ class AgentType(str, Enum):
     
     Каждый агент имеет свою специализацию и набор инструментов.
     """
-    ORCHESTRATOR = "orchestrator"  # Маршрутизация задач
-    CODER = "coder"                # Написание кода
-    ARCHITECT = "architect"        # Проектирование архитектуры
-    DEBUG = "debug"                # Отладка и исследование
-    ASK = "ask"                    # Ответы на вопросы
-    UNIVERSAL = "universal"        # Универсальный агент
+    ORCHESTRATOR: ClassVar = "orchestrator"  # Маршрутизация задач
+    CODER: ClassVar = "coder"                # Написание кода
+    ARCHITECT: ClassVar = "architect"        # Проектирование архитектуры
+    DEBUG: ClassVar = "debug"                # Отладка и исследование
+    ASK: ClassVar = "ask"                    # Ответы на вопросы
+    UNIVERSAL: ClassVar = "universal"        # Универсальный агент
 
 
 class AgentCapabilities(ValueObject):
