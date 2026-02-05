@@ -13,7 +13,7 @@ from ..entities import Conversation
 from ..value_objects import ConversationId
 
 
-class ConversationRepository(Repository[Conversation]):
+class ConversationRepository(Repository[Conversation, ConversationId]):
     """
     Repository interface для Conversation entities.
     

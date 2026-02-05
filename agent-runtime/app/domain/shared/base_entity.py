@@ -105,3 +105,7 @@ class Entity(ABC):
             "updated_at": self._updated_at.isoformat(),
             "version": self._version
         }
+
+
+# Alias for backward compatibility
+BaseEntity = Entity

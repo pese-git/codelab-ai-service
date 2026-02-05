@@ -13,7 +13,7 @@ from ..value_objects.agent_id import AgentId
 from ..value_objects.agent_capabilities import AgentType
 
 
-class AgentRepository(Repository[Agent]):
+class AgentRepository(Repository[Agent, AgentId]):
     """
     Интерфейс репозитория для агентов.
     

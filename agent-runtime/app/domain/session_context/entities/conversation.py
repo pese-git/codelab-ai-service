@@ -11,7 +11,7 @@ from typing import Optional, Dict, Any
 from datetime import datetime, timezone
 from pydantic import Field
 
-from ...shared.base_entity import BaseEntity
+from ...shared.base_entity import Entity, BaseEntity
 from ..value_objects import ConversationId, MessageCollection
 from ..events import (
     ConversationStarted,
