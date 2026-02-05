@@ -14,6 +14,7 @@ class PlanStatusEnum(str, Enum):
     """
     Возможные статусы плана выполнения.
     """
+    PENDING = "pending"       # Ожидает выполнения (alias для DRAFT)
     DRAFT = "draft"           # Черновик, не утвержден
     APPROVED = "approved"     # Утвержден, готов к выполнению
     IN_PROGRESS = "in_progress"  # В процессе выполнения
@@ -49,6 +50,7 @@ class PlanStatus(ValueObject):
     
     # Допустимые переходы между статусами
     _VALID_TRANSITIONS: dict[PlanStatusEnum, Set[PlanStatusEnum]] = {
+        PlanStatusEnum.PENDING: {PlanStatusEnum.IN_PROGRESS, PlanStatusEnum.CANCELLED},
         PlanStatusEnum.DRAFT: {PlanStatusEnum.APPROVED, PlanStatusEnum.CANCELLED},
         PlanStatusEnum.APPROVED: {
             PlanStatusEnum.IN_PROGRESS,
@@ -64,6 +66,13 @@ class PlanStatus(ValueObject):
         PlanStatusEnum.FAILED: set(),  # Терминальный
         PlanStatusEnum.CANCELLED: set(),  # Терминальный
     }
+    
+    # Константы для удобного использования
+    PENDING = None  # Будет инициализировано после определения класса
+    IN_PROGRESS = None
+    COMPLETED = None
+    FAILED = None
+    CANCELLED = None
     
     def __init__(self, value: PlanStatusEnum):
         """
@@ -86,6 +95,11 @@ class PlanStatus(ValueObject):
     def value(self) -> PlanStatusEnum:
         """Получить значение статуса."""
         return self._value
+    
+    @classmethod
+    def pending(cls) -> "PlanStatus":
+        """Создать статус PENDING."""
+        return cls(PlanStatusEnum.PENDING)
     
     @classmethod
     def draft(cls) -> "PlanStatus":
@@ -219,3 +233,11 @@ class PlanStatus(ValueObject):
     def __hash__(self) -> int:
         """Хеш для использования в множествах и словарях."""
         return hash(self._value)
+
+
+# Инициализация констант
+PlanStatus.PENDING = PlanStatus.pending()
+PlanStatus.IN_PROGRESS = PlanStatus.in_progress()
+PlanStatus.COMPLETED = PlanStatus.completed()
+PlanStatus.FAILED = PlanStatus.failed()
+PlanStatus.CANCELLED = PlanStatus.cancelled()

@@ -14,11 +14,12 @@ class SubtaskStatusEnum(str, Enum):
     """
     Возможные статусы подзадачи.
     """
-    PENDING = "pending"      # Ожидает выполнения
-    RUNNING = "running"      # В процессе выполнения
-    DONE = "done"           # Успешно завершена
-    FAILED = "failed"       # Завершена с ошибкой
-    BLOCKED = "blocked"     # Заблокирована зависимостями
+    PENDING = "pending"          # Ожидает выполнения
+    IN_PROGRESS = "in_progress"  # В процессе выполнения
+    RUNNING = "running"          # В процессе выполнения (alias)
+    DONE = "done"               # Успешно завершена
+    FAILED = "failed"           # Завершена с ошибкой
+    BLOCKED = "blocked"         # Заблокирована зависимостями
 
 
 class SubtaskStatus(ValueObject):
@@ -47,12 +48,23 @@ class SubtaskStatus(ValueObject):
     
     # Допустимые переходы между статусами
     _VALID_TRANSITIONS: dict[SubtaskStatusEnum, Set[SubtaskStatusEnum]] = {
-        SubtaskStatusEnum.PENDING: {SubtaskStatusEnum.RUNNING, SubtaskStatusEnum.BLOCKED},
+        SubtaskStatusEnum.PENDING: {
+            SubtaskStatusEnum.IN_PROGRESS,
+            SubtaskStatusEnum.RUNNING,
+            SubtaskStatusEnum.BLOCKED
+        },
+        SubtaskStatusEnum.IN_PROGRESS: {SubtaskStatusEnum.DONE, SubtaskStatusEnum.FAILED},
         SubtaskStatusEnum.RUNNING: {SubtaskStatusEnum.DONE, SubtaskStatusEnum.FAILED},
         SubtaskStatusEnum.BLOCKED: {SubtaskStatusEnum.PENDING},
         SubtaskStatusEnum.DONE: set(),  # Терминальный
-        SubtaskStatusEnum.FAILED: set(),  # Терминальный
+        SubtaskStatusEnum.FAILED: {SubtaskStatusEnum.PENDING},  # Можно retry
     }
+    
+    # Константы для удобного использования
+    PENDING = None  # Будет инициализировано после определения класса
+    IN_PROGRESS = None
+    DONE = None
+    FAILED = None
     
     def __init__(self, value: SubtaskStatusEnum):
         """
@@ -80,6 +92,11 @@ class SubtaskStatus(ValueObject):
     def pending(cls) -> "SubtaskStatus":
         """Создать статус PENDING."""
         return cls(SubtaskStatusEnum.PENDING)
+    
+    @classmethod
+    def in_progress(cls) -> "SubtaskStatus":
+        """Создать статус IN_PROGRESS."""
+        return cls(SubtaskStatusEnum.IN_PROGRESS)
     
     @classmethod
     def running(cls) -> "SubtaskStatus":
@@ -149,14 +166,18 @@ class SubtaskStatus(ValueObject):
         Проверить, является ли статус терминальным.
         
         Returns:
-            True если статус терминальный (DONE или FAILED)
+            True если статус терминальный (только DONE, FAILED можно retry)
         
         Example:
             >>> done = SubtaskStatus.done()
             >>> done.is_terminal()
             True
+            
+            >>> failed = SubtaskStatus.failed()
+            >>> failed.is_terminal()
+            False  # FAILED можно retry
         """
-        return self._value in {SubtaskStatusEnum.DONE, SubtaskStatusEnum.FAILED}
+        return self._value == SubtaskStatusEnum.DONE
     
     def is_pending(self) -> bool:
         """Проверить, является ли статус PENDING."""
@@ -195,3 +216,10 @@ class SubtaskStatus(ValueObject):
     def __hash__(self) -> int:
         """Хеш для использования в множествах и словарях."""
         return hash(self._value)
+
+
+# Инициализация констант
+SubtaskStatus.PENDING = SubtaskStatus.pending()
+SubtaskStatus.IN_PROGRESS = SubtaskStatus.in_progress()
+SubtaskStatus.DONE = SubtaskStatus.done()
+SubtaskStatus.FAILED = SubtaskStatus.failed()

@@ -37,7 +37,7 @@ class PlanId(ValueObject):
         Raises:
             ValueError: Если ID невалиден
         """
-        if not value:
+        if not value or not value.strip():
             raise ValueError("Plan ID cannot be empty")
         
         if not isinstance(value, str):
@@ -61,7 +61,7 @@ class PlanId(ValueObject):
     
     def __repr__(self) -> str:
         """Отладочное представление."""
-        return f"PlanId('{self._value}')"
+        return f"PlanId(value='{self._value}')"
     
     def __eq__(self, other: object) -> bool:
         """Сравнение на равенство."""
