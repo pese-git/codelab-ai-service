@@ -5,7 +5,8 @@
 """
 
 import logging
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, delete, and_
 
@@ -28,11 +29,16 @@ class PlanRepositoryImpl(PlanRepository):
     Атрибуты:
         _db: Сессия БД
         _mapper: Маппер для преобразований
+        _snapshots: In-memory хранилище snapshots (class variable)
     
     Пример:
         >>> repository = PlanRepositoryImpl(db_session)
         >>> plan = await repository.find_by_id("plan-1")
     """
+    
+    # In-memory хранилище для snapshots (shared между всеми экземплярами)
+    # TODO: Заменить на Redis для production
+    _snapshots: Dict[str, Dict[str, Any]] = {}
     
     def __init__(self, db: AsyncSession):
         """
@@ -447,3 +453,63 @@ class PlanRepositoryImpl(PlanRepository):
         except Exception as e:
             logger.error(f"Error counting plans for session {session_id}: {e}")
             return 0
+    
+    async def save_snapshot(
+        self,
+        snapshot_id: str,
+        snapshot: Dict[str, Any]
+    ) -> None:
+        """
+        Сохранить snapshot плана в in-memory хранилище.
+        
+        Args:
+            snapshot_id: Уникальный ID snapshot
+            snapshot: Данные snapshot
+            
+        Example:
+            >>> await repo.save_snapshot("snapshot-123", {"plan_id": "plan-1", ...})
+        """
+        try:
+            # Добавить timestamp для возможной очистки старых snapshots
+            snapshot_with_meta = {
+                **snapshot,
+                "_saved_at": datetime.now(timezone.utc).isoformat()
+            }
+            
+            PlanRepositoryImpl._snapshots[snapshot_id] = snapshot_with_meta
+            
+            logger.debug(
+                f"Saved plan snapshot {snapshot_id} "
+                f"(subtasks: {snapshot.get('subtask_count', 0)})"
+            )
+            
+        except Exception as e:
+            logger.error(f"Error saving snapshot {snapshot_id}: {e}")
+            raise
+    
+    async def get_snapshot(
+        self,
+        snapshot_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Получить snapshot плана из in-memory хранилища.
+        
+        Args:
+            snapshot_id: ID snapshot
+            
+        Returns:
+            Данные snapshot или None если не найден
+            
+        Example:
+            >>> snapshot = await repo.get_snapshot("snapshot-123")
+            >>> if snapshot:
+            ...     print(f"Plan ID: {snapshot['plan_id']}")
+        """
+        snapshot = PlanRepositoryImpl._snapshots.get(snapshot_id)
+        
+        if snapshot:
+            logger.debug(f"Retrieved plan snapshot {snapshot_id}")
+        else:
+            logger.debug(f"Plan snapshot {snapshot_id} not found")
+        
+        return snapshot

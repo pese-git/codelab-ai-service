@@ -7,12 +7,20 @@ Handles conversion between:
 """
 import json
 import logging
-from typing import List
+from typing import List, Union
 from datetime import datetime, timezone
 
 from app.domain.entities.plan import Plan, Subtask, PlanStatus, SubtaskStatus
 from app.domain.entities.agent_context import AgentType
 from app.infrastructure.persistence.models.plan import PlanModel, SubtaskModel
+
+# Import для поддержки новых Value Objects
+try:
+    from app.domain.execution_context.value_objects import PlanId, SubtaskId
+except ImportError:
+    # Fallback если Value Objects еще не доступны
+    PlanId = None
+    SubtaskId = None
 
 logger = logging.getLogger("agent-runtime.plan_mapper")
 
@@ -25,7 +33,52 @@ class PlanMapper:
     - Domain entities не зависят от БД
     - Mapper изолирует преобразование
     - Обработка JSON сериализации
+    
+    Поддерживает Value Objects (PlanId, SubtaskId) для совместимости
+    с новой архитектурой.
     """
+    
+    @staticmethod
+    def _convert_plan_id(value: Union[str, 'PlanId']) -> str:
+        """
+        Конвертировать PlanId в строку для БД.
+        
+        Поддерживает как строки, так и PlanId Value Objects.
+        
+        Args:
+            value: str или PlanId
+            
+        Returns:
+            Строковое представление ID
+            
+        Example:
+            >>> plan_id_str = PlanMapper._convert_plan_id(PlanId("plan-123"))
+            >>> plan_id_str = PlanMapper._convert_plan_id("plan-123")
+        """
+        if PlanId and isinstance(value, PlanId):
+            return value.value
+        return str(value) if value else None
+    
+    @staticmethod
+    def _convert_subtask_id(value: Union[str, 'SubtaskId']) -> str:
+        """
+        Конвертировать SubtaskId в строку для БД.
+        
+        Поддерживает как строки, так и SubtaskId Value Objects.
+        
+        Args:
+            value: str или SubtaskId
+            
+        Returns:
+            Строковое представление ID
+            
+        Example:
+            >>> subtask_id_str = PlanMapper._convert_subtask_id(SubtaskId("st-123"))
+            >>> subtask_id_str = PlanMapper._convert_subtask_id("st-123")
+        """
+        if SubtaskId and isinstance(value, SubtaskId):
+            return value.value
+        return str(value) if value else None
     
     @staticmethod
     def to_domain(plan_model: PlanModel) -> Plan:
