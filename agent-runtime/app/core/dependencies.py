@@ -35,6 +35,7 @@ from app.domain.agent_context.services.agent_coordination_service import (
 )
 from app.domain.adapters.conversation_service_adapter import ConversationServiceAdapter
 from app.domain.adapters.agent_orchestration_adapter import AgentOrchestrationAdapter
+from app.domain.adapters.execution_engine_adapter import ExecutionEngineAdapter
 from app.application.commands import (
     CreateSessionHandler,
     AddMessageHandler,
@@ -572,39 +573,64 @@ async def get_architect_agent_for_planning(
     return ArchitectAgent(plan_repository=plan_repository)
 
 
+async def get_execution_plan_repository(
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Получить типобезопасный ExecutionPlanRepository.
+    
+    Фаза 10.3: Новый репозиторий для работы с ExecutionPlan entities.
+    
+    Args:
+        db: Сессия БД (инжектируется)
+        
+    Returns:
+        ExecutionPlanRepositoryImpl: Типобезопасный репозиторий планов
+    """
+    from ..infrastructure.persistence.repositories.execution_plan_repository_impl import (
+        ExecutionPlanRepositoryImpl
+    )
+    return ExecutionPlanRepositoryImpl(db)
+
+
 async def get_execution_engine(
-    plan_repository = Depends(get_plan_repository),
+    execution_plan_repository = Depends(get_execution_plan_repository),
     approval_manager = Depends(get_approval_manager)
 ):
     """
-    Получить ExecutionEngine для выполнения планов.
+    Получить ExecutionEngineAdapter для выполнения планов.
+    
+    Фаза 10.3: Обновлено для использования ExecutionEngineAdapter,
+    который делегирует вызовы в PlanExecutionService из новой DDD-архитектуры.
     
     Args:
-        plan_repository: Репозиторий планов (инжектируется)
+        execution_plan_repository: Типобезопасный репозиторий планов (инжектируется)
         approval_manager: Approval manager для HITL (инжектируется)
         
     Returns:
-        ExecutionEngine: Engine для выполнения планов с State Machine
+        ExecutionEngineAdapter: Адаптер для выполнения планов
     """
-    from ..domain.services.execution_engine import ExecutionEngine
-    from ..domain.services.subtask_executor import SubtaskExecutor
-    from ..domain.services.dependency_resolver import DependencyResolver
+    from ..domain.execution_context.services.plan_execution_service import PlanExecutionService
+    from ..domain.execution_context.services.subtask_executor import SubtaskExecutor
+    from ..domain.execution_context.services.dependency_resolver import DependencyResolver
     
-    # Создать зависимости для ExecutionEngine
+    # Создать зависимости для PlanExecutionService
     subtask_executor = SubtaskExecutor(
-        plan_repository=plan_repository,
+        plan_repository=execution_plan_repository,
         max_retries=3
     )
     
     dependency_resolver = DependencyResolver()
     
-    return ExecutionEngine(
-        plan_repository=plan_repository,
+    # Создать PlanExecutionService с типобезопасным репозиторием
+    plan_execution_service = PlanExecutionService(
+        plan_repository=execution_plan_repository,
         subtask_executor=subtask_executor,
-        dependency_resolver=dependency_resolver,
-        approval_manager=approval_manager,  # ✅ НОВОЕ: Передаем ApprovalManager
-        max_parallel_tasks=1  # Временно 1 для избежания race condition
+        dependency_resolver=dependency_resolver
     )
+    
+    # Вернуть адаптер для обратной совместимости
+    return ExecutionEngineAdapter(plan_execution_service)
 
 
 async def get_execution_coordinator(

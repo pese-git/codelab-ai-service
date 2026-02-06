@@ -1,17 +1,24 @@
 """
 ExecutionCoordinator - Application-level coordinator для выполнения планов.
 
-Координирует взаимодействие между OrchestratorAgent и ExecutionEngine.
+Координирует взаимодействие между OrchestratorAgent и ExecutionEngine/ExecutionEngineAdapter.
 Управляет lifecycle выполнения плана и обрабатывает ошибки.
+
+Фаза 10.3: Обновлено для поддержки ExecutionEngineAdapter.
 """
 
 import logging
-from typing import Dict, Any, Optional, TYPE_CHECKING, AsyncGenerator
+from typing import Dict, Any, Optional, TYPE_CHECKING, AsyncGenerator, Union
 
 from app.domain.services.execution_engine import (
     ExecutionEngine,
     ExecutionResult,
     ExecutionEngineError
+)
+from app.domain.adapters.execution_engine_adapter import (
+    ExecutionEngineAdapter,
+    ExecutionResult as AdapterExecutionResult,
+    ExecutionEngineError as AdapterExecutionEngineError
 )
 from app.domain.entities.plan import PlanStatus
 from app.models.schemas import StreamChunk
@@ -34,19 +41,19 @@ class ExecutionCoordinator:
     Application-level coordinator для выполнения планов.
     
     Responsibilities:
-    - Координация выполнения плана через ExecutionEngine
+    - Координация выполнения плана через ExecutionEngine/ExecutionEngineAdapter
     - Мониторинг прогресса выполнения
     - Обработка ошибок и failures
     - Поддержка cancellation
     - Предоставление статуса выполнения
     
     Attributes:
-        execution_engine: Engine для выполнения планов
+        execution_engine: Engine или Adapter для выполнения планов
         plan_repository: Repository для работы с планами
     
     Example:
         >>> coordinator = ExecutionCoordinator(
-        ...     execution_engine=engine,
+        ...     execution_engine=engine_adapter,
         ...     plan_repository=repo
         ... )
         >>> result = await coordinator.execute_plan(
@@ -59,20 +66,23 @@ class ExecutionCoordinator:
     
     def __init__(
         self,
-        execution_engine: ExecutionEngine,
+        execution_engine: Union[ExecutionEngine, ExecutionEngineAdapter],
         plan_repository: "PlanRepository"
     ):
         """
         Initialize ExecutionCoordinator.
         
+        Фаза 10.3: Обновлено для поддержки ExecutionEngineAdapter.
+        
         Args:
-            execution_engine: Engine для выполнения планов
+            execution_engine: Engine или Adapter для выполнения планов
             plan_repository: Repository для работы с планами
         """
         self.execution_engine = execution_engine
         self.plan_repository = plan_repository
         
-        logger.info("ExecutionCoordinator initialized")
+        engine_type = type(execution_engine).__name__
+        logger.info(f"ExecutionCoordinator initialized with {engine_type}")
     
     async def execute_plan(
         self,
