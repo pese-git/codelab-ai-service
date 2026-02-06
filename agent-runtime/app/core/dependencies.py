@@ -16,11 +16,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.database import get_db, get_database_service, DatabaseService
 from app.infrastructure.persistence.repositories import (
-    SessionRepositoryImpl,
-    AgentContextRepositoryImpl,
     ConversationRepositoryImpl,
     AgentRepositoryImpl
 )
+from app.infrastructure.persistence.repositories.execution_plan_repository_impl import ExecutionPlanRepositoryImpl
 from app.infrastructure.adapters import EventPublisherAdapter
 from app.domain.services import (
     SessionManagementService,
@@ -71,36 +70,6 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
 
 # ==================== Repository Dependencies ====================
 
-async def get_session_repository(
-    db: AsyncSession = Depends(get_db_session)
-) -> SessionRepositoryImpl:
-    """
-    Получить репозиторий сессий.
-    
-    Args:
-        db: Сессия БД (инжектируется)
-        
-    Returns:
-        SessionRepositoryImpl: Реализация репозитория сессий
-    """
-    return SessionRepositoryImpl(db)
-
-
-async def get_agent_context_repository(
-    db: AsyncSession = Depends(get_db_session)
-) -> AgentContextRepositoryImpl:
-    """
-    Получить репозиторий контекстов агентов.
-    
-    Args:
-        db: Сессия БД (инжектируется)
-        
-    Returns:
-        AgentContextRepositoryImpl: Реализация репозитория контекстов
-    """
-    return AgentContextRepositoryImpl(db)
-
-
 async def get_conversation_repository(
     db: AsyncSession = Depends(get_db_session)
 ) -> ConversationRepositoryImpl:
@@ -131,20 +100,19 @@ async def get_agent_repository(
     return AgentRepositoryImpl(db)
 
 
-async def get_plan_repository(
+async def get_execution_plan_repository(
     db: AsyncSession = Depends(get_db_session)
-):
+) -> ExecutionPlanRepositoryImpl:
     """
-    Получить репозиторий планов.
+    Получить репозиторий планов выполнения (новая Clean Architecture).
     
     Args:
         db: Сессия БД (инжектируется)
         
     Returns:
-        PlanRepositoryImpl: Реализация репозитория планов
+        ExecutionPlanRepositoryImpl: Реализация репозитория планов
     """
-    from ..infrastructure.persistence.repositories.plan_repository_impl import PlanRepositoryImpl
-    return PlanRepositoryImpl(db)
+    return ExecutionPlanRepositoryImpl(db)
 
 
 async def get_fsm_state_repository(
@@ -446,7 +414,7 @@ async def get_tool_result_handler(
     agent_service: AgentOrchestrationService = Depends(get_agent_orchestration_service),
     switch_helper = Depends(get_agent_switch_helper),
     approval_manager = Depends(get_approval_manager),
-    plan_repository = Depends(get_plan_repository)
+    plan_repository = Depends(get_execution_plan_repository)
 ):
     """
     Получить handler результатов инструментов.
@@ -558,7 +526,7 @@ async def get_agent_context_manager_adapter(
 # ==================== Planning System Dependencies ====================
 
 async def get_architect_agent_for_planning(
-    plan_repository = Depends(get_plan_repository)
+    plan_repository = Depends(get_execution_plan_repository)
 ):
     """
     Получить ArchitectAgent для создания планов.
@@ -635,7 +603,7 @@ async def get_execution_engine(
 
 async def get_execution_coordinator(
     execution_engine = Depends(get_execution_engine),
-    plan_repository = Depends(get_plan_repository)
+    plan_repository = Depends(get_execution_plan_repository)
 ):
     """
     Получить ExecutionCoordinator для координации выполнения планов.
@@ -714,7 +682,7 @@ async def get_plan_approval_handler(
     session_service: SessionManagementService = Depends(get_session_management_service),
     execution_coordinator = Depends(get_execution_coordinator),
     fsm_orchestrator = Depends(get_fsm_orchestrator),
-    plan_repository = Depends(get_plan_repository)
+    plan_repository = Depends(get_execution_plan_repository)
 ):
     """
     Получить handler Plan Approval решений.
@@ -766,7 +734,7 @@ async def get_message_orchestration_service(
     tool_result_handler = Depends(get_tool_result_handler),
     hitl_handler = Depends(get_hitl_decision_handler),
     plan_approval_handler = Depends(get_plan_approval_handler),
-    plan_repository = Depends(get_plan_repository),
+    plan_repository = Depends(get_execution_plan_repository),
     execution_coordinator = Depends(get_execution_coordinator),
     session_service = Depends(get_session_management_service),
     approval_manager = Depends(get_approval_manager),
@@ -879,13 +847,13 @@ async def get_switch_agent_handler(
 # ==================== Query Handler Dependencies ====================
 
 async def get_get_session_handler(
-    repository: SessionRepositoryImpl = Depends(get_session_repository)
+    repository: ConversationRepositoryImpl = Depends(get_conversation_repository)
 ) -> GetSessionHandler:
     """
     Получить обработчик запроса получения сессии.
     
     Args:
-        repository: Репозиторий сессий (инжектируется)
+        repository: Репозиторий разговоров (инжектируется)
         
     Returns:
         GetSessionHandler: Query handler
@@ -894,15 +862,15 @@ async def get_get_session_handler(
 
 
 async def get_list_sessions_handler(
-    session_repository: SessionRepositoryImpl = Depends(get_session_repository),
-    context_repository: AgentContextRepositoryImpl = Depends(get_agent_context_repository)
+    session_repository: ConversationRepositoryImpl = Depends(get_conversation_repository),
+    context_repository: AgentRepositoryImpl = Depends(get_agent_repository)
 ) -> ListSessionsHandler:
     """
     Получить обработчик запроса списка сессий.
     
     Args:
-        session_repository: Репозиторий сессий (инжектируется)
-        context_repository: Репозиторий контекстов (инжектируется)
+        session_repository: Репозиторий разговоров (инжектируется)
+        context_repository: Репозиторий агентов (инжектируется)
         
     Returns:
         ListSessionsHandler: Query handler
@@ -911,7 +879,7 @@ async def get_list_sessions_handler(
 
 
 async def get_get_agent_context_handler(
-    repository: AgentContextRepositoryImpl = Depends(get_agent_context_repository)
+    repository: AgentRepositoryImpl = Depends(get_agent_repository)
 ) -> GetAgentContextHandler:
     """
     Получить обработчик запроса получения контекста агента.
