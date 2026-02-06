@@ -7,8 +7,16 @@
 
 from .session_adapter import SessionAdapter
 from .agent_context_adapter import AgentContextAdapter
+from .execution_engine_adapter import (
+    ExecutionEngineAdapter,
+    ExecutionEngineError,
+    ExecutionResult
+)
 
 __all__ = [
     "SessionAdapter",
     "AgentContextAdapter",
+    "ExecutionEngineAdapter",
+    "ExecutionEngineError",
+    "ExecutionResult",
 ]
