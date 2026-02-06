@@ -5,7 +5,9 @@ Domain Services для Agent Context.
 """
 
 from .agent_router_service import AgentRouterService
+from .agent_coordination_service import AgentCoordinationService
 
 __all__ = [
     "AgentRouterService",
+    "AgentCoordinationService",
 ]
