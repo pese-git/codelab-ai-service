@@ -155,7 +155,7 @@ class ExecutionPlanRepositoryImpl(ExecutionPlanRepository):
             )
             raise
     
-    async def delete(self, plan_id: PlanId) -> None:
+    async def delete(self, plan_id: PlanId) -> bool:
         """
         Удалить план.
         
@@ -164,18 +164,28 @@ class ExecutionPlanRepositoryImpl(ExecutionPlanRepository):
         Args:
             plan_id: ID плана
             
+        Returns:
+            True если план был удален, False если не найден
+            
         Raises:
             Exception: При ошибке удаления
             
         Example:
-            >>> await repo.delete(PlanId("plan-123"))
+            >>> deleted = await repo.delete(PlanId("plan-123"))
         """
         try:
+            # Проверяем существование
+            exists = await self.exists(plan_id)
+            if not exists:
+                logger.debug(f"ExecutionPlan {plan_id.value} not found for deletion")
+                return False
+            
             await self._db.execute(
                 delete(PlanModel).where(PlanModel.id == plan_id.value)
             )
             await self._db.flush()
             logger.debug(f"Deleted ExecutionPlan {plan_id.value}")
+            return True
             
         except Exception as e:
             logger.error(
@@ -211,7 +221,7 @@ class ExecutionPlanRepositoryImpl(ExecutionPlanRepository):
                 select(PlanModel)
                 .where(
                     PlanModel.session_id == conversation_id.value,
-                    PlanModel.status.in_(["approved", "in_progress"])
+                    PlanModel.status.in_(["draft", "approved", "in_progress"])
                 )
                 .order_by(PlanModel.created_at.desc())
             )
@@ -268,6 +278,246 @@ class ExecutionPlanRepositoryImpl(ExecutionPlanRepository):
         except Exception as e:
             logger.error(
                 f"Error counting plans for conversation {conversation_id.value}: {e}",
+                exc_info=True
+            )
+            raise
+    
+    async def exists(self, plan_id: PlanId) -> bool:
+        """
+        Проверить существование плана.
+        
+        Args:
+            plan_id: ID плана
+            
+        Returns:
+            True если план существует, False иначе
+            
+        Example:
+            >>> if await repo.exists(PlanId("plan-123")):
+            ...     print("Plan exists")
+        """
+        try:
+            from sqlalchemy import func
+            
+            result = await self._db.execute(
+                select(func.count(PlanModel.id))
+                .where(PlanModel.id == plan_id.value)
+            )
+            count = result.scalar_one()
+            return count > 0
+            
+        except Exception as e:
+            logger.error(
+                f"Error checking existence of ExecutionPlan {plan_id.value}: {e}",
+                exc_info=True
+            )
+            raise
+    
+    # Методы базового Repository интерфейса (aliases)
+    
+    async def get(self, id: PlanId) -> Optional[ExecutionPlan]:
+        """
+        Получить план по ID (alias для find_by_id).
+        
+        Args:
+            id: ID плана
+            
+        Returns:
+            ExecutionPlan или None
+        """
+        return await self.find_by_id(id)
+    
+    async def add(self, entity: ExecutionPlan) -> None:
+        """
+        Добавить новый план (alias для save).
+        
+        Args:
+            entity: ExecutionPlan entity
+        """
+        await self.save(entity)
+    
+    async def update(self, entity: ExecutionPlan) -> None:
+        """
+        Обновить существующий план (alias для save).
+        
+        Args:
+            entity: ExecutionPlan entity
+        """
+        await self.save(entity)
+    
+    async def remove(self, id: PlanId) -> None:
+        """
+        Удалить план (alias для delete).
+        
+        Args:
+            id: ID плана
+        """
+        await self.delete(id)
+    
+    async def list_all(
+        self,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None
+    ) -> List[ExecutionPlan]:
+        """
+        Получить все планы с пагинацией.
+        
+        Args:
+            limit: Максимальное количество планов
+            offset: Смещение от начала
+            
+        Returns:
+            Список ExecutionPlan
+            
+        Example:
+            >>> plans = await repo.list_all(limit=10, offset=0)
+        """
+        try:
+            query = select(PlanModel).order_by(PlanModel.created_at.desc())
+            
+            if offset:
+                query = query.offset(offset)
+            if limit:
+                query = query.limit(limit)
+            
+            result = await self._db.execute(query)
+            models = result.scalars().all()
+            
+            plans = []
+            for model in models:
+                plan = await self._mapper.to_entity(model, self._db)
+                plans.append(plan)
+            
+            logger.debug(f"Listed {len(plans)} plans")
+            return plans
+            
+        except Exception as e:
+            logger.error(f"Error listing plans: {e}", exc_info=True)
+            raise
+    
+    async def count(self) -> int:
+        """
+        Подсчитать общее количество планов.
+        
+        Returns:
+            Общее количество планов
+            
+        Example:
+            >>> total = await repo.count()
+        """
+        try:
+            from sqlalchemy import func
+            
+            result = await self._db.execute(
+                select(func.count(PlanModel.id))
+            )
+            count = result.scalar_one()
+            logger.debug(f"Total plans count: {count}")
+            return count
+            
+        except Exception as e:
+            logger.error(f"Error counting plans: {e}", exc_info=True)
+            raise
+    
+    async def find_by_status(
+        self,
+        status: str,
+        limit: Optional[int] = None
+    ) -> List[ExecutionPlan]:
+        """
+        Найти планы по статусу.
+        
+        Args:
+            status: Статус плана (draft, approved, in_progress, etc.)
+            limit: Максимальное количество планов
+            
+        Returns:
+            Список ExecutionPlan
+            
+        Example:
+            >>> active_plans = await repo.find_by_status("in_progress")
+        """
+        try:
+            query = select(PlanModel).where(
+                PlanModel.status == status
+            ).order_by(PlanModel.created_at.desc())
+            
+            if limit:
+                query = query.limit(limit)
+            
+            result = await self._db.execute(query)
+            models = result.scalars().all()
+            
+            plans = []
+            for model in models:
+                plan = await self._mapper.to_entity(model, self._db)
+                plans.append(plan)
+            
+            logger.debug(f"Found {len(plans)} plans with status {status}")
+            return plans
+            
+        except Exception as e:
+            logger.error(f"Error finding plans by status {status}: {e}", exc_info=True)
+            raise
+    
+    async def count_by_conversation(
+        self,
+        conversation_id: ConversationId
+    ) -> int:
+        """
+        Подсчитать планы для conversation (alias для count_by_conversation_id).
+        
+        Args:
+            conversation_id: ID conversation
+            
+        Returns:
+            Количество планов
+        """
+        return await self.count_by_conversation_id(conversation_id)
+    
+    async def find_all_by_conversation_id(
+        self,
+        conversation_id: ConversationId,
+        limit: int = 50,
+        offset: int = 0
+    ) -> List[ExecutionPlan]:
+        """
+        Найти все планы для conversation (расширенная версия find_by_conversation_id).
+        
+        Args:
+            conversation_id: ID conversation
+            limit: Максимальное количество планов
+            offset: Смещение
+            
+        Returns:
+            Список ExecutionPlan
+        """
+        try:
+            query = select(PlanModel).where(
+                PlanModel.session_id == conversation_id.value
+            ).order_by(PlanModel.created_at.desc())
+            
+            if offset:
+                query = query.offset(offset)
+            if limit:
+                query = query.limit(limit)
+            
+            result = await self._db.execute(query)
+            models = result.scalars().all()
+            
+            plans = []
+            for model in models:
+                plan = await self._mapper.to_entity(model, self._db)
+                plans.append(plan)
+            
+            logger.debug(
+                f"Found {len(plans)} plans for conversation {conversation_id.value}"
+            )
+            return plans
+            
+        except Exception as e:
+            logger.error(
+                f"Error finding plans for conversation {conversation_id.value}: {e}",
                 exc_info=True
             )
             raise

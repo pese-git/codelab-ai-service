@@ -4,6 +4,7 @@ Value Object для идентификатора плана выполнения
 Инкапсулирует валидацию и бизнес-правила для ID плана.
 """
 
+import uuid
 from app.domain.shared.value_object import ValueObject
 
 
@@ -72,3 +73,19 @@ class PlanId(ValueObject):
     def __hash__(self) -> int:
         """Хеш для использования в множествах и словарях."""
         return hash(self._value)
+    
+    @staticmethod
+    def generate() -> "PlanId":
+        """
+        Сгенерировать новый уникальный PlanId.
+        
+        Returns:
+            Новый PlanId с уникальным UUID
+            
+        Example:
+            >>> plan_id = PlanId.generate()
+            >>> len(plan_id.value)
+            36
+        """
+        unique_id = str(uuid.uuid4())
+        return PlanId(unique_id)
