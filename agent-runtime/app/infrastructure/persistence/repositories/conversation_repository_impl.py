@@ -5,8 +5,8 @@
 """
 
 import logging
-from typing import Optional, List
-from datetime import datetime
+from typing import Optional, List, Dict, Any
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, delete
 
@@ -29,12 +29,11 @@ class ConversationRepositoryImpl(ConversationRepository):
     Атрибуты:
         _db: Сессия БД SQLAlchemy
         _mapper: Mapper для преобразования данных
-    
-    Пример:
-        >>> repo = ConversationRepositoryImpl(db_session)
-        >>> conv_id = ConversationId("conv-123")
-        >>> conversation = await repo.find_by_id(conv_id)
+        _snapshots: In-memory хранилище для snapshots (class variable)
     """
+    
+    # In-memory хранилище для snapshots (shared между всеми экземплярами)
+    _snapshots: Dict[str, Dict[str, Any]] = {}
     
     def __init__(self, db: AsyncSession):
         """
@@ -46,6 +45,59 @@ class ConversationRepositoryImpl(ConversationRepository):
         self._db = db
         self._mapper = ConversationMapper()
     
+    async def save_snapshot(
+        self,
+        snapshot_id: str,
+        snapshot: Dict[str, Any]
+    ) -> None:
+        """
+        Сохранить snapshot conversation в in-memory хранилище.
+        
+        Args:
+            snapshot_id: Уникальный ID snapshot
+            snapshot: Данные snapshot
+        """
+        try:
+            # Добавить timestamp для возможной очистки старых snapshots
+            snapshot_with_meta = {
+                **snapshot,
+                "_saved_at": datetime.now(timezone.utc).isoformat()
+            }
+            
+            ConversationRepositoryImpl._snapshots[snapshot_id] = snapshot_with_meta
+            
+            logger.debug(
+                f"Saved snapshot {snapshot_id} "
+                f"(messages: {snapshot.get('message_count', 0)})"
+            )
+            
+        except Exception as e:
+            logger.error(f"Error saving snapshot {snapshot_id}: {e}")
+            raise
+    
+    async def get_snapshot(
+        self,
+        snapshot_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Получить snapshot conversation из in-memory хранилища.
+        
+        Args:
+            snapshot_id: Уникальный ID snapshot
+            
+        Returns:
+            Данные snapshot или None
+        """
+        snapshot = ConversationRepositoryImpl._snapshots.get(snapshot_id)
+        
+        if snapshot:
+            logger.debug(f"Retrieved snapshot {snapshot_id}")
+        else:
+            logger.debug(f"Snapshot {snapshot_id} not found")
+        
+        return snapshot
+
+
     async def find_by_id(
         self,
         conversation_id: ConversationId,

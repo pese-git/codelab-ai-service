@@ -5,7 +5,8 @@ AgentId Value Object.
 """
 
 import uuid
-from typing import Optional
+from typing import Optional, Any
+from pydantic import field_validator
 
 from ...shared.value_object import ValueObject
 
@@ -21,103 +22,97 @@ class AgentId(ValueObject):
     - Генерацию новых ID
     
     Атрибуты:
-        value: Строковое значение ID
+        value: Строковое значение ID (UUID без префикса)
     
     Пример:
         >>> agent_id = AgentId.generate()
         >>> agent_id.value
-        'agent-123e4567-e89b-12d3-a456-426614174000'
+        '123e4567-e89b-12d3-a456-426614174000'
         
-        >>> agent_id = AgentId("agent-123")
+        >>> agent_id = AgentId(value="123e4567-e89b-12d3-a456-426614174000")
         >>> str(agent_id)
-        'agent-123'
+        '123e4567-e89b-12d3-a456-426614174000'
     """
     
-    def __init__(self, value: str) -> None:
+    value: str
+    
+    @field_validator('value')
+    @classmethod
+    def validate_value(cls, v: str) -> str:
         """
-        Создать AgentId с валидацией.
+        Валидация значения ID.
         
         Args:
-            value: Строковое значение ID
+            v: Значение для валидации
+            
+        Returns:
+            Валидированное значение
             
         Raises:
             ValueError: Если ID невалиден
-            
-        Пример:
-            >>> agent_id = AgentId("agent-123")
-            >>> agent_id.value
-            'agent-123'
         """
-        if not value:
+        if not v:
             raise ValueError("Agent ID не может быть пустым")
         
-        if not isinstance(value, str):
-            raise ValueError(f"Agent ID должен быть строкой, получен {type(value).__name__}")
+        if not isinstance(v, str):
+            raise ValueError(f"Agent ID должен быть строкой, получен {type(v).__name__}")
         
-        if len(value) > 255:
-            raise ValueError(f"Agent ID слишком длинный: {len(value)} символов (максимум 255)")
+        v = v.strip()
+        
+        if not v:
+            raise ValueError("Agent ID не может состоять только из пробелов")
+        
+        if len(v) > 255:
+            raise ValueError(f"Agent ID слишком длинный: {len(v)} символов (максимум 255)")
         
         # Проверка на недопустимые символы
-        if any(char in value for char in ['\n', '\r', '\t', '\0']):
+        if any(char in v for char in ['\n', '\r', '\t', '\0']):
             raise ValueError("Agent ID содержит недопустимые символы")
         
-        self._value = value.strip()
-        
-        if not self._value:
-            raise ValueError("Agent ID не может состоять только из пробелов")
-    
-    @property
-    def value(self) -> str:
-        """Получить строковое значение ID."""
-        return self._value
+        return v
     
     @staticmethod
-    def generate(prefix: str = "agent") -> "AgentId":
+    def generate() -> "AgentId":
         """
         Сгенерировать новый уникальный AgentId.
         
-        Args:
-            prefix: Префикс для ID (по умолчанию "agent")
-            
+        Генерирует чистый UUID без префикса для совместимости с БД VARCHAR(36).
+        
         Returns:
-            Новый AgentId с уникальным значением
+            Новый AgentId с уникальным UUID
             
         Пример:
             >>> agent_id = AgentId.generate()
-            >>> agent_id.value.startswith("agent-")
-            True
-            
-            >>> custom_id = AgentId.generate(prefix="ctx")
-            >>> custom_id.value.startswith("ctx-")
-            True
+            >>> len(agent_id.value)
+            36
         """
         unique_id = str(uuid.uuid4())
-        return AgentId(f"{prefix}-{unique_id}")
+        return AgentId(value=unique_id)
     
     @staticmethod
     def from_session_id(session_id: str) -> "AgentId":
         """
-        Создать AgentId из session ID.
+        Создать AgentId из session ID (генерирует новый UUID).
         
-        Полезно для создания связанного контекста агента.
+        ВАЖНО: Теперь генерирует новый UUID вместо использования session_id,
+        чтобы соответствовать ограничению БД VARCHAR(36).
         
         Args:
-            session_id: ID сессии
+            session_id: ID сессии (используется только для валидации)
             
         Returns:
-            AgentId связанный с сессией
+            AgentId с новым UUID
             
         Пример:
             >>> agent_id = AgentId.from_session_id("session-123")
-            >>> agent_id.value
-            'agent-session-123'
+            >>> len(agent_id.value)
+            36
         """
         if not session_id:
             raise ValueError("Session ID не может быть пустым")
         
-        # Убираем префикс "session-" если есть
-        clean_id = session_id.replace("session-", "")
-        return AgentId(f"agent-{clean_id}")
+        # Генерируем новый UUID вместо использования session_id
+        return AgentId.generate()
     
     def __str__(self) -> str:
         """Строковое представление."""

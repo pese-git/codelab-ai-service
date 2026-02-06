@@ -191,3 +191,40 @@ class ConversationRepository(Repository[Conversation, ConversationId]):
             >>> inactive = await repo.find_inactive_since(since)
         """
         pass
+    
+    @abstractmethod
+    async def save_snapshot(
+        self,
+        snapshot_id: str,
+        snapshot: dict
+    ) -> None:
+        """
+        Сохранить snapshot conversation (для изоляции контекста subtasks).
+        
+        Args:
+            snapshot_id: Уникальный ID snapshot
+            snapshot: Данные snapshot
+            
+        Пример:
+            >>> await repo.save_snapshot("conv-123_snapshot_subtask-1", snapshot_data)
+        """
+        pass
+    
+    @abstractmethod
+    async def get_snapshot(
+        self,
+        snapshot_id: str
+    ) -> Optional[dict]:
+        """
+        Получить snapshot conversation.
+        
+        Args:
+            snapshot_id: Уникальный ID snapshot
+            
+        Returns:
+            Данные snapshot или None
+            
+        Пример:
+            >>> snapshot = await repo.get_snapshot("conv-123_snapshot_subtask-1")
+        """
+        pass

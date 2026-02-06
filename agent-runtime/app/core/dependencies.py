@@ -26,6 +26,15 @@ from app.domain.services import (
     SessionManagementService,
     AgentOrchestrationService
 )
+# Новые сервисы и адаптеры (Фаза 10)
+from app.domain.session_context.services.conversation_management_service import (
+    ConversationManagementService
+)
+from app.domain.agent_context.services.agent_coordination_service import (
+    AgentCoordinationService
+)
+from app.domain.adapters.conversation_service_adapter import ConversationServiceAdapter
+from app.domain.adapters.agent_orchestration_adapter import AgentOrchestrationAdapter
 from app.application.commands import (
     CreateSessionHandler,
     AddMessageHandler,
@@ -248,44 +257,88 @@ async def get_approval_manager(
 
 # ==================== Domain Service Dependencies ====================
 
-async def get_session_management_service(
-    repository: SessionRepositoryImpl = Depends(get_session_repository),
+# Новые сервисы (Фаза 10)
+
+async def get_conversation_management_service(
+    repository: ConversationRepositoryImpl = Depends(get_conversation_repository),
     event_publisher: EventPublisherAdapter = Depends(get_event_publisher)
-) -> SessionManagementService:
+) -> ConversationManagementService:
     """
-    Получить доменный сервис управления сессиями.
+    Получить новый сервис управления разговорами (Фаза 10).
     
     Args:
-        repository: Репозиторий сессий (инжектируется)
+        repository: Репозиторий разговоров (инжектируется)
         event_publisher: Адаптер для публикации событий (инжектируется)
         
     Returns:
-        SessionManagementService: Доменный сервис
+        ConversationManagementService: Новый доменный сервис
     """
-    return SessionManagementService(
+    return ConversationManagementService(
         repository=repository,
         event_publisher=event_publisher.publish
     )
+
+
+async def get_agent_coordination_service(
+    repository: AgentRepositoryImpl = Depends(get_agent_repository),
+    event_publisher: EventPublisherAdapter = Depends(get_event_publisher)
+) -> AgentCoordinationService:
+    """
+    Получить новый сервис координации агентов (Фаза 10).
+    
+    Args:
+        repository: Репозиторий агентов (инжектируется)
+        event_publisher: Адаптер для публикации событий (инжектируется)
+        
+    Returns:
+        AgentCoordinationService: Новый доменный сервис
+    """
+    return AgentCoordinationService(
+        repository=repository,
+        event_publisher=event_publisher.publish
+    )
+
+
+# Legacy сервисы через адаптеры (Фаза 10.1.4)
+
+async def get_session_management_service(
+    conversation_service: ConversationManagementService = Depends(get_conversation_management_service)
+) -> SessionManagementService:
+    """
+    Получить доменный сервис управления сессиями (через адаптер).
+    
+    ВАЖНО: Теперь возвращает ConversationServiceAdapter, который предоставляет
+    старый API SessionManagementService, но использует новый ConversationManagementService.
+    
+    Это часть Фазы 10.1.4 - постепенная миграция на новую архитектуру.
+    
+    Args:
+        conversation_service: Новый сервис разговоров (инжектируется)
+        
+    Returns:
+        SessionManagementService: Адаптер с legacy API
+    """
+    return ConversationServiceAdapter(conversation_service)
 
 
 async def get_agent_orchestration_service(
-    repository: AgentContextRepositoryImpl = Depends(get_agent_context_repository),
-    event_publisher: EventPublisherAdapter = Depends(get_event_publisher)
+    coordination_service: AgentCoordinationService = Depends(get_agent_coordination_service)
 ) -> AgentOrchestrationService:
     """
-    Получить доменный сервис оркестрации агентов.
+    Получить доменный сервис оркестрации агентов (через адаптер).
+    
+    ВАЖНО: Теперь возвращает AgentOrchestrationAdapter, который предоставляет
+    старый API AgentOrchestrationService, но использует новый AgentCoordinationService.
+    
+    Это часть Фазы 10.1.4 - постепенная миграция на новую архитектуру.
     
     Args:
-        repository: Репозиторий контекстов (инжектируется)
-        event_publisher: Адаптер для публикации событий (инжектируется)
+        coordination_service: Новый сервис координации (инжектируется)
         
     Returns:
-        AgentOrchestrationService: Доменный сервис
+        AgentOrchestrationService: Адаптер с legacy API
     """
-    return AgentOrchestrationService(
-        repository=repository,
-        event_publisher=event_publisher.publish
-    )
+    return AgentOrchestrationAdapter(coordination_service)
 
 
 # ==================== Agent Switch Helper ====================

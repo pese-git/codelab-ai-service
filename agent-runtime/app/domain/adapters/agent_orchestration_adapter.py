@@ -126,6 +126,9 @@ class AgentOrchestrationAdapter:
         Returns:
             AgentContext entity (legacy)
         """
+        from ..entities.agent_context import AgentSwitch
+        import uuid
+        
         # Создать AgentContext с теми же данными
         context = AgentContext(
             id=agent.id,
@@ -138,14 +141,16 @@ class AgentOrchestrationAdapter:
             updated_at=agent.updated_at
         )
         
-        # Конвертировать историю переключений
+        # Конвертировать историю переключений в объекты AgentSwitch
         for record in agent.switch_history:
-            context.switch_history.append({
-                "from": record.from_agent.value if record.from_agent else None,
-                "to": record.to_agent.value,
-                "reason": record.reason,
-                "timestamp": record.switched_at.isoformat(),
-                "confidence": record.confidence
-            })
+            switch = AgentSwitch(
+                id=record.id if hasattr(record, 'id') and record.id else str(uuid.uuid4()),
+                from_agent=record.from_agent,
+                to_agent=record.to_agent,
+                reason=record.reason,
+                switched_at=record.switched_at,
+                confidence=record.confidence
+            )
+            context.switch_history.append(switch)
         
         return context

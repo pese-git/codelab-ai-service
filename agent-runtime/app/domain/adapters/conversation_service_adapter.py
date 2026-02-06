@@ -287,7 +287,8 @@ class ConversationServiceAdapter:
             Session entity (legacy)
         """
         # Получить список сообщений из MessageCollection
-        messages = conversation.messages.to_list()
+        # MessageCollection.messages - это List[Message]
+        messages = conversation.messages.messages
         
         # Создать Session с теми же данными
         session = Session(

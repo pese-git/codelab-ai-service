@@ -278,12 +278,12 @@ class AgentCoordinationService:
         # Опубликовать событие успешного переключения
         if self._event_publisher:
             event = AgentSwitched(
-                aggregate_id=session_id,
+                agent_id=AgentId(value=agent.id),
                 session_id=session_id,
-                from_agent=from_type.value,
-                to_agent=target_type.value,
+                from_type=from_type,
+                to_type=target_type,
                 reason=reason,
-                switch_count=agent.switch_count
+                confidence=confidence
             )
             await self._event_publisher(event)
         

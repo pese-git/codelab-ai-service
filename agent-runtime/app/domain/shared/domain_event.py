@@ -58,6 +58,25 @@ class DomainEvent(BaseModel):
         if not self.event_type:
             object.__setattr__(self, 'event_type', self.__class__.__name__)
     
+    def get_event_name(self) -> str:
+        """
+        Get event name (for backward compatibility with legacy code).
+        
+        Returns:
+            Event class name
+        """
+        return self.__class__.__name__
+    
+    @property
+    def aggregate_id(self) -> str:
+        """
+        Get aggregate ID (for backward compatibility with legacy code).
+        
+        Returns event_id as aggregate_id for compatibility.
+        Override in subclasses if needed.
+        """
+        return self.event_id
+    
     def to_dict(self) -> Dict[str, Any]:
         """
         Convert event to dictionary representation.

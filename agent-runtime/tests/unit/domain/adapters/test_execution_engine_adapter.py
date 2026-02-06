@@ -50,21 +50,21 @@ def sample_plan():
     subtask1 = Subtask(
         id=SubtaskId("subtask-1"),
         description="Test subtask 1",
-        agent_id=AgentId("code"),
+        agent_id=AgentId(value="code"),
         dependencies=[],
         status=SubtaskStatus.PENDING
     )
     subtask2 = Subtask(
         id=SubtaskId("subtask-2"),
         description="Test subtask 2",
-        agent_id=AgentId("architect"),
-        dependencies=[SubtaskId("subtask-1")],
+        agent_id=AgentId(value="architect"),
+        dependencies=[SubtaskId(value="subtask-1")],
         status=SubtaskStatus.PENDING
     )
     
     plan = ExecutionPlan(
         id=plan_id,
-        conversation_id=ConversationId("conv-123"),
+        conversation_id=ConversationId(value="conv-123"),
         goal="Test goal",
         subtasks=[subtask1, subtask2],
         status=PlanStatus.PENDING
