@@ -8,7 +8,7 @@ from typing import Optional
 from pydantic import Field
 
 from .base import Query, QueryHandler
-from ...domain.repositories.agent_context_repository import AgentContextRepository
+from ...domain.agent_context.repositories.agent_repository import AgentRepository
 from ..dto.agent_context_dto import AgentContextDTO
 
 
@@ -51,12 +51,12 @@ class GetAgentContextHandler(QueryHandler[Optional[AgentContextDTO]]):
         ...     print(f"Current agent: {dto.current_agent}")
     """
     
-    def __init__(self, repository: AgentContextRepository):
+    def __init__(self, repository: AgentRepository):
         """
         Инициализация обработчика.
         
         Args:
-            repository: Репозиторий контекстов агентов
+            repository: Репозиторий агентов
         """
         self._repository = repository
     
@@ -77,14 +77,14 @@ class GetAgentContextHandler(QueryHandler[Optional[AgentContextDTO]]):
             ... )
             >>> dto = await handler.handle(query)
         """
-        # Получить контекст из репозитория
-        context = await self._repository.find_by_session_id(query.session_id)
+        # Получить агента из репозитория
+        agent = await self._repository.find_by_session_id(query.session_id)
         
-        if not context:
+        if not agent:
             return None
         
         # Преобразовать в DTO
         return AgentContextDTO.from_entity(
-            context,
+            agent,
             include_history=query.include_history
         )

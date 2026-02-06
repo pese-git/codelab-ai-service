@@ -8,8 +8,8 @@ from typing import List
 from pydantic import Field
 
 from .base import Query, QueryHandler
-from ...domain.repositories.session_repository import SessionRepository
-from ...domain.repositories.agent_context_repository import AgentContextRepository
+from ...domain.session_context.repositories.conversation_repository import ConversationRepository
+from ...domain.agent_context.repositories.agent_repository import AgentRepository
 from ..dto.session_dto import SessionListItemDTO
 
 
@@ -59,15 +59,15 @@ class ListSessionsHandler(QueryHandler[List[SessionListItemDTO]]):
     
     def __init__(
         self,
-        session_repository: SessionRepository,
-        context_repository: AgentContextRepository
+        session_repository: ConversationRepository,
+        context_repository: AgentRepository
     ):
         """
         Инициализация обработчика.
         
         Args:
-            session_repository: Репозиторий сессий
-            context_repository: Репозиторий контекстов агентов
+            session_repository: Репозиторий разговоров
+            context_repository: Репозиторий агентов
         """
         self._session_repository = session_repository
         self._context_repository = context_repository
@@ -102,8 +102,8 @@ class ListSessionsHandler(QueryHandler[List[SessionListItemDTO]]):
         result = []
         for session in sessions:
             # Получить текущего агента для сессии
-            context = await self._context_repository.find_by_session_id(session.id)
-            current_agent = context.current_agent.value if context else None
+            agent = await self._context_repository.find_by_session_id(str(session.id))
+            current_agent = agent.current_type.value if agent else None
             
             # Создать DTO
             dto = SessionListItemDTO.from_entity(

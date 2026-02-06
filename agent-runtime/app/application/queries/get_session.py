@@ -8,7 +8,8 @@ from typing import Optional
 from pydantic import Field
 
 from .base import Query, QueryHandler
-from ...domain.repositories.session_repository import SessionRepository
+from ...domain.session_context.repositories.conversation_repository import ConversationRepository
+from ...domain.session_context.value_objects.conversation_id import ConversationId
 from ..dto.session_dto import SessionDTO
 
 
@@ -51,12 +52,12 @@ class GetSessionHandler(QueryHandler[Optional[SessionDTO]]):
         ...     print(f"Found session: {dto.title}")
     """
     
-    def __init__(self, repository: SessionRepository):
+    def __init__(self, repository: ConversationRepository):
         """
         Инициализация обработчика.
         
         Args:
-            repository: Репозиторий сессий
+            repository: Репозиторий разговоров
         """
         self._repository = repository
     
@@ -74,14 +75,17 @@ class GetSessionHandler(QueryHandler[Optional[SessionDTO]]):
             >>> query = GetSessionQuery(session_id="session-1", include_messages=True)
             >>> dto = await handler.handle(query)
         """
-        # Получить сессию из репозитория
-        session = await self._repository.find_by_id(query.session_id)
+        # Получить conversation из репозитория
+        conversation = await self._repository.find_by_id(
+            ConversationId(query.session_id),
+            load_messages=query.include_messages
+        )
         
-        if not session:
+        if not conversation:
             return None
         
         # Преобразовать в DTO
         return SessionDTO.from_entity(
-            session,
+            conversation,
             include_messages=query.include_messages
         )

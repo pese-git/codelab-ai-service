@@ -9,7 +9,7 @@ from typing import Optional, List
 from datetime import datetime
 from pydantic import BaseModel, Field
 
-from ...domain.entities.session import Session
+from ...domain.session_context.entities.conversation import Conversation as Session
 from .message_dto import MessageDTO
 
 

@@ -8,7 +8,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel, Field
 
-from ...domain.entities.agent_context import AgentContext, AgentSwitch
+from ...domain.agent_context.entities.agent import Agent as AgentContext, AgentSwitchRecord as AgentSwitch
 
 
 class AgentSwitchDTO(BaseModel):
@@ -130,9 +130,9 @@ class AgentContextDTO(BaseModel):
             ]
         
         return cls(
-            id=context.id,
+            id=str(context.id) if hasattr(context.id, 'value') else context.id,
             session_id=context.session_id,
-            current_agent=context.current_agent.value,
+            current_agent=context.current_type.value if hasattr(context, 'current_type') else context.current_agent.value,
             switch_count=context.switch_count,
             switch_history=history_dto,
             last_switch_at=context.last_switch_at,

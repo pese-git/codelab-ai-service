@@ -341,6 +341,58 @@ class ConversationRepositoryImpl(ConversationRepository):
         """Alias для delete (базовый метод Repository)."""
         await self.delete(id)
     
+    async def find_active(
+        self,
+        limit: int = 100,
+        offset: int = 0
+    ) -> List[Conversation]:
+        """
+        Найти активные conversations (для обратной совместимости с legacy).
+        
+        Args:
+            limit: Максимальное количество результатов
+            offset: Смещение для пагинации
+            
+        Returns:
+            Список активных conversations
+        """
+        result = await self._db.execute(
+            select(SessionModel)
+            .where(
+                SessionModel.is_active == True,
+                SessionModel.deleted_at.is_(None)
+            )
+            .order_by(SessionModel.last_activity.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        models = result.scalars().all()
+        
+        conversations = []
+        for model in models:
+            conversation = await self._mapper.to_entity(model, self._db, load_messages=False)
+            conversations.append(conversation)
+        
+        logger.debug(f"Found {len(conversations)} active conversations")
+        return conversations
+    
+    async def list(
+        self,
+        limit: int = 100,
+        offset: int = 0
+    ) -> List[Conversation]:
+        """
+        Получить все conversations (для обратной совместимости с legacy).
+        
+        Args:
+            limit: Максимальное количество результатов
+            offset: Смещение для пагинации
+            
+        Returns:
+            Список conversations
+        """
+        return await self.list_all(limit=limit, offset=offset)
+    
     async def list_all(
         self,
         limit: Optional[int] = None,
