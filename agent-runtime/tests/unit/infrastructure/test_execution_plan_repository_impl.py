@@ -67,7 +67,7 @@ def sample_subtask():
     return Subtask(
         id=SubtaskId("subtask-1"),
         description="Test subtask",
-        agent_id=AgentId("coder"),
+        agent_id=AgentId(value="coder"),
         dependencies=[],
         status=SubtaskStatus.pending(),
         estimated_time="5 min"
@@ -149,7 +149,7 @@ class TestExecutionPlanRepositoryImpl:
         new_subtask = Subtask(
             id=SubtaskId("subtask-2"),
             description="New subtask",
-            agent_id=AgentId("debug")
+            agent_id=AgentId(value="debug")
         )
         found.add_subtask(new_subtask)
         
@@ -358,18 +358,18 @@ class TestExecutionPlanRepositoryImpl:
         subtask1 = Subtask(
             id=SubtaskId("st-1"),
             description="Subtask 1",
-            agent_id=AgentId("coder")
+            agent_id=AgentId(value="coder")
         )
         subtask2 = Subtask(
             id=SubtaskId("st-2"),
             description="Subtask 2",
-            agent_id=AgentId("debug"),
+            agent_id=AgentId(value="debug"),
             dependencies=[SubtaskId("st-1")]
         )
         subtask3 = Subtask(
             id=SubtaskId("st-3"),
             description="Subtask 3",
-            agent_id=AgentId("ask")
+            agent_id=AgentId(value="ask")
         )
         
         plan = ExecutionPlan(

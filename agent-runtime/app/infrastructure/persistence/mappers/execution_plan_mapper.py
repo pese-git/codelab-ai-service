@@ -63,12 +63,17 @@ class ExecutionPlanMapper:
         # Загрузить subtasks если требуется
         subtasks: List[Subtask] = []
         if load_subtasks:
-            result = await db.execute(
-                select(SubtaskModel)
-                .where(SubtaskModel.plan_id == model.id)
-                .order_by(SubtaskModel.created_at.asc())
-            )
-            subtask_models = result.scalars().all()
+            # Сначала проверяем, есть ли уже загруженные subtasks в модели
+            if hasattr(model, 'subtasks') and model.subtasks:
+                subtask_models = model.subtasks
+            else:
+                # Загружаем из БД
+                result = await db.execute(
+                    select(SubtaskModel)
+                    .where(SubtaskModel.plan_id == model.id)
+                    .order_by(SubtaskModel.created_at.asc())
+                )
+                subtask_models = result.scalars().all()
             
             # Преобразовать модели subtasks в entities
             for st_model in subtask_models:
@@ -124,26 +129,15 @@ class ExecutionPlanMapper:
                     f"Failed to parse dependencies for subtask {model.id}"
                 )
         
-        # Парсинг metadata
-        metadata = {}
-        if model.metadata_json:
-            try:
-                metadata = json.loads(model.metadata_json)
-            except json.JSONDecodeError:
-                logger.warning(
-                    f"Failed to parse metadata for subtask {model.id}"
-                )
-        
         return Subtask(
             id=SubtaskId(model.id),
             description=model.description,
-            agent_id=AgentId(model.agent),
+            agent_id=AgentId(value=model.agent),
             dependencies=dependencies,
             status=SubtaskStatus.from_string(model.status),
             estimated_time=model.estimated_time,
             result=model.result,
             error=model.error,
-            metadata=metadata,
             started_at=model.started_at,
             completed_at=model.completed_at,
             created_at=model.created_at,
@@ -179,6 +173,11 @@ class ExecutionPlanMapper:
         if model is None:
             model = PlanModel(id=entity.id.value)
             db.add(model)
+            # Установить timestamps из entity если они есть
+            if entity.created_at:
+                model.created_at = entity.created_at
+            if entity.updated_at:
+                model.updated_at = entity.updated_at
         
         # Обновить поля
         model.session_id = entity.conversation_id.value
@@ -189,7 +188,8 @@ class ExecutionPlanMapper:
         model.approved_at = entity.approved_at
         model.started_at = entity.started_at
         model.completed_at = entity.completed_at
-        model.updated_at = entity.updated_at
+        if entity.updated_at:
+            model.updated_at = entity.updated_at
         
         # Сохранить subtasks
         await self._save_subtasks(entity, db)
@@ -229,7 +229,6 @@ class ExecutionPlanMapper:
                 estimated_time=subtask.estimated_time,
                 result=subtask.result,
                 error=subtask.error,
-                metadata_json=json.dumps(subtask.metadata) if subtask.metadata else None,
                 started_at=subtask.started_at,
                 completed_at=subtask.completed_at,
                 created_at=subtask.created_at,
