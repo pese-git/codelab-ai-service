@@ -3,12 +3,21 @@
 
 Этот модуль содержит базовые классы для доменных сущностей.
 Сущности представляют бизнес-объекты с уникальной идентичностью.
+
+MIGRATION NOTE (Phase 10):
+- Session, AgentContext, AgentType, AgentSwitch are now aliases to new DDD entities
+- Legacy entities moved to *_legacy.py files
+- Use new imports from domain.session_context and domain.agent_context for new code
 """
 
 from .base import Entity
 from .message import Message
-from .session import Session
-from .agent_context import AgentContext, AgentType, AgentSwitch
+
+# Алиасы для обратной совместимости (deprecated - use new DDD entities)
+from ..session_context.entities.conversation import Conversation as Session
+from ..agent_context.entities.agent import Agent as AgentContext, AgentSwitchRecord as AgentSwitch
+from ..agent_context.value_objects.agent_capabilities import AgentType
+
 from .hitl import (
     HITLDecision,
     HITLPolicyRule,
@@ -27,16 +36,19 @@ from .approval import (
 __all__ = [
     "Entity",
     "Message",
-    "Session",
-    "AgentContext",
-    "AgentType",
-    "AgentSwitch",
+    # Deprecated aliases (use new DDD entities instead)
+    "Session",  # Use Conversation from domain.session_context
+    "AgentContext",  # Use Agent from domain.agent_context
+    "AgentType",  # Use from domain.agent_context.value_objects
+    "AgentSwitch",  # Use AgentSwitchRecord from domain.agent_context.entities
+    # HITL entities
     "HITLDecision",
     "HITLPolicyRule",
     "HITLPolicy",
     "HITLUserDecision",
     "HITLAuditLog",
     "HITLPendingState",
+    # Approval entities
     "ApprovalRequestType",
     "ApprovalPolicyRule",
     "ApprovalPolicy",
