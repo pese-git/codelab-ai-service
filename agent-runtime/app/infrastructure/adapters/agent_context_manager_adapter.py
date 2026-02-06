@@ -9,7 +9,8 @@ import logging
 from typing import List, Optional
 
 from ...domain.services.agent_orchestration import AgentOrchestrationService
-from ...domain.entities.agent_context import AgentContext, AgentType
+from ...domain.agent_context.entities.agent import Agent as AgentContext
+from ...domain.agent_context.value_objects.agent_capabilities import AgentType
 from ...core.errors import AgentSwitchError
 
 logger = logging.getLogger("agent-runtime.adapters.agent_context_manager")
