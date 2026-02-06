@@ -23,20 +23,8 @@ class ConversationStarted(DomainEvent):
     """
     
     conversation_id: str
-    title: Optional[str]
-    metadata: Dict[str, Any]
-    
-    def __init__(
-        self,
-        conversation_id: str,
-        title: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        occurred_at: Optional[datetime] = None
-    ):
-        super().__init__(occurred_at=occurred_at)
-        self.conversation_id = conversation_id
-        self.title = title
-        self.metadata = metadata or {}
+    title: Optional[str] = None
+    metadata: Dict[str, Any] = {}
 
 
 class MessageAdded(DomainEvent):
@@ -57,23 +45,7 @@ class MessageAdded(DomainEvent):
     message_id: str
     role: str
     content_length: int
-    has_tool_calls: bool
-    
-    def __init__(
-        self,
-        conversation_id: str,
-        message_id: str,
-        role: str,
-        content_length: int,
-        has_tool_calls: bool = False,
-        occurred_at: Optional[datetime] = None
-    ):
-        super().__init__(occurred_at=occurred_at)
-        self.conversation_id = conversation_id
-        self.message_id = message_id
-        self.role = role
-        self.content_length = content_length
-        self.has_tool_calls = has_tool_calls
+    has_tool_calls: bool = False
 
 
 class ConversationDeactivated(DomainEvent):
@@ -88,17 +60,7 @@ class ConversationDeactivated(DomainEvent):
     """
     
     conversation_id: str
-    reason: Optional[str]
-    
-    def __init__(
-        self,
-        conversation_id: str,
-        reason: Optional[str] = None,
-        occurred_at: Optional[datetime] = None
-    ):
-        super().__init__(occurred_at=occurred_at)
-        self.conversation_id = conversation_id
-        self.reason = reason
+    reason: Optional[str] = None
 
 
 class ConversationActivated(DomainEvent):
@@ -112,14 +74,6 @@ class ConversationActivated(DomainEvent):
     """
     
     conversation_id: str
-    
-    def __init__(
-        self,
-        conversation_id: str,
-        occurred_at: Optional[datetime] = None
-    ):
-        super().__init__(occurred_at=occurred_at)
-        self.conversation_id = conversation_id
 
 
 class MessagesCleared(DomainEvent):
@@ -135,16 +89,6 @@ class MessagesCleared(DomainEvent):
     
     conversation_id: str
     cleared_count: int
-    
-    def __init__(
-        self,
-        conversation_id: str,
-        cleared_count: int,
-        occurred_at: Optional[datetime] = None
-    ):
-        super().__init__(occurred_at=occurred_at)
-        self.conversation_id = conversation_id
-        self.cleared_count = cleared_count
 
 
 class ToolMessagesCleared(DomainEvent):
@@ -161,16 +105,38 @@ class ToolMessagesCleared(DomainEvent):
     
     conversation_id: str
     cleared_count: int
-    preserved_result: Optional[str]
+    preserved_result: Optional[str] = None
+
+
+class SnapshotCreated(DomainEvent):
+    """
+    Событие: Snapshot создан.
     
-    def __init__(
-        self,
-        conversation_id: str,
-        cleared_count: int,
-        preserved_result: Optional[str] = None,
-        occurred_at: Optional[datetime] = None
-    ):
-        super().__init__(occurred_at=occurred_at)
-        self.conversation_id = conversation_id
-        self.cleared_count = cleared_count
-        self.preserved_result = preserved_result
+    Публикуется при создании snapshot conversation.
+    
+    Атрибуты:
+        conversation_id: ID conversation
+        snapshot_id: ID созданного snapshot
+        message_count: Количество сообщений в snapshot
+    """
+    
+    conversation_id: str
+    snapshot_id: str
+    message_count: int
+
+
+class SnapshotRestored(DomainEvent):
+    """
+    Событие: Snapshot восстановлен.
+    
+    Публикуется при восстановлении conversation из snapshot.
+    
+    Атрибуты:
+        conversation_id: ID conversation
+        snapshot_id: ID восстановленного snapshot
+        restored_message_count: Количество восстановленных сообщений
+    """
+    
+    conversation_id: str
+    snapshot_id: str
+    restored_message_count: int

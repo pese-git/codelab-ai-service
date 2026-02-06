@@ -6,6 +6,7 @@ Agent Entity.
 
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
+from pydantic import Field, field_validator
 
 from ...shared.base_entity import Entity
 from ..value_objects.agent_id import AgentId
@@ -26,38 +27,26 @@ class AgentSwitchRecord(Entity):
         confidence: Уверенность в переключении
     """
     
-    from_agent: Optional[AgentType]
-    to_agent: AgentType
-    reason: str
-    switched_at: datetime
-    confidence: Optional[str] = None
-    
-    def __init__(
-        self,
-        id: str,
-        from_agent: Optional[AgentType],
-        to_agent: AgentType,
-        reason: str,
-        switched_at: Optional[datetime] = None,
-        confidence: Optional[str] = None
-    ) -> None:
-        """
-        Создать запись о переключении.
-        
-        Args:
-            id: Уникальный ID записи
-            from_agent: Агент, с которого переключились
-            to_agent: Агент, на который переключились
-            reason: Причина переключения
-            switched_at: Время переключения
-            confidence: Уверенность в переключении
-        """
-        super().__init__(id=id)
-        self.from_agent = from_agent
-        self.to_agent = to_agent
-        self.reason = reason
-        self.switched_at = switched_at or datetime.now(timezone.utc)
-        self.confidence = confidence
+    from_agent: Optional[AgentType] = Field(
+        default=None,
+        description="Агент, с которого переключились"
+    )
+    to_agent: AgentType = Field(
+        ...,
+        description="Агент, на который переключились"
+    )
+    reason: str = Field(
+        ...,
+        description="Причина переключения"
+    )
+    switched_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Время переключения"
+    )
+    confidence: Optional[str] = Field(
+        default=None,
+        description="Уверенность в переключении"
+    )
     
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -108,85 +97,51 @@ class Agent(Entity):
         ... )
     """
     
-    def __init__(
-        self,
-        id: str,
-        session_id: str,
-        capabilities: AgentCapabilities,
-        switch_history: Optional[List[AgentSwitchRecord]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        last_switch_at: Optional[datetime] = None,
-        switch_count: int = 0,
-        created_at: Optional[datetime] = None,
-        updated_at: Optional[datetime] = None
-    ) -> None:
-        """
-        Создать Agent.
-        
-        Args:
-            id: Уникальный ID агента
-            session_id: ID сессии
-            capabilities: Возможности агента
-            switch_history: История переключений
-            metadata: Дополнительные метаданные
-            last_switch_at: Время последнего переключения
-            switch_count: Количество переключений
-            created_at: Время создания
-            updated_at: Время последнего обновления
-        """
-        super().__init__(
-            id=id,
-            created_at=created_at,
-            updated_at=updated_at
-        )
-        
-        if not session_id:
+    session_id: str = Field(
+        ...,
+        description="ID сессии, к которой относится агент"
+    )
+    capabilities: AgentCapabilities = Field(
+        ...,
+        description="Возможности агента"
+    )
+    switch_history: List[AgentSwitchRecord] = Field(
+        default_factory=list,
+        description="История переключений"
+    )
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Дополнительные метаданные"
+    )
+    last_switch_at: Optional[datetime] = Field(
+        default=None,
+        description="Время последнего переключения"
+    )
+    switch_count: int = Field(
+        default=0,
+        description="Количество переключений"
+    )
+    
+    @field_validator('session_id')
+    @classmethod
+    def validate_session_id(cls, v: str) -> str:
+        """Валидация session_id."""
+        if not v:
             raise ValueError("session_id не может быть пустым")
-        
-        if not isinstance(capabilities, AgentCapabilities):
+        return v
+    
+    @field_validator('capabilities')
+    @classmethod
+    def validate_capabilities(cls, v: Any) -> AgentCapabilities:
+        """Валидация capabilities."""
+        if not isinstance(v, AgentCapabilities):
             raise ValueError("capabilities должен быть AgentCapabilities")
-        
-        self._session_id = session_id
-        self._capabilities = capabilities
-        self._switch_history = switch_history or []
-        self._metadata = metadata or {}
-        self._last_switch_at = last_switch_at
-        self._switch_count = switch_count
-    
-    @property
-    def session_id(self) -> str:
-        """Получить ID сессии."""
-        return self._session_id
-    
-    @property
-    def capabilities(self) -> AgentCapabilities:
-        """Получить возможности агента."""
-        return self._capabilities
+        return v
     
     @property
     def current_type(self) -> AgentType:
         """Получить текущий тип агента."""
-        return self._capabilities.agent_type
-    
-    @property
-    def switch_history(self) -> List[AgentSwitchRecord]:
-        """Получить историю переключений."""
-        return self._switch_history.copy()
-    
-    @property
-    def metadata(self) -> Dict[str, Any]:
-        """Получить метаданные."""
-        return self._metadata.copy()
-    
-    @property
-    def last_switch_at(self) -> Optional[datetime]:
-        """Получить время последнего переключения."""
-        return self._last_switch_at
-    
-    @property
-    def switch_count(self) -> int:
-        """Получить количество переключений."""
-        return self._switch_count
+        return self.capabilities.agent_type
     
     @staticmethod
     def create(
@@ -239,7 +194,7 @@ class Agent(Entity):
             return False
         
         # Нельзя превысить лимит переключений
-        if self._switch_count >= self._capabilities.max_switches:
+        if self.switch_count >= self.capabilities.max_switches:
             return False
         
         return True
@@ -276,7 +231,7 @@ class Agent(Entity):
             else:
                 raise ValueError(
                     f"Превышен лимит переключений: "
-                    f"{self._switch_count}/{self._capabilities.max_switches}"
+                    f"{self.switch_count}/{self.capabilities.max_switches}"
                 )
         
         # Создать запись о переключении
@@ -290,13 +245,13 @@ class Agent(Entity):
         )
         
         # Добавить в историю
-        self._switch_history.append(record)
+        self.switch_history.append(record)
         
         # Обновить состояние
         new_capabilities = AgentCapabilities.for_agent_type(target_type)
-        self._capabilities = new_capabilities
-        self._last_switch_at = datetime.now(timezone.utc)
-        self._switch_count += 1
+        self.capabilities = new_capabilities
+        self.last_switch_at = datetime.now(timezone.utc)
+        self.switch_count += 1
         self.mark_updated()
         
         return record
@@ -313,7 +268,7 @@ class Agent(Entity):
             >>> if last:
             ...     print(f"Last switch to: {last.to_agent.value}")
         """
-        return self._switch_history[-1] if self._switch_history else None
+        return self.switch_history[-1] if self.switch_history else None
     
     def get_switch_history_dict(self) -> List[Dict[str, Any]]:
         """
@@ -327,7 +282,7 @@ class Agent(Entity):
             >>> history[0]['to']
             'coder'
         """
-        return [record.to_dict() for record in self._switch_history]
+        return [record.to_dict() for record in self.switch_history]
     
     def reset_to_orchestrator(self, reason: str = "Session reset") -> None:
         """
@@ -356,7 +311,7 @@ class Agent(Entity):
         Пример:
             >>> agent.add_metadata("user_preference", "verbose")
         """
-        self._metadata[key] = value
+        self.metadata[key] = value
         self.mark_updated()
     
     def get_metadata(self, key: str, default: Any = None) -> Any:
@@ -373,7 +328,7 @@ class Agent(Entity):
         Пример:
             >>> pref = agent.get_metadata("user_preference", "normal")
         """
-        return self._metadata.get(key, default)
+        return self.metadata.get(key, default)
     
     def supports_tool(self, tool_name: str) -> bool:
         """
@@ -390,13 +345,13 @@ class Agent(Entity):
             ...     # Выполнить операцию с файлом
             ...     pass
         """
-        return self._capabilities.supports_tool(tool_name)
+        return self.capabilities.supports_tool(tool_name)
     
     def __repr__(self) -> str:
         """Строковое представление агента."""
         return (
             f"<Agent(id='{self.id}', "
-            f"session_id='{self._session_id}', "
+            f"session_id='{self.session_id}', "
             f"type='{self.current_type.value}', "
-            f"switches={self._switch_count})>"
+            f"switches={self.switch_count})>"
         )

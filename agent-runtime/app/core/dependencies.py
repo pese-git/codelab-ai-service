@@ -17,7 +17,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.database import get_db, get_database_service, DatabaseService
 from app.infrastructure.persistence.repositories import (
     SessionRepositoryImpl,
-    AgentContextRepositoryImpl
+    AgentContextRepositoryImpl,
+    ConversationRepositoryImpl,
+    AgentRepositoryImpl
 )
 from app.infrastructure.adapters import EventPublisherAdapter
 from app.domain.services import (
@@ -87,6 +89,36 @@ async def get_agent_context_repository(
         AgentContextRepositoryImpl: Реализация репозитория контекстов
     """
     return AgentContextRepositoryImpl(db)
+
+
+async def get_conversation_repository(
+    db: AsyncSession = Depends(get_db_session)
+) -> ConversationRepositoryImpl:
+    """
+    Получить репозиторий разговоров (новая Clean Architecture).
+    
+    Args:
+        db: Сессия БД (инжектируется)
+        
+    Returns:
+        ConversationRepositoryImpl: Реализация репозитория разговоров
+    """
+    return ConversationRepositoryImpl(db)
+
+
+async def get_agent_repository(
+    db: AsyncSession = Depends(get_db_session)
+) -> AgentRepositoryImpl:
+    """
+    Получить репозиторий агентов (новая Clean Architecture).
+    
+    Args:
+        db: Сессия БД (инжектируется)
+        
+    Returns:
+        AgentRepositoryImpl: Реализация репозитория агентов
+    """
+    return AgentRepositoryImpl(db)
 
 
 async def get_plan_repository(

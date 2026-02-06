@@ -59,6 +59,15 @@ class Entity(BaseModel):
             self._domain_events: List[Any] = []
         self._domain_events.append(event)
     
+    def record_event(self, event: Any) -> None:
+        """
+        Alias for add_domain_event (for backward compatibility).
+        
+        Args:
+            event: Domain event to add
+        """
+        self.add_domain_event(event)
+    
     def clear_domain_events(self) -> None:
         """Clear all domain events."""
         self._domain_events = []

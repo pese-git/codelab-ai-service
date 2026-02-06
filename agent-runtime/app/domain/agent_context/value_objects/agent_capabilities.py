@@ -4,7 +4,7 @@ AgentCapabilities Value Object.
 Инкапсулирует возможности и ограничения агента.
 """
 
-from typing import List, Set, Optional, ClassVar
+from typing import List, Set, Optional, ClassVar, Union
 from enum import Enum
 
 from ...shared.value_object import ValueObject
@@ -22,6 +22,49 @@ class AgentType(str, Enum):
     DEBUG: ClassVar = "debug"                # Отладка и исследование
     ASK: ClassVar = "ask"                    # Ответы на вопросы
     UNIVERSAL: ClassVar = "universal"        # Универсальный агент
+    
+    @classmethod
+    def from_value(cls, value: Union[str, "AgentType", object]) -> "AgentType":
+        """
+        Создать AgentType из строки или другого enum.
+        
+        Поддерживает конвертацию из:
+        - Строки: "orchestrator" → AgentType.ORCHESTRATOR
+        - Другого AgentType enum (из старого кода)
+        - Уже существующего AgentType
+        
+        Args:
+            value: Значение для конвертации
+            
+        Returns:
+            AgentType enum
+            
+        Raises:
+            ValueError: Если значение невалидно
+        """
+        # Если уже наш AgentType
+        if isinstance(value, cls):
+            return value
+        
+        # Если это enum из другого модуля, берем его value
+        if hasattr(value, 'value'):
+            value = value.value
+        
+        # Конвертируем строку в enum
+        if isinstance(value, str):
+            try:
+                return cls(value)
+            except ValueError:
+                valid_values = [e.value for e in cls]
+                raise ValueError(
+                    f"Невалидный тип агента: {value}. "
+                    f"Допустимые значения: {', '.join(valid_values)}"
+                )
+        
+        raise ValueError(
+            f"Невалидный тип для AgentType: {type(value).__name__}. "
+            f"Ожидается str или AgentType"
+        )
 
 
 class AgentCapabilities(ValueObject):
@@ -51,7 +94,7 @@ class AgentCapabilities(ValueObject):
     
     def __init__(
         self,
-        agent_type: AgentType,
+        agent_type: Union[AgentType, str, object],
         supported_tools: Optional[Set[str]] = None,
         max_switches: int = 50,
         can_delegate: bool = False,
@@ -61,7 +104,7 @@ class AgentCapabilities(ValueObject):
         Создать AgentCapabilities с валидацией.
         
         Args:
-            agent_type: Тип агента
+            agent_type: Тип агента (AgentType, str или enum из старого кода)
             supported_tools: Набор поддерживаемых инструментов
             max_switches: Максимальное количество переключений
             can_delegate: Может ли агент делегировать задачи
@@ -77,8 +120,8 @@ class AgentCapabilities(ValueObject):
             ...     max_switches=50
             ... )
         """
-        if not isinstance(agent_type, AgentType):
-            raise ValueError(f"agent_type должен быть AgentType, получен {type(agent_type).__name__}")
+        # Конвертируем agent_type в наш enum (поддерживает старые enum)
+        agent_type = AgentType.from_value(agent_type)
         
         if max_switches < 1:
             raise ValueError(f"max_switches должен быть >= 1, получен {max_switches}")
