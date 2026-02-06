@@ -17,7 +17,7 @@ from app.domain.services.fsm_orchestrator import FSMOrchestrator
 from app.domain.entities.fsm_state import FSMState, FSMEvent
 
 if TYPE_CHECKING:
-    from app.domain.entities.session import Session
+    from app.domain.session_context.entities.conversation import Conversation as Session
     from app.domain.services.session_management import SessionManagementService
     from app.domain.interfaces.stream_handler import IStreamHandler
     from app.agents.architect_agent import ArchitectAgent

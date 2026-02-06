@@ -11,7 +11,7 @@ import logging
 
 if TYPE_CHECKING:
     from app.infrastructure.adapters import SessionManagerAdapter
-    from app.domain.entities.session import Session
+    from app.domain.session_context.entities.conversation import Conversation as Session
     from app.domain.services.session_management import SessionManagementService
     from app.domain.interfaces.stream_handler import IStreamHandler
 

@@ -11,7 +11,7 @@ from typing import List, Union
 from datetime import datetime, timezone
 
 from app.domain.entities.plan import Plan, Subtask, PlanStatus, SubtaskStatus
-from app.domain.entities.agent_context import AgentType
+from app.domain.agent_context.value_objects.agent_capabilities import AgentType
 from app.infrastructure.persistence.models.plan import PlanModel, SubtaskModel
 
 # Import для поддержки новых Value Objects

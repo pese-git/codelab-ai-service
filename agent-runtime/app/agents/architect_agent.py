@@ -11,14 +11,14 @@ from typing import AsyncGenerator, Dict, Any, Optional, List, TYPE_CHECKING
 from app.agents.base_agent import BaseAgent, AgentType
 from app.agents.prompts.architect import ARCHITECT_PROMPT
 from app.models.schemas import StreamChunk
-from app.domain.entities.session import Session
+from app.domain.session_context.entities.conversation import Conversation as Session
 from app.domain.entities.plan import Plan, Subtask
 from app.domain.services.session_management import SessionManagementService
 from app.core.config import AppConfig
 
 if TYPE_CHECKING:
     from app.domain.interfaces.stream_handler import IStreamHandler
-    from app.domain.repositories.plan_repository import PlanRepository
+    from app.domain.execution_context.repositories.execution_plan_repository import ExecutionPlanRepository as PlanRepository
 
 logger = logging.getLogger("agent-runtime.architect_agent")
 

@@ -28,7 +28,7 @@ from app.domain.execution_context.events import (
     SubtaskFailed,
     SubtaskRetried
 )
-from app.domain.entities.agent_context import AgentType
+from app.domain.agent_context.value_objects.agent_capabilities import AgentType
 from app.domain.services.agent_registry import agent_registry
 from app.models.schemas import StreamChunk
 

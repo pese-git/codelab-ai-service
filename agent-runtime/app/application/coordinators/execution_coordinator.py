@@ -24,7 +24,7 @@ from app.domain.entities.plan import PlanStatus
 from app.models.schemas import StreamChunk
 
 if TYPE_CHECKING:
-    from app.domain.repositories.plan_repository import PlanRepository
+    from app.domain.execution_context.repositories.execution_plan_repository import ExecutionPlanRepository as PlanRepository
     from app.domain.services.session_management import SessionManagementService
     from app.domain.interfaces.stream_handler import IStreamHandler
 

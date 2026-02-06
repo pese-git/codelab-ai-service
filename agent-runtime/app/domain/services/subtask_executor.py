@@ -13,12 +13,12 @@ from typing import Dict, Any, Optional, TYPE_CHECKING, AsyncGenerator
 from datetime import datetime, timezone
 
 from app.domain.entities.plan import Subtask, SubtaskStatus
-from app.domain.entities.agent_context import AgentType
+from app.domain.agent_context.value_objects.agent_capabilities import AgentType
 from app.domain.services.agent_registry import agent_registry
 from app.models.schemas import StreamChunk
 
 if TYPE_CHECKING:
-    from app.domain.repositories.plan_repository import PlanRepository
+    from app.domain.execution_context.repositories.execution_plan_repository import ExecutionPlanRepository as PlanRepository
     from app.domain.services.session_management import SessionManagementService
     from app.domain.interfaces.stream_handler import IStreamHandler
 

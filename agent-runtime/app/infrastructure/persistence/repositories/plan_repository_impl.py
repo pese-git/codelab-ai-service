@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, delete, and_
 
-from app.domain.repositories.plan_repository import PlanRepository
+from app.domain.execution_context.repositories.execution_plan_repository import ExecutionPlanRepository as PlanRepository
 from app.domain.entities.plan import Plan, PlanStatus
 from app.core.errors import RepositoryError
 from app.infrastructure.persistence.models.plan import PlanModel, SubtaskModel
