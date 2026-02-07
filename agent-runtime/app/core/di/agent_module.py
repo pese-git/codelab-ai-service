@@ -161,7 +161,7 @@ class AgentModule:
             agent_context_repo = AgentContextRepositoryImpl(db)
             
             self._orchestration_service = AgentOrchestrationService(
-                agent_context_repository=agent_context_repo,
+                repository=agent_context_repo,
                 event_publisher=event_publisher
             )
         

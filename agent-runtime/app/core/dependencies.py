@@ -192,8 +192,9 @@ async def get_create_session_handler(
     Returns:
         CreateSessionHandler: Command handler
     """
-    session_service = container.session_module.provide_session_service(db)
-    return CreateSessionHandler(session_service)
+    conversation_repo = container.session_module.provide_conversation_repository(db)
+    conversation_service = container.session_module.provide_conversation_service(conversation_repo)
+    return CreateSessionHandler(conversation_service)
 
 
 async def get_add_message_handler(

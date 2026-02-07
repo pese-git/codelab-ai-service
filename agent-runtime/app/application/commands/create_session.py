@@ -8,7 +8,8 @@ from typing import Optional
 from pydantic import Field
 
 from .base import Command, CommandHandler
-from ...domain.services.session_management import SessionManagementService
+from ...domain.session_context.services import ConversationManagementService
+from ...domain.session_context.value_objects import ConversationId
 from ...domain.session_context.entities.conversation import Conversation as Session
 from ..dto.session_dto import SessionDTO
 
@@ -50,14 +51,14 @@ class CreateSessionHandler(CommandHandler[SessionDTO]):
         'session-1'
     """
     
-    def __init__(self, session_service: SessionManagementService):
+    def __init__(self, conversation_service: ConversationManagementService):
         """
         Инициализация обработчика.
         
         Args:
-            session_service: Доменный сервис управления сессиями
+            conversation_service: Доменный сервис управления conversations
         """
-        self._session_service = session_service
+        self._conversation_service = conversation_service
     
     async def handle(self, command: CreateSessionCommand) -> SessionDTO:
         """
@@ -76,9 +77,10 @@ class CreateSessionHandler(CommandHandler[SessionDTO]):
             >>> command = CreateSessionCommand(session_id="session-1")
             >>> dto = await handler.handle(command)
         """
-        # Создать сессию через доменный сервис
-        session = await self._session_service.create_session(
-            session_id=command.session_id
+        # Создать conversation через доменный сервис
+        # ConversationManagementService сам создаст ConversationId из строки
+        session = await self._conversation_service.create_conversation(
+            conversation_id=command.session_id
         )
         
         # Преобразовать в DTO

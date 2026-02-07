@@ -15,7 +15,6 @@ from app.domain.session_context.services import (
 )
 from app.domain.session_context.repositories import ConversationRepository
 from app.infrastructure.persistence.repositories import ConversationRepositoryImpl
-from app.domain.services import SessionManagementService
 
 logger = logging.getLogger("agent-runtime.di.session_module")
 
@@ -29,7 +28,6 @@ class SessionModule:
     - ConversationManagementService
     - ConversationSnapshotService
     - ToolMessageCleanupService
-    - SessionManagementService (legacy, для обратной совместимости)
     """
     
     def __init__(self):
@@ -38,7 +36,6 @@ class SessionModule:
         self._conversation_service: Optional[ConversationManagementService] = None
         self._snapshot_service: Optional[ConversationSnapshotService] = None
         self._cleanup_service: Optional[ToolMessageCleanupService] = None
-        self._session_service: Optional[SessionManagementService] = None
         
         logger.debug("SessionModule инициализирован")
     
@@ -98,34 +95,19 @@ class SessionModule:
             self._cleanup_service = ToolMessageCleanupService()
         return self._cleanup_service
     
-    def provide_session_service(
+    def provide_conversation_management_service(
         self,
-        db: AsyncSession,
-        event_publisher=None
-    ) -> SessionManagementService:
+        conversation_repository: ConversationRepository
+    ) -> ConversationManagementService:
         """
-        Предоставить legacy SessionManagementService.
+        Предоставить сервис управления conversations.
         
-        Для обратной совместимости со старым кодом.
+        Alias для provide_conversation_service для совместимости.
         
         Args:
-            db: Сессия БД
-            event_publisher: Publisher событий (опционально)
+            conversation_repository: Репозиторий conversations
             
         Returns:
-            SessionManagementService: Legacy сервис
+            ConversationManagementService: Сервис управления
         """
-        if self._session_service is None:
-            from app.infrastructure.persistence.repositories import (
-                SessionRepositoryImpl,
-                AgentContextRepositoryImpl
-            )
-            
-            session_repo = SessionRepositoryImpl(db)
-            
-            self._session_service = SessionManagementService(
-                repository=session_repo,
-                event_publisher=event_publisher
-            )
-        
-        return self._session_service
+        return self.provide_conversation_service(conversation_repository)
