@@ -11,7 +11,7 @@ from datetime import datetime
 
 from ...domain.services.session_management import SessionManagementService
 from ...domain.session_context.entities.conversation import Conversation as Session
-from ...domain.session_context.value_objects.message import Message
+from ...domain.entities.message import Message
 from ...core.errors import SessionNotFoundError
 
 logger = logging.getLogger("agent-runtime.adapters.session_manager")

@@ -11,8 +11,8 @@ import logging
 from typing import Optional
 
 from ..agent_context.services.agent_coordination_service import AgentCoordinationService
-from ..agent_context.entities.agent import Agent
-from ..entities.agent_context import AgentContext, AgentType
+from ..agent_context.entities.agent import Agent, Agent as AgentContext
+from ..agent_context.value_objects.agent_capabilities import AgentType
 
 logger = logging.getLogger("agent-runtime.adapters.agent_orchestration")
 
@@ -126,7 +126,7 @@ class AgentOrchestrationAdapter:
         Returns:
             AgentContext entity (legacy)
         """
-        from ..entities.agent_context import AgentSwitch
+        from ..agent_context.entities.agent import AgentSwitchRecord as AgentSwitch
         import uuid
         
         # Создать AgentContext с теми же данными

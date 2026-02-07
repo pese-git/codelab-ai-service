@@ -8,7 +8,8 @@ AgentContext Adapter - адаптер обратной совместимост�
 from typing import Optional, List
 from datetime import datetime
 
-from ..entities.agent_context import AgentContext, AgentSwitch, AgentType
+from ..agent_context.entities.agent import Agent as AgentContext, AgentSwitchRecord as AgentSwitch
+from ..agent_context.value_objects.agent_capabilities import AgentType
 from ..agent_context.entities.agent import Agent, AgentSwitchRecord
 from ..agent_context.value_objects import AgentId, AgentCapabilities
 

@@ -14,7 +14,7 @@ from ..session_context.services.conversation_management_service import (
     ConversationManagementService
 )
 from ..session_context.entities import Conversation
-from ..entities.session import Session
+from ..session_context.entities.conversation import Conversation as Session
 from ..entities.message import Message
 
 logger = logging.getLogger("agent-runtime.adapters.conversation_service")

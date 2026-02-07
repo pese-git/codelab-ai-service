@@ -8,7 +8,7 @@ Session Adapter - адаптер обратной совместимости.
 from typing import Optional, List
 from datetime import datetime
 
-from ..entities.session import Session
+from ..session_context.entities.conversation import Conversation as Session
 from ..entities.message import Message
 from ..session_context.entities.conversation import Conversation
 from ..session_context.value_objects import ConversationId, MessageCollection
