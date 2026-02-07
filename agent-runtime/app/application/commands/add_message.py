@@ -8,7 +8,7 @@ from typing import Optional, Dict, Any, List
 from pydantic import Field
 
 from .base import Command, CommandHandler
-from ...domain.services.session_management import SessionManagementService
+from ...domain.session_context.services import ConversationManagementService
 from ..dto.message_dto import MessageDTO
 
 
@@ -79,7 +79,7 @@ class AddMessageHandler(CommandHandler[MessageDTO]):
         >>> dto = await handler.handle(command)
     """
     
-    def __init__(self, session_service: SessionManagementService):
+    def __init__(self, session_service: ConversationManagementService):
         """
         Инициализация обработчика.
         

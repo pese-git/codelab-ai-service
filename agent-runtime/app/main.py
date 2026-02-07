@@ -63,7 +63,7 @@ async def lifespan(app: FastAPI):
         
         # Управление сессиями и контекстом через адаптеры
         # Адаптеры обеспечивают обратную совместимость с новыми доменными сервисами
-        # Персистентность обрабатывается доменными сервисами (SessionManagementService, AgentOrchestrationService)
+        # Персистентность обрабатывается доменными сервисами (ConversationManagementService, AgentOrchestrationService)
         logger.info("✓ Session/context management via new architecture (adapters)")
         
         # Инициализация через новый DI Container
@@ -87,25 +87,21 @@ async def lifespan(app: FastAPI):
             
             # Initialize session cleanup service with factory pattern
             from app.infrastructure.persistence.repositories import (
-                SessionRepositoryImpl,
+                ConversationRepositoryImpl,
                 AgentContextRepositoryImpl
             )
             from app.infrastructure.persistence.database import async_session_maker
-            from app.domain.services import SessionManagementService
+            from app.domain.session_context.services import ConversationManagementService
             from contextlib import asynccontextmanager
             
-            # Получить event publisher через контейнер
-            event_publisher = container.infrastructure_module.provide_event_publisher()
-            
-            # Фабрика-контекстный менеджер для создания session service с новой DB сессией
+            # Фабрика-контекстный менеджер для создания conversation service с новой DB сессией
             @asynccontextmanager
             async def create_cleanup_session_service():
-                """Async context manager factory to create session service with fresh DB session"""
+                """Async context manager factory to create conversation service with fresh DB session"""
                 async with async_session_maker() as db:
-                    cleanup_repo = SessionRepositoryImpl(db)
-                    service = SessionManagementService(
-                        repository=cleanup_repo,
-                        event_publisher=event_publisher
+                    cleanup_repo = ConversationRepositoryImpl(db)
+                    service = ConversationManagementService(
+                        repository=cleanup_repo
                     )
                     yield service
             

@@ -13,7 +13,7 @@ from ...agent_context.entities.agent import Agent as AgentContext
 from ....models.schemas import StreamChunk
 
 if TYPE_CHECKING:
-    from ..session_management import SessionManagementService
+    from ...session_context.services import ConversationManagementService
     from ..agent_orchestration import AgentOrchestrationService
 
 logger = logging.getLogger("agent-runtime.domain.helpers.agent_switch")
@@ -36,7 +36,7 @@ class AgentSwitchHelper:
     
     def __init__(
         self,
-        session_service: "SessionManagementService",
+        session_service: "ConversationManagementService",
         agent_service: "AgentOrchestrationService"
     ):
         """

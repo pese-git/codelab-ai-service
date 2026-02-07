@@ -5,7 +5,7 @@ DI Module для Session Context.
 """
 
 import logging
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.session_context.services import (
@@ -16,6 +16,9 @@ from app.domain.session_context.services import (
 from app.domain.session_context.repositories import ConversationRepository
 from app.infrastructure.persistence.repositories import ConversationRepositoryImpl
 
+if TYPE_CHECKING:
+    from app.infrastructure.adapters.event_publisher_adapter import EventPublisher
+
 logger = logging.getLogger("agent-runtime.di.session_module")
 
 
@@ -25,9 +28,13 @@ class SessionModule:
     
     Предоставляет:
     - ConversationRepository
-    - ConversationManagementService
+    - ConversationManagementService (новая архитектура)
     - ConversationSnapshotService
     - ToolMessageCleanupService
+    
+    Обратная совместимость:
+    - provide_session_service() возвращает ConversationManagementService
+      (замена для SessionManagementService)
     """
     
     def __init__(self):
@@ -94,6 +101,27 @@ class SessionModule:
         if self._cleanup_service is None:
             self._cleanup_service = ToolMessageCleanupService()
         return self._cleanup_service
+    
+    def provide_session_service(
+        self,
+        db: AsyncSession,
+        event_publisher: Optional["EventPublisher"] = None
+    ) -> ConversationManagementService:
+        """
+        Предоставить сервис управления сессиями.
+        
+        Это метод обратной совместимости, который возвращает ConversationManagementService
+        вместо устаревшего SessionManagementService.
+        
+        Args:
+            db: Сессия БД
+            event_publisher: Event publisher (опционально, для совместимости)
+            
+        Returns:
+            ConversationManagementService: Сервис управления conversations
+        """
+        conversation_repository = self.provide_conversation_repository(db)
+        return self.provide_conversation_service(conversation_repository)
     
     def provide_conversation_management_service(
         self,

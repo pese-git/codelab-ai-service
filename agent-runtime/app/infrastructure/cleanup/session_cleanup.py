@@ -10,8 +10,8 @@ import logging
 from datetime import datetime, timezone
 from typing import Callable
 from contextlib import asynccontextmanager
+from ...domain.session_context.services import ConversationManagementService
 
-from ...domain.services.session_management import SessionManagementService
 
 logger = logging.getLogger("agent-runtime.infrastructure.session_cleanup")
 
@@ -33,8 +33,8 @@ class SessionCleanupService:
         >>> @asynccontextmanager
         ... async def create_session_service():
         ...     async with async_session_maker() as db:
-        ...         repo = SessionRepositoryImpl(db)
-        ...         yield SessionManagementService(repo, event_publisher)
+        ...         repo = ConversationRepositoryImpl(db)
+        ...         yield ConversationManagementService(repo)
         >>> cleanup_service = SessionCleanupService(
         ...     session_service_factory=create_session_service,
         ...     cleanup_interval_hours=1,

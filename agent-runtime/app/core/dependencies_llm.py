@@ -15,9 +15,9 @@ from ..domain.services.llm_response_processor import LLMResponseProcessor
 from ..domain.services.tool_filter_service import ToolFilterService
 from ..domain.services.tool_registry import ToolRegistry
 from ..domain.services.hitl_policy import hitl_policy_service
-from ..domain.services.session_management import SessionManagementService
+# Используем новую архитектуру - ConversationManagementService
+from ..domain.session_context.services import ConversationManagementService
 from ..application.handlers.stream_llm_response_handler import StreamLLMResponseHandler
-from .dependencies import get_session_management_service
 
 logger = logging.getLogger("agent-runtime.dependencies_llm")
 

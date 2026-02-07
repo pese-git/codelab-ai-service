@@ -12,7 +12,7 @@ from typing import AsyncGenerator, Optional, TYPE_CHECKING
 from ...models.schemas import StreamChunk
 
 if TYPE_CHECKING:
-    from .session_management import SessionManagementService
+    from ..session_context.services import ConversationManagementService
     from .message_processor import MessageProcessor
     from .approval_management import ApprovalManager
     from .tool_result_handler import ToolResultHandler
@@ -39,7 +39,7 @@ class HITLDecisionHandler:
     def __init__(
         self,
         approval_manager: "ApprovalManager",
-        session_service: "SessionManagementService",
+        session_service: "ConversationManagementService",
         message_processor: "MessageProcessor",
         tool_result_handler: "ToolResultHandler"
     ):

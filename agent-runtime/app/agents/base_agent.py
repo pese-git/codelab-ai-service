@@ -12,7 +12,7 @@ import logging
 if TYPE_CHECKING:
     from app.infrastructure.adapters import SessionManagerAdapter
     from app.domain.session_context.entities.conversation import Conversation as Session
-    from app.domain.services.session_management import SessionManagementService
+    from app.domain.session_context.services import ConversationManagementService
     from app.domain.interfaces.stream_handler import IStreamHandler
 
 logger = logging.getLogger("agent-runtime.base_agent")
@@ -73,7 +73,7 @@ class BaseAgent(ABC):
         message: str,
         context: Dict[str, Any],
         session: "Session",
-        session_service: "SessionManagementService",
+        session_service: "ConversationManagementService",
         stream_handler: "IStreamHandler"
     ) -> AsyncGenerator:
         """

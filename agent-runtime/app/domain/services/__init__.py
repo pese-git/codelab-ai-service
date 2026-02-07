@@ -5,7 +5,12 @@
 бизнес-логику, не принадлежащую конкретной сущности.
 """
 
+# Новая архитектура - ConversationManagementService
+from app.domain.session_context.services import ConversationManagementService
+
+# Обратная совместимость - SessionManagementService (deprecated)
 from .session_management import SessionManagementService
+
 from .agent_orchestration import AgentOrchestrationService
 from .hitl_policy import HITLPolicyService, hitl_policy_service
 from .approval_management import ApprovalManager, get_approval_manager_with_db, approval_manager
@@ -24,7 +29,9 @@ from .hitl_decision_handler import HITLDecisionHandler
 from .plan_approval_handler import PlanApprovalHandler
 
 __all__ = [
-    # Существующие сервисы
+    # Новая архитектура
+    "ConversationManagementService",
+    # Существующие сервисы (SessionManagementService deprecated)
     "SessionManagementService",
     "AgentOrchestrationService",
     "HITLPolicyService",

@@ -25,7 +25,7 @@ from app.models.schemas import StreamChunk
 
 if TYPE_CHECKING:
     from app.domain.execution_context.repositories.execution_plan_repository import ExecutionPlanRepository as PlanRepository
-    from app.domain.services.session_management import SessionManagementService
+    from app.domain.session_context.services import ConversationManagementService
     from app.domain.interfaces.stream_handler import IStreamHandler
 
 logger = logging.getLogger("agent-runtime.application.execution_coordinator")
@@ -88,7 +88,7 @@ class ExecutionCoordinator:
         self,
         plan_id: str,
         session_id: str,
-        session_service: "SessionManagementService",
+        session_service: "ConversationManagementService",
         stream_handler: "IStreamHandler"
     ) -> AsyncGenerator[StreamChunk, None]:
         """

@@ -211,8 +211,12 @@ async def get_add_message_handler(
     Returns:
         AddMessageHandler: Command handler
     """
-    session_service = container.session_module.provide_session_service(db)
-    return AddMessageHandler(session_service)
+    # Используем provide_session_service, который теперь возвращает ConversationManagementService
+    conversation_service = container.session_module.provide_session_service(
+        db=db,
+        event_publisher=None
+    )
+    return AddMessageHandler(conversation_service)
 
 
 async def get_switch_agent_handler(

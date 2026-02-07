@@ -50,7 +50,7 @@ def mock_execution_coordinator():
 
 @pytest.fixture
 def mock_session_service():
-    """Mock для SessionManagementService."""
+    """Mock для ConversationManagementService."""
     service = AsyncMock()
     return service
 

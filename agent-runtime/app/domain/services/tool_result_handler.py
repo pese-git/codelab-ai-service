@@ -11,7 +11,7 @@ from typing import AsyncGenerator, Optional, TYPE_CHECKING
 from ...models.schemas import StreamChunk
 
 if TYPE_CHECKING:
-    from .session_management import SessionManagementService
+    from ..session_context.services import ConversationManagementService
     from .agent_orchestration import AgentOrchestrationService
     from .helpers.agent_switch_helper import AgentSwitchHelper
     from ..interfaces.stream_handler import IStreamHandler
@@ -44,7 +44,7 @@ class ToolResultHandler:
     
     def __init__(
         self,
-        session_service: "SessionManagementService",
+        session_service: "ConversationManagementService",
         agent_service: "AgentOrchestrationService",
         agent_router,  # AgentRouter
         stream_handler: Optional["IStreamHandler"],

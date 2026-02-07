@@ -10,7 +10,7 @@ from app.agents.base_agent import BaseAgent, AgentType
 from app.agents.prompts.ask import ASK_PROMPT
 from app.models.schemas import StreamChunk
 from app.domain.session_context.entities.conversation import Conversation as Session
-from app.domain.services.session_management import SessionManagementService
+from app.domain.session_context.services import ConversationManagementService
 from app.core.config import AppConfig
 
 if TYPE_CHECKING:
@@ -57,7 +57,7 @@ class AskAgent(BaseAgent):
         message: str,
         context: Dict[str, Any],
         session: Session,
-        session_service: SessionManagementService,
+        session_service: ConversationManagementService,
         stream_handler: "IStreamHandler"
     ) -> AsyncGenerator[StreamChunk, None]:
         """

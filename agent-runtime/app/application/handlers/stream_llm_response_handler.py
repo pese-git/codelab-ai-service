@@ -18,7 +18,7 @@ from typing import AsyncGenerator, List, Dict, Optional, Any
 from ...domain.interfaces.stream_handler import IStreamHandler
 from ...domain.services.llm_response_processor import LLMResponseProcessor
 from ...domain.services.tool_filter_service import ToolFilterService
-from ...domain.services.session_management import SessionManagementService
+from ...domain.session_context.services import ConversationManagementService
 from ...domain.services.approval_management import ApprovalManager
 from ...domain.entities.llm_response import ProcessedResponse
 from ...infrastructure.llm.llm_client import LLMClient
@@ -76,7 +76,7 @@ class StreamLLMResponseHandler(IStreamHandler):
         tool_filter: ToolFilterService,
         response_processor: LLMResponseProcessor,
         event_publisher: LLMEventPublisher,
-        session_service: SessionManagementService,
+        session_service: ConversationManagementService,
         approval_manager: ApprovalManager
     ):
         """

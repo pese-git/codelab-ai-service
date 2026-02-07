@@ -13,7 +13,7 @@ from ...models.schemas import StreamChunk
 from ..entities.fsm_state import FSMEvent
 
 if TYPE_CHECKING:
-    from .session_management import SessionManagementService
+    from ..session_context.services import ConversationManagementService
     from .approval_management import ApprovalManager
     from .fsm_orchestrator import FSMOrchestrator
     from ...agents.orchestrator_agent import OrchestratorAgent
@@ -51,7 +51,7 @@ class PlanApprovalHandler:
     def __init__(
         self,
         approval_manager: "ApprovalManager",
-        session_service: "SessionManagementService",
+        session_service: "ConversationManagementService",
         fsm_orchestrator: "FSMOrchestrator",
         execution_coordinator: "ExecutionCoordinator",
         plan_repository: "PlanRepository",

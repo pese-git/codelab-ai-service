@@ -18,7 +18,7 @@ from app.domain.entities.fsm_state import FSMState, FSMEvent
 
 if TYPE_CHECKING:
     from app.domain.session_context.entities.conversation import Conversation as Session
-    from app.domain.services.session_management import SessionManagementService
+    from app.domain.session_context.services import ConversationManagementService
     from app.domain.interfaces.stream_handler import IStreamHandler
     from app.agents.architect_agent import ArchitectAgent
     from app.application.coordinators.execution_coordinator import ExecutionCoordinator
@@ -151,7 +151,7 @@ class OrchestratorAgent(BaseAgent):
         message: str,
         context: Dict[str, Any],
         session: "Session",
-        session_service: "SessionManagementService",
+        session_service: "ConversationManagementService",
         stream_handler: "IStreamHandler"
     ) -> AsyncGenerator[StreamChunk, None]:
         """
@@ -456,7 +456,7 @@ class OrchestratorAgent(BaseAgent):
         message: str,
         context: Dict[str, Any],
         session: "Session",
-        session_service: "SessionManagementService",
+        session_service: "ConversationManagementService",
         stream_handler: "IStreamHandler"
     ) -> AsyncGenerator[StreamChunk, None]:
         """

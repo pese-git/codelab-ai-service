@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.infrastructure.adapters import SessionManagerAdapter
-from app.domain.services import SessionManagementService
+from app.domain.session_context.services.conversation_management_service import ConversationManagementService
 from app.domain.entities.session import Session
 from app.core.errors import SessionNotFoundError, SessionAlreadyExistsError
 
@@ -27,9 +27,9 @@ async def mock_repository():
 
 @pytest_asyncio.fixture
 async def session_service(mock_repository):
-    """Create SessionManagementService with mock repository"""
-    return SessionManagementService(
-        repository=mock_repository,
+    """Create ConversationManagementService with mock repository"""
+    return ConversationManagementService(
+        conversation_repository=mock_repository,
         event_publisher=AsyncMock()  # Mock event publisher
     )
 
@@ -226,7 +226,7 @@ async def test_integration_create_and_get(mock_repository):
     mock_repository.find_by_id = mock_find
     
     # Create service and adapter
-    service = SessionManagementService(repository=mock_repository, event_publisher=AsyncMock())
+    service = ConversationManagementService(conversation_repository=mock_repository, event_publisher=AsyncMock())
     adapter = SessionManagerAdapter(service)
     
     # Create session
@@ -253,7 +253,7 @@ async def test_integration_add_messages(mock_repository):
     mock_repository.save = AsyncMock()
     
     # Create service and adapter
-    service = SessionManagementService(repository=mock_repository, event_publisher=AsyncMock())
+    service = ConversationManagementService(conversation_repository=mock_repository, event_publisher=AsyncMock())
     adapter = SessionManagerAdapter(service)
     
     # Add messages

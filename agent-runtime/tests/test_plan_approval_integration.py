@@ -12,11 +12,11 @@ from datetime import datetime, timezone
 
 from app.domain.services.plan_approval_handler import PlanApprovalHandler, PlanApprovalDecision
 from app.domain.services.approval_management import ApprovalManager
-from app.domain.services.session_management import SessionManagementService
+from app.domain.session_context.services.conversation_management_service import ConversationManagementService
 from app.domain.services.fsm_orchestrator import FSMOrchestrator
 from app.domain.entities.fsm_state import FSMState, FSMEvent
 from app.domain.entities.plan import Plan, Subtask, PlanStatus, SubtaskStatus
-from app.domain.entities.agent_context import AgentType
+from app.agents.base_agent import AgentType
 from app.domain.entities.approval import PendingApprovalState
 from app.application.coordinators.execution_coordinator import ExecutionCoordinator
 from app.domain.services.execution_engine import ExecutionResult
@@ -64,9 +64,9 @@ class TestPlanApprovalIntegration:
     
     @pytest_asyncio.fixture
     async def session_service(self, mock_session_repository):
-        """Create SessionManagementService with mock repository"""
-        return SessionManagementService(
-            repository=mock_session_repository,
+        """Create ConversationManagementService with mock repository"""
+        return ConversationManagementService(
+            conversation_repository=mock_session_repository,
             event_publisher=AsyncMock()
         )
     
