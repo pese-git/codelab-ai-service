@@ -9,7 +9,7 @@ from pydantic import Field
 
 from .base import Command, CommandHandler
 from ...domain.services.agent_orchestration import AgentOrchestrationService
-from ...domain.entities.agent_context import AgentType
+from ...domain.agent_context.value_objects.agent_capabilities import AgentType
 from ..dto.agent_context_dto import AgentContextDTO
 
 

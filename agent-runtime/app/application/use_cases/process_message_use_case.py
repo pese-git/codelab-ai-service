@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from .base_use_case import StreamingUseCase
 from ...models.schemas import StreamChunk
-from ...domain.entities.agent_context import AgentType
+from ...domain.agent_context.value_objects.agent_capabilities import AgentType
 
 logger = logging.getLogger("agent-runtime.use_cases.process_message")
 

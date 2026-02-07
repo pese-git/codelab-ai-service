@@ -10,7 +10,8 @@ from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 
-from ....domain.entities.agent_context import AgentContext, AgentType, AgentSwitch
+from ....domain.agent_context.entities.agent import Agent as AgentContext, AgentSwitchRecord as AgentSwitch
+from ....domain.agent_context.value_objects.agent_capabilities import AgentType
 from ..models import AgentContextModel, AgentSwitchModel, SessionModel
 
 logger = logging.getLogger("agent-runtime.infrastructure.agent_context_mapper")

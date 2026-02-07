@@ -10,8 +10,8 @@ from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from ....domain.entities.session import Session
-from ....domain.entities.message import Message
+from ....domain.session_context.entities.conversation import Conversation as Session
+from ....domain.session_context.value_objects.message import Message
 from ..models import SessionModel, MessageModel
 
 logger = logging.getLogger("agent-runtime.infrastructure.session_mapper")

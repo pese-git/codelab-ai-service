@@ -9,7 +9,7 @@ from pydantic import Field
 
 from .base import Command, CommandHandler
 from ...domain.services.session_management import SessionManagementService
-from ...domain.entities.session import Session
+from ...domain.session_context.entities.conversation import Conversation as Session
 from ..dto.session_dto import SessionDTO
 
 
