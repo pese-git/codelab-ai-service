@@ -129,10 +129,16 @@ class AgentModule:
             AgentSwitcher: Сервис переключения
         """
         if self._agent_switcher is None:
-            self._agent_switcher = AgentSwitcher(
+            from app.domain.services.helpers.agent_switch_helper import AgentSwitchHelper
+            
+            switch_helper = AgentSwitchHelper(
                 session_service=session_service,
-                agent_context_service=agent_context_service,
-                event_publisher=event_publisher
+                agent_service=agent_context_service
+            )
+            
+            self._agent_switcher = AgentSwitcher(
+                agent_service=agent_context_service,
+                switch_helper=switch_helper
             )
         return self._agent_switcher
     

@@ -156,6 +156,36 @@ class DIContainer:
     
     # ==================== Domain Services ====================
     
+    def _create_stream_handler(self, db: AsyncSession, session_service, llm_client):
+        """Helper для создания StreamLLMResponseHandler с правильными зависимостями."""
+        from app.application.handlers import StreamLLMResponseHandler
+        from app.domain.services.tool_filter_service import ToolFilterService
+        from app.domain.services.llm_response_processor import LLMResponseProcessor
+        from app.domain.services.hitl_policy import HITLPolicyService
+        from app.domain.services.approval_management import ApprovalManager
+        from app.domain.services.tool_registry import ToolRegistry
+        from app.infrastructure.persistence.repositories.approval_repository_impl import ApprovalRepositoryImpl
+        
+        # Create dependencies
+        tool_registry = ToolRegistry()
+        tool_filter = ToolFilterService(tool_registry=tool_registry)
+        hitl_policy = HITLPolicyService()
+        response_processor = LLMResponseProcessor(hitl_policy=hitl_policy)
+        approval_repository = ApprovalRepositoryImpl(db)
+        approval_manager = ApprovalManager(
+            approval_repository=approval_repository,
+            approval_policy=None
+        )
+        
+        return StreamLLMResponseHandler(
+            llm_client=llm_client,
+            tool_filter=tool_filter,
+            response_processor=response_processor,
+            event_publisher=self.infrastructure_module.provide_event_publisher(),
+            session_service=session_service,
+            approval_manager=approval_manager
+        )
+    
     def _get_message_processor(self, db: AsyncSession) -> MessageProcessor:
         """Получить MessageProcessor (singleton)."""
         if self._message_processor is None:
@@ -170,38 +200,25 @@ class DIContainer:
             agent_registry = self.agent_module.provide_agent_registry()
             llm_client = self.infrastructure_module.provide_llm_client()
             
-            from app.application.handlers import StreamLLMResponseHandler
-            from app.domain.services.tool_filter_service import ToolFilterService
-            from app.domain.services.llm_response_processor import LLMResponseProcessor
-            from app.domain.services.hitl_policy import HITLPolicyService
-            from app.domain.services.approval_management import ApprovalManager
-            from app.infrastructure.tool_registry import ToolRegistry
+            # Create stream handler
+            stream_handler = self._create_stream_handler(db, session_service, llm_client)
             
-            # Create dependencies for StreamLLMResponseHandler
-            tool_registry = ToolRegistry()
-            tool_filter = ToolFilterService(tool_registry=tool_registry)
-            hitl_policy = HITLPolicyService()
-            response_processor = LLMResponseProcessor(hitl_policy=hitl_policy)
-            approval_manager = ApprovalManager(
-                approval_repository=self.session_module.provide_approval_repository(db),
-                approval_policy=None
-            )
+            from app.domain.services.helpers.agent_switch_helper import AgentSwitchHelper
+            from app.domain.agent_context.services.agent_router_service import AgentRouterService
             
-            stream_handler = StreamLLMResponseHandler(
-                llm_client=llm_client,
-                tool_filter=tool_filter,
-                response_processor=response_processor,
-                event_publisher=self.infrastructure_module.provide_event_publisher(),
+            # Create agent_router and switch_helper
+            agent_router = AgentRouterService()
+            switch_helper = AgentSwitchHelper(
                 session_service=session_service,
-                approval_manager=approval_manager
+                agent_service=agent_context_service
             )
             
             self._message_processor = MessageProcessor(
                 session_service=session_service,
-                agent_context_service=agent_context_service,
-                agent_registry=agent_registry,
+                agent_service=agent_context_service,
+                agent_router=agent_router,
                 stream_handler=stream_handler,
-                event_publisher=self.infrastructure_module.provide_event_publisher()
+                switch_helper=switch_helper
             )
         
         return self._message_processor
@@ -237,20 +254,25 @@ class DIContainer:
             agent_registry = self.agent_module.provide_agent_registry()
             llm_client = self.infrastructure_module.provide_llm_client()
             
-            from app.application.handlers import StreamLLMResponseHandler
-            stream_handler = StreamLLMResponseHandler(
-                llm_client=llm_client,
+            # Create stream handler
+            stream_handler = self._create_stream_handler(db, session_service, llm_client)
+            
+            # Create agent_router and switch_helper
+            from app.domain.agent_context.services.agent_router_service import AgentRouterService
+            from app.domain.services.helpers.agent_switch_helper import AgentSwitchHelper
+            
+            agent_router = AgentRouterService()
+            switch_helper = AgentSwitchHelper(
                 session_service=session_service,
-                agent_context_service=agent_context_service,
-                event_publisher=self.infrastructure_module.provide_event_publisher()
+                agent_service=agent_context_service
             )
             
             self._tool_result_handler = ToolResultHandler(
                 session_service=session_service,
-                agent_context_service=agent_context_service,
-                agent_registry=agent_registry,
+                agent_service=agent_context_service,
+                agent_router=agent_router,
                 stream_handler=stream_handler,
-                event_publisher=self.infrastructure_module.provide_event_publisher()
+                switch_helper=switch_helper
             )
         
         return self._tool_result_handler
@@ -262,27 +284,26 @@ class DIContainer:
                 db=db,
                 event_publisher=self.infrastructure_module.provide_event_publisher()
             )
-            agent_context_service = self.agent_module.provide_orchestration_service(
-                db=db,
-                event_publisher=self.infrastructure_module.provide_event_publisher()
-            )
-            agent_registry = self.agent_module.provide_agent_registry()
-            llm_client = self.infrastructure_module.provide_llm_client()
             
-            from app.application.handlers import StreamLLMResponseHandler
-            stream_handler = StreamLLMResponseHandler(
-                llm_client=llm_client,
-                session_service=session_service,
-                agent_context_service=agent_context_service,
-                event_publisher=self.infrastructure_module.provide_event_publisher()
+            # Create approval manager
+            from app.domain.services.approval_management import ApprovalManager
+            from app.infrastructure.persistence.repositories.approval_repository_impl import ApprovalRepositoryImpl
+            
+            approval_repository = ApprovalRepositoryImpl(db)
+            approval_manager = ApprovalManager(
+                approval_repository=approval_repository,
+                approval_policy=None
             )
+            
+            # Get message_processor and tool_result_handler (they will be created if needed)
+            message_processor = self._get_message_processor(db)
+            tool_result_handler = self._get_tool_result_handler(db)
             
             self._hitl_handler = HITLDecisionHandler(
+                approval_manager=approval_manager,
                 session_service=session_service,
-                agent_context_service=agent_context_service,
-                agent_registry=agent_registry,
-                stream_handler=stream_handler,
-                event_publisher=self.infrastructure_module.provide_event_publisher()
+                message_processor=message_processor,
+                tool_result_handler=tool_result_handler
             )
         
         return self._hitl_handler

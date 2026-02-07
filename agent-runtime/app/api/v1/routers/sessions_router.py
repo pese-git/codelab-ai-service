@@ -396,8 +396,9 @@ async def get_pending_approvals(
     try:
         # Проверить существование сессии через репозиторий
         from app.infrastructure.persistence.repositories import ConversationRepositoryImpl
+        from app.domain.session_context.value_objects.conversation_id import ConversationId
         conversation_repo = ConversationRepositoryImpl(db)
-        session_exists = await conversation_repo.exists(session_id)
+        session_exists = await conversation_repo.exists(ConversationId(session_id))
         
         if not session_exists:
             raise HTTPException(
