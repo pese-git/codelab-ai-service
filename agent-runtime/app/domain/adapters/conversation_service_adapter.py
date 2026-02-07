@@ -286,19 +286,6 @@ class ConversationServiceAdapter:
         Returns:
             Session entity (legacy)
         """
-        # Получить список сообщений из MessageCollection
-        # MessageCollection.messages - это List[Message]
-        messages = conversation.messages.messages
-        
-        # Создать Session с теми же данными
-        session = Session(
-            id=conversation.conversation_id.value,
-            messages=messages,
-            last_activity=conversation.last_activity,
-            is_active=conversation.is_active,
-            metadata=conversation.metadata.copy(),
-            created_at=conversation.created_at,
-            updated_at=conversation.updated_at
-        )
-        
-        return session
+        # Conversation уже является Session через alias
+        # Просто возвращаем conversation
+        return conversation
