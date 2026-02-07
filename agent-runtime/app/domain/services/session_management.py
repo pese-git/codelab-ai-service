@@ -11,6 +11,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 
 from ..session_context.entities.conversation import Conversation as Session
+from ..session_context.value_objects import ConversationId
 from ..entities.message import Message
 from ..session_context.repositories.conversation_repository import ConversationRepository as SessionRepository
 from ..events.session_events import (
@@ -80,14 +81,18 @@ class SessionManagementService:
         if not session_id:
             session_id = str(uuid.uuid4())
         
+        # Преобразовать в ConversationId для нового репозитория
+        conv_id = ConversationId(session_id)
+        
         # Проверить, что сессия не существует
-        existing = await self._repository.find_by_id(session_id)
+        existing = await self._repository.find_by_id(conv_id)
         if existing:
             raise SessionAlreadyExistsError(session_id)
         
-        # Создать новую сессию
+        # Создать новую сессию с ConversationId
         session = Session(
             id=session_id,
+            conversation_id=conv_id,
             last_activity=datetime.now(timezone.utc)
         )
         
@@ -124,8 +129,10 @@ class SessionManagementService:
         Пример:
             >>> session = await service.get_session("session-123")
         """
-        session = await self._repository.find_by_id(session_id)
-        
+        # Преобразовать в ConversationId
+        conv_id = ConversationId(session_id)
+        session = await self._repository.find_by_id(conv_id)
+
         if not session:
             raise SessionNotFoundError(session_id)
         
