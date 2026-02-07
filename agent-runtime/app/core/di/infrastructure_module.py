@@ -42,7 +42,7 @@ class InfrastructureModule:
         """
         if self._llm_client is None:
             self._llm_client = LLMProxyClient(
-                base_url=AppConfig.LLM_PROXY_URL
+                api_url=AppConfig.LLM_PROXY_URL
             )
             logger.info(f"LLMProxyClient создан (base_url={AppConfig.LLM_PROXY_URL})")
         

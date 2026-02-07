@@ -171,11 +171,29 @@ class DIContainer:
             llm_client = self.infrastructure_module.provide_llm_client()
             
             from app.application.handlers import StreamLLMResponseHandler
+            from app.domain.services.tool_filter_service import ToolFilterService
+            from app.domain.services.llm_response_processor import LLMResponseProcessor
+            from app.domain.services.hitl_policy_service import HITLPolicyService
+            from app.domain.services.approval_management import ApprovalManager
+            from app.infrastructure.tool_registry import ToolRegistry
+            
+            # Create dependencies for StreamLLMResponseHandler
+            tool_registry = ToolRegistry()
+            tool_filter = ToolFilterService(tool_registry=tool_registry)
+            hitl_policy = HITLPolicyService()
+            response_processor = LLMResponseProcessor(hitl_policy=hitl_policy)
+            approval_manager = ApprovalManager(
+                approval_repository=self.session_module.provide_approval_repository(db),
+                approval_policy=None
+            )
+            
             stream_handler = StreamLLMResponseHandler(
                 llm_client=llm_client,
+                tool_filter=tool_filter,
+                response_processor=response_processor,
+                event_publisher=self.infrastructure_module.provide_event_publisher(),
                 session_service=session_service,
-                agent_context_service=agent_context_service,
-                event_publisher=self.infrastructure_module.provide_event_publisher()
+                approval_manager=approval_manager
             )
             
             self._message_processor = MessageProcessor(
