@@ -113,7 +113,7 @@ class MessageProcessor:
         # ВАЖНО: message=None означает "не добавлять user message" (для tool_result)
         if message is not None and message != "":
             await self._session_service.add_message(
-                session_id=session_id,
+                conversation_id=session_id,
                 role="user",
                 content=message
             )
@@ -125,7 +125,7 @@ class MessageProcessor:
             )
         
         # Получить или создать сессию (теперь с user message)
-        session = await self._session_service.get_or_create_session(session_id)
+        session = await self._session_service.get_or_create_conversation(session_id)
         
         # Получить или создать контекст агента
         context = await self._agent_service.get_or_create_context(

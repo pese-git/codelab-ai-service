@@ -1,24 +1,17 @@
 """
 ExecutionCoordinator - Application-level coordinator для выполнения планов.
 
-Координирует взаимодействие между OrchestratorAgent и ExecutionEngine/ExecutionEngineAdapter.
+Координирует взаимодействие между OrchestratorAgent и ExecutionEngine.
 Управляет lifecycle выполнения плана и обрабатывает ошибки.
-
-Фаза 10.3: Обновлено для поддержки ExecutionEngineAdapter.
 """
 
 import logging
-from typing import Dict, Any, Optional, TYPE_CHECKING, AsyncGenerator, Union
+from typing import Dict, Any, Optional, TYPE_CHECKING, AsyncGenerator
 
 from app.domain.services.execution_engine import (
     ExecutionEngine,
     ExecutionResult,
     ExecutionEngineError
-)
-from app.domain.adapters.execution_engine_adapter import (
-    ExecutionEngineAdapter,
-    ExecutionResult as AdapterExecutionResult,
-    ExecutionEngineError as AdapterExecutionEngineError
 )
 from app.domain.entities.plan import PlanStatus
 from app.models.schemas import StreamChunk
@@ -66,16 +59,14 @@ class ExecutionCoordinator:
     
     def __init__(
         self,
-        execution_engine: Union[ExecutionEngine, ExecutionEngineAdapter],
+        execution_engine: ExecutionEngine,
         plan_repository: "PlanRepository"
     ):
         """
         Initialize ExecutionCoordinator.
         
-        Фаза 10.3: Обновлено для поддержки ExecutionEngineAdapter.
-        
         Args:
-            execution_engine: Engine или Adapter для выполнения планов
+            execution_engine: Engine для выполнения планов
             plan_repository: Repository для работы с планами
         """
         self.execution_engine = execution_engine

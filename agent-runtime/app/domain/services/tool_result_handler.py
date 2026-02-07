@@ -145,7 +145,7 @@ class ToolResultHandler:
             )
         
         # Получить сессию
-        session = await self._session_service.get_or_create_session(session_id)
+        session = await self._session_service.get_or_create_conversation(session_id)
         
         # Получить контекст агента
         # ВАЖНО: НЕ указываем initial_agent, чтобы не сбросить существующий контекст

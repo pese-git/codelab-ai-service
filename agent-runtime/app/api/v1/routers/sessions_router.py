@@ -323,7 +323,7 @@ async def get_session_history(
                 db=db,
                 event_publisher=container.infrastructure_module.provide_event_publisher()
             )
-            agent_context = await agent_service.get_agent_context(session_id)
+            agent_context = await agent_service.get_or_create_context(session_id)
             if agent_context:
                 current_agent = agent_context.current_agent
                 agent_history = agent_context.get_agent_history()
