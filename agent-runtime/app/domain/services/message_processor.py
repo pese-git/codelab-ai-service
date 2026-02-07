@@ -10,7 +10,7 @@ import time
 import logging
 from typing import AsyncGenerator, Optional, TYPE_CHECKING
 
-from ..entities.agent_context import AgentType
+from ..agent_context.value_objects.agent_capabilities import AgentType
 from ...models.schemas import StreamChunk
 from ...core.errors import SessionNotFoundError
 

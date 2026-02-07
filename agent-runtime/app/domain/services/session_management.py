@@ -10,9 +10,9 @@ import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 
-from ..entities.session import Session
+from ..session_context.entities.conversation import Conversation as Session
 from ..entities.message import Message
-from ..repositories.session_repository import SessionRepository
+from ..session_context.repositories.conversation_repository import ConversationRepository as SessionRepository
 from ..events.session_events import (
     SessionCreated,
     MessageReceived,

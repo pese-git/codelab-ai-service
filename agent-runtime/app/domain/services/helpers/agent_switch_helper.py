@@ -8,7 +8,8 @@
 import logging
 from typing import Optional, TYPE_CHECKING
 
-from ...entities.agent_context import AgentType, AgentContext
+from ...agent_context.value_objects.agent_capabilities import AgentType
+from ...agent_context.entities.agent import Agent as AgentContext
 from ....models.schemas import StreamChunk
 
 if TYPE_CHECKING:

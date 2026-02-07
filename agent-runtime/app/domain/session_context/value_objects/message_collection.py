@@ -9,6 +9,7 @@ from typing import List, Optional, Dict, Any, Literal
 from datetime import datetime, timezone
 
 from ...shared.value_object import ValueObject
+# Import from entities to avoid circular dependency with __init__.py
 from ...entities.message import Message
 
 

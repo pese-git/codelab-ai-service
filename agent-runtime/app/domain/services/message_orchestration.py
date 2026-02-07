@@ -8,7 +8,7 @@
 import logging
 from typing import AsyncGenerator, Optional
 
-from ..entities.agent_context import AgentType
+from ..agent_context.value_objects.agent_capabilities import AgentType
 from ...models.schemas import StreamChunk
 
 logger = logging.getLogger("agent-runtime.domain.message_orchestration")
