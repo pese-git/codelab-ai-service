@@ -173,7 +173,7 @@ class DIContainer:
             from app.application.handlers import StreamLLMResponseHandler
             from app.domain.services.tool_filter_service import ToolFilterService
             from app.domain.services.llm_response_processor import LLMResponseProcessor
-            from app.domain.services.hitl_policy_service import HITLPolicyService
+            from app.domain.services.hitl_policy import HITLPolicyService
             from app.domain.services.approval_management import ApprovalManager
             from app.infrastructure.tool_registry import ToolRegistry
             
