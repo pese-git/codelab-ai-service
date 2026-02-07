@@ -142,18 +142,28 @@ class ExecutionModule:
             ExecutionEngine: Legacy engine
         """
         if self._execution_engine is None:
-            from app.infrastructure.persistence.repositories.plan_repository_impl_legacy import (
-                PlanRepositoryImplLegacy
+            from app.infrastructure.persistence.repositories.execution_plan_repository_impl import (
+                ExecutionPlanRepositoryImpl
             )
+            from app.domain.services.subtask_executor import SubtaskExecutor
+            from app.domain.services.dependency_resolver import DependencyResolver
+            from app.domain.services.approval_management import ApprovalManager
+            from app.infrastructure.persistence.repositories.approval_repository_impl import ApprovalRepositoryImpl
             
-            plan_repo = PlanRepositoryImplLegacy(db)
+            plan_repo = ExecutionPlanRepositoryImpl(db)
+            subtask_executor = SubtaskExecutor(plan_repository=plan_repo)
+            dependency_resolver = DependencyResolver()
+            approval_repository = ApprovalRepositoryImpl(db)
+            approval_manager = ApprovalManager(
+                approval_repository=approval_repository,
+                approval_policy=None
+            )
             
             self._execution_engine = ExecutionEngine(
                 plan_repository=plan_repo,
-                agent_registry=agent_registry,
-                session_service=session_service,
-                stream_handler=stream_handler,
-                event_publisher=event_publisher
+                subtask_executor=subtask_executor,
+                dependency_resolver=dependency_resolver,
+                approval_manager=approval_manager
             )
         
         return self._execution_engine

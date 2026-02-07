@@ -311,19 +311,48 @@ class DIContainer:
     def _get_plan_approval_handler(self, db: AsyncSession) -> PlanApprovalHandler:
         """Получить PlanApprovalHandler (singleton)."""
         if self._plan_approval_handler is None:
-            execution_engine = self.execution_module.provide_execution_engine(
+            from app.application.coordinators.execution_coordinator import ExecutionCoordinator
+            from app.domain.services.approval_management import ApprovalManager
+            from app.domain.services.fsm_orchestrator import FSMOrchestrator
+            from app.infrastructure.persistence.repositories.approval_repository_impl import ApprovalRepositoryImpl
+            from app.infrastructure.persistence.repositories.execution_plan_repository_impl import ExecutionPlanRepositoryImpl
+            
+            session_service = self.session_module.provide_session_service(
                 db=db,
-                agent_registry=self.agent_module.provide_agent_registry(),
-                session_service=self.session_module.provide_session_service(
-                    db=db,
-                    event_publisher=self.infrastructure_module.provide_event_publisher()
-                ),
                 event_publisher=self.infrastructure_module.provide_event_publisher()
             )
             
-            self._plan_approval_handler = PlanApprovalHandler(
-                execution_engine=execution_engine,
+            # Create dependencies
+            execution_engine = self.execution_module.provide_execution_engine(
+                db=db,
+                agent_registry=self.agent_module.provide_agent_registry(),
+                session_service=session_service,
                 event_publisher=self.infrastructure_module.provide_event_publisher()
+            )
+            
+            plan_repository = ExecutionPlanRepositoryImpl(db)
+            execution_coordinator = ExecutionCoordinator(
+                execution_engine=execution_engine,
+                plan_repository=plan_repository
+            )
+            
+            approval_repository = ApprovalRepositoryImpl(db)
+            approval_manager = ApprovalManager(
+                approval_repository=approval_repository,
+                approval_policy=None
+            )
+            
+            fsm_orchestrator = FSMOrchestrator()
+            llm_client = self.infrastructure_module.provide_llm_client()
+            stream_handler = self._create_stream_handler(db, session_service, llm_client)
+            
+            self._plan_approval_handler = PlanApprovalHandler(
+                approval_manager=approval_manager,
+                session_service=session_service,
+                fsm_orchestrator=fsm_orchestrator,
+                execution_coordinator=execution_coordinator,
+                plan_repository=plan_repository,
+                stream_handler=stream_handler
             )
         
         return self._plan_approval_handler
