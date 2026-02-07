@@ -66,32 +66,19 @@ async def lifespan(app: FastAPI):
         # Персистентность обрабатывается доменными сервисами (SessionManagementService, AgentOrchestrationService)
         logger.info("✓ Session/context management via new architecture (adapters)")
         
-        # Инициализация адаптеров для новой архитектуры
-        # ВАЖНО: Не используем database session при startup, так как адаптеры
-        # будут использоваться с request-scoped сессиями через dependency injection
-        from app.infrastructure.adapters import (
-            SessionManagerAdapter,
-            AgentContextManagerAdapter
-        )
-        from app.domain.services import (
-            SessionManagementService,
-            AgentOrchestrationService
-        )
+        # Инициализация через новый DI Container
+        # Все зависимости управляются через модульный DI
+        from app.core.di import get_container
         from app.infrastructure.cleanup import SessionCleanupService
-        from app.core.dependencies import get_event_publisher
         from app.services.database import get_db
         
         try:
-            # Получить singleton event publisher
-            event_publisher = get_event_publisher()
+            # Получить DI контейнер
+            container = get_container()
+            logger.info("✓ DI Container инициализирован")
             
-            # ПРИМЕЧАНИЕ: Мы НЕ создаем репозитории и сервисы здесь,
-            # так как они требуют database session, которая должна быть request-scoped.
-            # Вместо этого, глобальные адаптеры будут None, и мы будем использовать
-            # dependency injection в роутерах для получения сервисов с правильной сессией.
-            
-            # Установить глобальные адаптеры в None (будут использоваться через DI)
-            global session_manager_adapter, agent_context_manager_adapter, message_orchestration_service
+            # ПРИМЕЧАНИЕ: Все сервисы создаются через DI Container
+            # с request-scoped database sessions через dependency injection
             session_manager_adapter = None
             agent_context_manager_adapter = None
             message_orchestration_service = None
@@ -99,9 +86,16 @@ async def lifespan(app: FastAPI):
             logger.info("✓ Manager adapters will be initialized per-request via dependency injection")
             
             # Initialize session cleanup service with factory pattern
-            from app.infrastructure.persistence.repositories import SessionRepositoryImpl
+            from app.infrastructure.persistence.repositories import (
+                SessionRepositoryImpl,
+                AgentContextRepositoryImpl
+            )
             from app.infrastructure.persistence.database import async_session_maker
+            from app.domain.services import SessionManagementService
             from contextlib import asynccontextmanager
+            
+            # Получить event publisher через контейнер
+            event_publisher = container.infrastructure_module.provide_event_publisher()
             
             # Фабрика-контекстный менеджер для создания session service с новой DB сессией
             @asynccontextmanager
@@ -111,7 +105,7 @@ async def lifespan(app: FastAPI):
                     cleanup_repo = SessionRepositoryImpl(db)
                     service = SessionManagementService(
                         repository=cleanup_repo,
-                        event_publisher=event_publisher.publish
+                        event_publisher=event_publisher
                     )
                     yield service
             
@@ -126,9 +120,6 @@ async def lifespan(app: FastAPI):
                 
         except Exception as e:
             logger.error(f"Failed to initialize services: {e}", exc_info=True)
-            session_manager_adapter = None
-            agent_context_manager_adapter = None
-            message_orchestration_service = None
             cleanup_service = None
         
         # Publish system startup event

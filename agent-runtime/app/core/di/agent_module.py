@@ -1,0 +1,168 @@
+"""
+DI Module для Agent Context.
+
+Предоставляет зависимости для работы с агентами.
+"""
+
+import logging
+from typing import Optional
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.domain.agent_context.services import (
+    AgentCoordinationService,
+    AgentRouterService
+)
+from app.domain.agent_context.repositories import AgentRepository
+from app.infrastructure.persistence.repositories import AgentRepositoryImpl
+from app.domain.services import (
+    AgentOrchestrationService,
+    AgentRegistry,
+    AgentSwitcher
+)
+
+logger = logging.getLogger("agent-runtime.di.agent_module")
+
+
+class AgentModule:
+    """
+    DI модуль для Agent Context.
+    
+    Предоставляет:
+    - AgentRepository
+    - AgentCoordinationService
+    - AgentRouterService
+    - AgentRegistry
+    - AgentSwitcher
+    - AgentOrchestrationService (legacy)
+    """
+    
+    def __init__(self):
+        """Инициализация модуля."""
+        self._agent_repository: Optional[AgentRepository] = None
+        self._coordination_service: Optional[AgentCoordinationService] = None
+        self._router_service: Optional[AgentRouterService] = None
+        self._agent_registry: Optional[AgentRegistry] = None
+        self._agent_switcher: Optional[AgentSwitcher] = None
+        self._orchestration_service: Optional[AgentOrchestrationService] = None
+        
+        logger.debug("AgentModule инициализирован")
+    
+    def provide_agent_repository(
+        self,
+        db: AsyncSession
+    ) -> AgentRepository:
+        """
+        Предоставить репозиторий агентов.
+        
+        Args:
+            db: Сессия БД
+            
+        Returns:
+            AgentRepository: Реализация репозитория
+        """
+        return AgentRepositoryImpl(db)
+    
+    def provide_coordination_service(
+        self,
+        agent_repository: AgentRepository
+    ) -> AgentCoordinationService:
+        """
+        Предоставить сервис координации агентов.
+        
+        Args:
+            agent_repository: Репозиторий агентов
+            
+        Returns:
+            AgentCoordinationService: Сервис координации
+        """
+        if self._coordination_service is None:
+            self._coordination_service = AgentCoordinationService(
+                repository=agent_repository
+            )
+        return self._coordination_service
+    
+    def provide_router_service(
+        self,
+        agent_registry: AgentRegistry
+    ) -> AgentRouterService:
+        """
+        Предоставить сервис маршрутизации агентов.
+        
+        Args:
+            agent_registry: Реестр агентов
+            
+        Returns:
+            AgentRouterService: Сервис маршрутизации
+        """
+        if self._router_service is None:
+            self._router_service = AgentRouterService(
+                agent_registry=agent_registry
+            )
+        return self._router_service
+    
+    def provide_agent_registry(self) -> AgentRegistry:
+        """
+        Предоставить реестр агентов.
+        
+        Returns:
+            AgentRegistry: Реестр агентов
+        """
+        if self._agent_registry is None:
+            self._agent_registry = AgentRegistry()
+        return self._agent_registry
+    
+    def provide_agent_switcher(
+        self,
+        session_service,
+        agent_context_service,
+        event_publisher=None
+    ) -> AgentSwitcher:
+        """
+        Предоставить сервис переключения агентов.
+        
+        Args:
+            session_service: Сервис управления сессиями
+            agent_context_service: Сервис контекста агентов
+            event_publisher: Publisher событий (опционально)
+            
+        Returns:
+            AgentSwitcher: Сервис переключения
+        """
+        if self._agent_switcher is None:
+            self._agent_switcher = AgentSwitcher(
+                session_service=session_service,
+                agent_context_service=agent_context_service,
+                event_publisher=event_publisher
+            )
+        return self._agent_switcher
+    
+    def provide_orchestration_service(
+        self,
+        db: AsyncSession,
+        event_publisher=None
+    ) -> AgentOrchestrationService:
+        """
+        Предоставить legacy AgentOrchestrationService.
+        
+        Для обратной совместимости со старым кодом.
+        
+        Args:
+            db: Сессия БД
+            event_publisher: Publisher событий (опционально)
+            
+        Returns:
+            AgentOrchestrationService: Legacy сервис
+        """
+        if self._orchestration_service is None:
+            from app.infrastructure.persistence.repositories import (
+                AgentContextRepositoryImpl
+            )
+            
+            agent_context_repo = AgentContextRepositoryImpl(db)
+            
+            self._orchestration_service = AgentOrchestrationService(
+                agent_context_repository=agent_context_repo,
+                event_publisher=event_publisher
+            )
+        
+        return self._orchestration_service

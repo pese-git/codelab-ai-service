@@ -13,7 +13,16 @@ from typing import Optional
 from ..schemas.message_schemas import MessageStreamRequest
 from ....models.schemas import StreamChunk
 from ....agents.base_agent import AgentType
-from ....core.dependencies import get_message_orchestration_service
+from ....core.dependencies import (
+    get_process_message_use_case,
+    get_switch_agent_use_case,
+    get_process_tool_result_use_case,
+    get_handle_approval_use_case
+)
+from ....application.use_cases.process_message_use_case import ProcessMessageRequest
+from ....application.use_cases.switch_agent_use_case import SwitchAgentRequest
+from ....application.use_cases.process_tool_result_use_case import ProcessToolResultRequest
+from ....application.use_cases.handle_approval_use_case import HandleApprovalRequest
 
 logger = logging.getLogger("agent-runtime.api.messages")
 
@@ -23,7 +32,10 @@ router = APIRouter(prefix="/agent/message", tags=["messages"])
 @router.post("/stream")
 async def message_stream_sse(
     request: MessageStreamRequest,
-    message_orchestration_service=Depends(get_message_orchestration_service)
+    process_message_use_case=Depends(get_process_message_use_case),
+    switch_agent_use_case=Depends(get_switch_agent_use_case),
+    process_tool_result_use_case=Depends(get_process_tool_result_use_case),
+    handle_approval_use_case=Depends(get_handle_approval_use_case)
 ):
     """
     SSE streaming endpoint для обработки сообщений.
@@ -84,11 +96,12 @@ async def message_stream_sse(
         
         async def generate():
             try:
-                async for chunk in message_orchestration_service.process_message(
+                use_case_request = ProcessMessageRequest(
                     session_id=session_id,
                     message=content,
                     agent_type=agent_type
-                ):
+                )
+                async for chunk in process_message_use_case.execute(use_case_request):
                     # Преобразовать в SSE формат
                     chunk_json = chunk.model_dump_json(exclude_none=False)
                     if chunk.type == "plan_approval_required":
@@ -132,12 +145,13 @@ async def message_stream_sse(
         
         async def tool_result_generate():
             try:
-                async for chunk in message_orchestration_service.process_tool_result(
+                use_case_request = ProcessToolResultRequest(
                     session_id=session_id,
                     call_id=call_id,
                     result=result,
                     error=error
-                ):
+                )
+                async for chunk in process_tool_result_use_case.execute(use_case_request):
                     yield f"data: {chunk.model_dump_json()}\n\n"
             except Exception as e:
                 logger.error(f"Error processing tool_result: {e}", exc_info=True)
@@ -183,12 +197,12 @@ async def message_stream_sse(
         
         async def switch_agent_generate():
             try:
-                # Переключаем агента через MessageOrchestrationService
-                async for chunk in message_orchestration_service.switch_agent(
+                # Переключаем агента через Use Case
+                use_case_request = SwitchAgentRequest(
                     session_id=session_id,
-                    agent_type=agent_type,
-                    reason=reason
-                ):
+                    new_agent_type=agent_type
+                )
+                async for chunk in switch_agent_use_case.execute(use_case_request):
                     yield f"data: {chunk.model_dump_json()}\n\n"
             except Exception as e:
                 logger.error(f"Error switching agent: {e}", exc_info=True)
@@ -229,14 +243,14 @@ async def message_stream_sse(
         
         async def hitl_decision_generate():
             try:
-                # Обрабатываем HITL решение через MessageOrchestrationService
-                async for chunk in message_orchestration_service.process_hitl_decision(
+                # Обрабатываем HITL решение через Use Case
+                use_case_request = HandleApprovalRequest(
                     session_id=session_id,
-                    call_id=call_id,
-                    decision=decision,
-                    modified_arguments=modified_arguments,
-                    feedback=feedback
-                ):
+                    approval_request_id=call_id,
+                    approved=(decision == "approved"),
+                    approval_type="hitl"
+                )
+                async for chunk in handle_approval_use_case.execute(use_case_request):
                     yield f"data: {chunk.model_dump_json()}\n\n"
             except Exception as e:
                 logger.error(f"Error processing HITL decision: {e}", exc_info=True)
@@ -276,13 +290,14 @@ async def message_stream_sse(
         
         async def plan_decision_generate():
             try:
-                # Обрабатываем Plan Approval решение через MessageOrchestrationService
-                async for chunk in message_orchestration_service.process_plan_decision(
+                # Обрабатываем Plan Approval решение через Use Case
+                use_case_request = HandleApprovalRequest(
                     session_id=session_id,
                     approval_request_id=approval_request_id,
-                    decision=decision,
-                    feedback=feedback
-                ):
+                    approved=(decision == "approved"),
+                    approval_type="plan"
+                )
+                async for chunk in handle_approval_use_case.execute(use_case_request):
                     yield f"data: {chunk.model_dump_json()}\n\n"
             except Exception as e:
                 logger.error(f"Error processing Plan Approval decision: {e}", exc_info=True)

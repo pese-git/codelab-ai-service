@@ -1,17 +1,30 @@
 """
-Dependency Injection modules.
+Dependency Injection модули для Agent Runtime.
 
-This package contains modular DI configuration organized by bounded contexts.
-Each module is responsible for providing dependencies for its specific context.
+Модульная организация DI согласно Clean Architecture:
+- SessionModule - зависимости для Session Context
+- AgentModule - зависимости для Agent Context
+- ExecutionModule - зависимости для Execution Context
+- InfrastructureModule - зависимости для Infrastructure Layer
+- DIContainer - центральный контейнер
 
-Modules:
-    - container: Central DI container
-    - session_module: Session Context dependencies
-    - agent_module: Agent Context dependencies
-    - execution_module: Execution Context dependencies
-    - approval_module: Approval Context dependencies
-    - llm_module: LLM Context dependencies
-    - infrastructure_module: Infrastructure layer dependencies
+Пример использования:
+    >>> from app.core.di import get_container
+    >>> container = get_container()
+    >>> use_case = container.get_process_message_use_case(db)
 """
 
-__all__ = []
+from .container import DIContainer, get_container
+from .session_module import SessionModule
+from .agent_module import AgentModule
+from .execution_module import ExecutionModule
+from .infrastructure_module import InfrastructureModule
+
+__all__ = [
+    "DIContainer",
+    "get_container",
+    "SessionModule",
+    "AgentModule",
+    "ExecutionModule",
+    "InfrastructureModule",
+]

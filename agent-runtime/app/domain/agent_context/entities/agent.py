@@ -143,6 +143,11 @@ class Agent(Entity):
         """Получить текущий тип агента."""
         return self.capabilities.agent_type
     
+    @property
+    def current_agent(self) -> AgentType:
+        """Получить текущего агента (alias для current_type, для обратной совместимости)."""
+        return self.current_type
+    
     @staticmethod
     def create(
         session_id: str,

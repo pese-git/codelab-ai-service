@@ -26,10 +26,11 @@ from ....core.dependencies import (
     get_create_session_handler,
     get_get_session_handler,
     get_list_sessions_handler,
-    get_session_manager_adapter,
-    get_agent_context_manager_adapter,
-    get_approval_manager
+    get_di_container
 )
+from ....core.di import DIContainer
+from ....services.database import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger("agent-runtime.api.sessions")
 
@@ -246,7 +247,8 @@ async def list_sessions(
 async def get_session_history(
     session_id: str,
     handler: GetSessionHandler = Depends(get_get_session_handler),
-    agent_context_manager_adapter=Depends(get_agent_context_manager_adapter)
+    db: AsyncSession = Depends(get_db),
+    container: DIContainer = Depends(get_di_container)
 ):
     """
     Получить историю сообщений для сессии.
@@ -313,11 +315,15 @@ async def get_session_history(
                     message_dict["tool_calls"] = msg.tool_calls
                 messages.append(message_dict)
         
-        # Получить информацию о текущем агенте из agent_context_manager_adapter
+        # Получить информацию о текущем агенте через сервис
         current_agent = None
         agent_history = []
         try:
-            agent_context = agent_context_manager_adapter.get(session_id)
+            agent_service = container.agent_module.provide_orchestration_service(
+                db=db,
+                event_publisher=container.infrastructure_module.provide_event_publisher()
+            )
+            agent_context = await agent_service.get_agent_context(session_id)
             if agent_context:
                 current_agent = agent_context.current_agent
                 agent_history = agent_context.get_agent_history()
@@ -343,8 +349,8 @@ async def get_session_history(
 @router.get("/{session_id}/pending-approvals")
 async def get_pending_approvals(
     session_id: str,
-    session_manager_adapter=Depends(get_session_manager_adapter),
-    approval_manager=Depends(get_approval_manager)
+    db: AsyncSession = Depends(get_db),
+    container: DIContainer = Depends(get_di_container)
 ):
     """
     Получить все pending approval запросы для сессии.
@@ -388,14 +394,27 @@ async def get_pending_approvals(
     logger.debug(f"Getting pending approvals for session {session_id}")
     
     try:
-        # Проверить существование сессии
-        if not session_manager_adapter.exists(session_id):
+        # Проверить существование сессии через репозиторий
+        from app.infrastructure.persistence.repositories import ConversationRepositoryImpl
+        conversation_repo = ConversationRepositoryImpl(db)
+        session_exists = await conversation_repo.exists(session_id)
+        
+        if not session_exists:
             raise HTTPException(
                 status_code=404,
                 detail=f"Session {session_id} not found"
             )
         
         # Получить pending approvals из ApprovalManager (загружает из БД)
+        from app.infrastructure.persistence.repositories.approval_repository_impl import ApprovalRepositoryImpl
+        from app.domain.services.approval_management import ApprovalManager
+        from app.domain.entities.approval import ApprovalPolicy
+        
+        approval_repo = ApprovalRepositoryImpl(db)
+        approval_manager = ApprovalManager(
+            approval_repository=approval_repo,
+            approval_policy=ApprovalPolicy.default()
+        )
         pending_approvals = await approval_manager.get_all_pending(session_id)
         
         return {

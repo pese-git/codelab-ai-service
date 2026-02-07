@@ -174,6 +174,7 @@ class MessageProcessor:
                 )
                 
                 # Обработать через Orchestrator для маршрутизации
+                agent_switched = False
                 async for chunk in self._process_with_orchestrator(
                     session_id=session_id,
                     message=message,
@@ -188,6 +189,7 @@ class MessageProcessor:
                             current_context=context
                         )
                         yield notification_chunk
+                        agent_switched = True
                         break
                     else:
                         # Переслать другие чанки
@@ -200,6 +202,20 @@ class MessageProcessor:
                                 f"завершаем обработку"
                             )
                             return  # Не продолжать обработку
+                
+                # Если произошло переключение агента, НЕ продолжать с orchestrator
+                # Вместо этого, продолжить с новым агентом ниже
+                if agent_switched:
+                    logger.info(
+                        f"Orchestrator переключил агента на {context.current_agent.value}, "
+                        f"продолжаем обработку с новым агентом"
+                    )
+                    # Обновить сессию после переключения
+                    session = await self._session_service.get_session(session_id)
+                    # НЕ делать return здесь - продолжить к обработке с новым агентом
+                else:
+                    # Orchestrator обработал сам (не переключил) - завершаем
+                    return
             
             # Получить текущего агента и обработать сообщение
             current_agent = self._agent_router.get_agent(context.current_agent)

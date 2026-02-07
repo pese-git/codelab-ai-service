@@ -7,7 +7,7 @@ Conversation Entity (рефакторинг Session).
 - Делегирование сложной логики в Domain Services
 """
 
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime, timezone
 from pydantic import Field
 
@@ -257,6 +257,18 @@ class Conversation(BaseEntity):
             )
         
         return count
+    
+    def get_history_for_llm(self, max_messages: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Получить историю сообщений в формате для LLM (для обратной совместимости).
+        
+        Args:
+            max_messages: Максимальное количество сообщений
+            
+        Returns:
+            Список сообщений в формате LLM API
+        """
+        return self.messages.to_llm_format(max_messages=max_messages)
     
     def get_duration_seconds(self) -> float:
         """
