@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from sqlalchemy.pool import StaticPool
 
 from app.infrastructure.persistence.models.base import Base
-from app.infrastructure.persistence.repositories import PlanRepositoryImpl
+from app.infrastructure.persistence.repositories.execution_plan_repository_impl import ExecutionPlanRepositoryImpl
 from app.domain.entities import Plan
 
 
@@ -50,7 +50,7 @@ async def db_session(db_engine):
 @pytest_asyncio.fixture
 def plan_repository(db_session):
     """Создать PlanRepositoryImpl."""
-    return PlanRepositoryImpl(db_session)
+    return ExecutionPlanRepositoryImpl(db_session)
 
 
 @pytest.fixture
@@ -237,8 +237,8 @@ class TestPlanRepositorySnapshotMethods:
     ):
         """Тест сохранения snapshot между разными экземплярами repository."""
         # Arrange
-        repo1 = PlanRepositoryImpl(db_session)
-        repo2 = PlanRepositoryImpl(db_session)
+        repo1 = ExecutionPlanRepositoryImpl(db_session)
+        repo2 = ExecutionPlanRepositoryImpl(db_session)
         
         session_id = "session-1"
         

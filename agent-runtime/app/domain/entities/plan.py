@@ -10,7 +10,7 @@ from enum import Enum
 from pydantic import Field
 
 from .base import Entity
-from .agent_context import AgentType
+from ..agent_context.value_objects.agent_capabilities import AgentType
 
 
 class SubtaskStatus(str, Enum):

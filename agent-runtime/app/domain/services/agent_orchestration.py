@@ -10,7 +10,7 @@ from typing import Optional
 
 from ..agent_context.entities.agent import Agent as AgentContext
 from ..agent_context.value_objects.agent_capabilities import AgentType
-from ..repositories.agent_context_repository import AgentContextRepository
+from ..agent_context.repositories.agent_repository import AgentRepository as AgentContextRepository
 from ..events.agent_events import (
     AgentAssigned,
     AgentSwitchRequested,

@@ -44,6 +44,9 @@ def __getattr__(name):
     elif name == "AgentType":
         from ..agent_context.value_objects.agent_capabilities import AgentType as AT
         return AT
+    elif name == "Plan":
+        from .plan import Plan as P
+        return P
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
 __all__ = [
@@ -54,6 +57,7 @@ __all__ = [
     "AgentContext",  # Use Agent from domain.agent_context
     "AgentType",  # Use from domain.agent_context.value_objects
     "AgentSwitch",  # Use AgentSwitchRecord from domain.agent_context.entities
+    "Plan",  # Legacy Plan entity (still used)
     # HITL entities
     "HITLDecision",
     "HITLPolicyRule",

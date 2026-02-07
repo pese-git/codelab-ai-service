@@ -7,7 +7,7 @@ Unit тесты для обновлений PlanMapper.
 import pytest
 from datetime import datetime, timezone
 
-from app.infrastructure.persistence.mappers import PlanMapper
+from app.infrastructure.persistence.mappers.execution_plan_mapper import ExecutionPlanMapper
 from app.infrastructure.persistence.models.plan import PlanModel, SubtaskModel
 from app.domain.entities import Plan
 from app.domain.execution_context.value_objects import PlanId, SubtaskId
@@ -15,8 +15,8 @@ from app.domain.execution_context.value_objects import PlanId, SubtaskId
 
 @pytest.fixture
 def mapper():
-    """Создать PlanMapper."""
-    return PlanMapper()
+    """Создать ExecutionPlanMapper."""
+    return ExecutionPlanMapper()
 
 
 class TestPlanMapperValueObjectSupport:
