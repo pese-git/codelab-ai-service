@@ -143,7 +143,7 @@ class SubtaskExecutor:
             )
             
             # Получить сессию (уже с очищенной историей)
-            session = await session_service.get_session(session_id)
+            session = await session_service.get_conversation(session_id)
             if not session:
                 raise SubtaskExecutionError(f"Session {session_id} not found")
             

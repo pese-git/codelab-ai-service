@@ -7,6 +7,7 @@ Sessions роутер.
 import logging
 from fastapi import APIRouter, HTTPException, Depends, Body
 from fastapi.responses import JSONResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..schemas.session_schemas import (
     CreateSessionRequest,
@@ -22,20 +23,43 @@ from ....application.queries import (
     ListSessionsHandler
 )
 from ....core.errors import SessionNotFoundError, SessionAlreadyExistsError
-from ....core.dependencies import (
-    get_create_session_handler,
-    get_get_session_handler,
-    get_list_sessions_handler,
-    get_di_container
-)
-from ....core.di import DIContainer
+from ....core.di import get_container, DIContainer
 from ....services.database import get_db
-from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger("agent-runtime.api.sessions")
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
+
+# ==================== Dependency Functions ====================
+
+async def get_create_session_handler(
+    db: AsyncSession = Depends(get_db)
+) -> CreateSessionHandler:
+    """Получить handler для создания сессии."""
+    container = get_container()
+    conversation_repo = container.session_module.provide_conversation_repository(db)
+    conversation_service = container.session_module.provide_conversation_service(conversation_repo)
+    return CreateSessionHandler(conversation_service)
+
+
+async def get_get_session_handler(
+    db: AsyncSession = Depends(get_db)
+) -> GetSessionHandler:
+    """Получить handler для получения сессии."""
+    from ....infrastructure.persistence.repositories import ConversationRepositoryImpl
+    return GetSessionHandler(ConversationRepositoryImpl(db))
+
+
+async def get_list_sessions_handler(
+    db: AsyncSession = Depends(get_db)
+) -> ListSessionsHandler:
+    """Получить handler для списка сессий."""
+    from ....infrastructure.persistence.repositories import ConversationRepositoryImpl, AgentRepositoryImpl
+    return ListSessionsHandler(ConversationRepositoryImpl(db), AgentRepositoryImpl(db))
+
+
+# ==================== Endpoints ====================
 
 @router.post("", response_model=CreateSessionResponse, status_code=201)
 async def create_session(
@@ -247,8 +271,7 @@ async def list_sessions(
 async def get_session_history(
     session_id: str,
     handler: GetSessionHandler = Depends(get_get_session_handler),
-    db: AsyncSession = Depends(get_db),
-    container: DIContainer = Depends(get_di_container)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Получить историю сообщений для сессии.
@@ -319,16 +342,18 @@ async def get_session_history(
         current_agent = None
         agent_history = []
         try:
-            agent_service = container.agent_module.provide_orchestration_service(
-                db=db,
-                event_publisher=container.infrastructure_module.provide_event_publisher()
+            # Используем новый AgentCoordinationService
+            container = get_container()
+            agent_repository = container.agent_module.provide_agent_repository(db)
+            agent_service = container.agent_module.provide_coordination_service(
+                agent_repository=agent_repository
             )
-            agent_context = await agent_service.get_or_create_context(session_id)
-            if agent_context:
-                current_agent = agent_context.current_agent
-                agent_history = agent_context.get_agent_history()
+            agent = await agent_service.get_or_create_agent(session_id)
+            if agent:
+                current_agent = agent.current_type
+                agent_history = agent.get_agent_history()
         except Exception as e:
-            logger.warning(f"Could not load agent context for {session_id}: {e}")
+            logger.warning(f"Could not load agent for {session_id}: {e}")
         
         return {
             "session_id": session_id,
@@ -349,8 +374,7 @@ async def get_session_history(
 @router.get("/{session_id}/pending-approvals")
 async def get_pending_approvals(
     session_id: str,
-    db: AsyncSession = Depends(get_db),
-    container: DIContainer = Depends(get_di_container)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Получить все pending approval запросы для сессии.

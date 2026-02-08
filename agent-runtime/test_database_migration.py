@@ -31,7 +31,8 @@ async def test_database_operations():
             init_database, init_db, close_db, get_db,
             get_database_service, DatabaseService
         )
-        from app.core.dependencies import DBSession, DBService
+        from sqlalchemy.ext.asyncio import AsyncSession
+        from app.services.database import DatabaseService
         print("   ✅ Все импорты успешны")
         
         # 2. Инициализация БД

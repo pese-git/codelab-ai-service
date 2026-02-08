@@ -16,7 +16,7 @@ from ...core.errors import SessionNotFoundError
 
 if TYPE_CHECKING:
     from ..session_context.services import ConversationManagementService
-    from .agent_orchestration import AgentOrchestrationService
+    from ..agent_context.services import AgentCoordinationService
     from .helpers.agent_switch_helper import AgentSwitchHelper
     from ..interfaces.stream_handler import IStreamHandler
 
@@ -46,7 +46,7 @@ class MessageProcessor:
     def __init__(
         self,
         session_service: "ConversationManagementService",
-        agent_service: "AgentOrchestrationService",
+        agent_service: "AgentCoordinationService",
         agent_router,  # AgentRouter
         stream_handler: Optional["IStreamHandler"],
         switch_helper: "AgentSwitchHelper"
@@ -127,21 +127,21 @@ class MessageProcessor:
         # Получить или создать сессию (теперь с user message)
         session = await self._session_service.get_or_create_conversation(session_id)
         
-        # Получить или создать контекст агента
-        context = await self._agent_service.get_or_create_context(
+        # Получить или создать агента
+        agent = await self._agent_service.get_or_create_agent(
             session_id=session_id,
-            initial_agent=agent_type or AgentType.ORCHESTRATOR
+            initial_type=agent_type or AgentType.ORCHESTRATOR
         )
         
         # Отследить время начала обработки
         start_time = time.time()
         processing_success = True
-        current_agent_for_tracking = context.current_agent
+        current_agent_for_tracking = agent.current_type
         
         try:
             # Обработать явный запрос на переключение агента
-            if agent_type and context.current_agent != agent_type:
-                from_agent = context.current_agent
+            if agent_type and agent.current_type != agent_type:
+                from_agent = agent.current_type
                 
                 logger.info(
                     f"Явное переключение агента для сессии {session_id}: "
@@ -149,7 +149,7 @@ class MessageProcessor:
                 )
                 
                 # Переключить агента
-                context = await self._switch_helper.execute_agent_switch(
+                agent = await self._switch_helper.execute_agent_switch(
                     session_id=session_id,
                     target_agent=agent_type,
                     reason="User requested agent switch",
@@ -167,7 +167,7 @@ class MessageProcessor:
             
             # Если текущий агент - Orchestrator и есть сообщение,
             # позволить ему выполнить маршрутизацию
-            if context.current_agent == AgentType.ORCHESTRATOR and message:
+            if agent.current_type == AgentType.ORCHESTRATOR and message:
                 logger.debug(
                     f"Текущий агент - Orchestrator, выполняется маршрутизация "
                     f"для сессии {session_id}"
@@ -178,15 +178,15 @@ class MessageProcessor:
                 async for chunk in self._process_with_orchestrator(
                     session_id=session_id,
                     message=message,
-                    context=context,
+                    context=agent,
                     session=session
                 ):
                     if chunk.type == "switch_agent":
-                        # Обработать переключение и получить новый контекст
-                        context, notification_chunk = await self._switch_helper.handle_agent_switch_request(
+                        # Обработать переключение и получить нового агента
+                        agent, notification_chunk = await self._switch_helper.handle_agent_switch_request(
                             session_id=session_id,
                             chunk=chunk,
-                            current_context=context
+                            current_agent=agent
                         )
                         yield notification_chunk
                         agent_switched = True
@@ -207,21 +207,21 @@ class MessageProcessor:
                 # Вместо этого, продолжить с новым агентом ниже
                 if agent_switched:
                     logger.info(
-                        f"Orchestrator переключил агента на {context.current_agent.value}, "
+                        f"Orchestrator переключил агента на {agent.current_type.value}, "
                         f"продолжаем обработку с новым агентом"
                     )
                     # Обновить сессию после переключения
-                    session = await self._session_service.get_session(session_id)
+                    session = await self._session_service.get_conversation(session_id)
                     # НЕ делать return здесь - продолжить к обработке с новым агентом
                 else:
                     # Orchestrator обработал сам (не переключил) - завершаем
                     return
             
             # Получить текущего агента и обработать сообщение
-            current_agent = self._agent_router.get_agent(context.current_agent)
+            current_agent = self._agent_router.get_agent(agent.current_type)
             
             logger.info(
-                f"Обработка с агентом {context.current_agent.value} "
+                f"Обработка с агентом {agent.current_type.value} "
                 f"для сессии {session_id}"
             )
             
@@ -229,7 +229,7 @@ class MessageProcessor:
             async for chunk in current_agent.process(
                 session_id=session_id,
                 message=message,
-                context=self._context_to_dict(context),
+                context=self._context_to_dict(agent),
                 session=session,
                 session_service=self._session_service,
                 stream_handler=self._stream_handler
@@ -237,23 +237,23 @@ class MessageProcessor:
                 # Проверить запросы на переключение агента от самого агента
                 if chunk.type == "switch_agent":
                     # Обработать переключение через helper
-                    context, notification_chunk = await self._switch_helper.handle_agent_switch_request(
+                    agent, notification_chunk = await self._switch_helper.handle_agent_switch_request(
                         session_id=session_id,
                         chunk=chunk,
-                        current_context=context
+                        current_agent=agent
                     )
                     
                     yield notification_chunk
                     
                     # Продолжить обработку с новым агентом
                     # Обновить сессию после переключения и добавления tool_result
-                    session = await self._session_service.get_session(session_id)
-                    new_agent = self._agent_router.get_agent(context.current_agent)
+                    session = await self._session_service.get_conversation(session_id)
+                    new_agent = self._agent_router.get_agent(agent.current_type)
                     
                     async for new_chunk in new_agent.process(
                         session_id=session_id,
                         message=message,
-                        context=self._context_to_dict(context),
+                        context=self._context_to_dict(agent),
                         session=session,
                         session_service=self._session_service,
                         stream_handler=self._stream_handler
@@ -344,7 +344,7 @@ class MessageProcessor:
         """
         return {
             "session_id": context.session_id,
-            "current_agent": context.current_agent.value,
+            "current_agent": context.current_type.value,
             "switch_count": context.switch_count,
             "agent_history": [
                 {

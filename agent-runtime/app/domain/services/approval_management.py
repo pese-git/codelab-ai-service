@@ -467,7 +467,7 @@ def _get_global_approval_manager() -> ApprovalManager:
         from app.infrastructure.persistence.repositories.approval_repository_impl import (
             ApprovalRepositoryImpl
         )
-        from app.services.database import get_db
+        from app.infrastructure.persistence.database import get_db
         
         class SelfManagedRepository(ApprovalRepository):
             """

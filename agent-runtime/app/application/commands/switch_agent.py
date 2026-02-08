@@ -8,7 +8,7 @@ from typing import Optional
 from pydantic import Field
 
 from .base import Command, CommandHandler
-from ...domain.services.agent_orchestration import AgentOrchestrationService
+from ...domain.agent_context.services.agent_coordination_service import AgentCoordinationService
 from ...domain.agent_context.value_objects.agent_capabilities import AgentType
 from ..dto.agent_context_dto import AgentContextDTO
 
@@ -46,13 +46,13 @@ class SwitchAgentHandler(CommandHandler[AgentContextDTO]):
     Обработчик команды переключения агента.
     
     Переключает агента через доменный сервис и
-    возвращает DTO обновленного контекста.
+    возвращает DTO обновленного агента.
     
     Атрибуты:
-        _orchestration_service: Доменный сервис оркестрации агентов
+        _coordination_service: Доменный сервис координации агентов
     
     Пример:
-        >>> handler = SwitchAgentHandler(orchestration_service)
+        >>> handler = SwitchAgentHandler(coordination_service)
         >>> command = SwitchAgentCommand(
         ...     session_id="session-1",
         ...     target_agent="coder",
@@ -63,14 +63,14 @@ class SwitchAgentHandler(CommandHandler[AgentContextDTO]):
         'coder'
     """
     
-    def __init__(self, orchestration_service: AgentOrchestrationService):
+    def __init__(self, coordination_service: AgentCoordinationService):
         """
         Инициализация обработчика.
         
         Args:
-            orchestration_service: Доменный сервис оркестрации агентов
+            coordination_service: Доменный сервис координации агентов
         """
-        self._orchestration_service = orchestration_service
+        self._coordination_service = coordination_service
     
     async def handle(self, command: SwitchAgentCommand) -> AgentContextDTO:
         """
@@ -104,12 +104,12 @@ class SwitchAgentHandler(CommandHandler[AgentContextDTO]):
             )
         
         # Переключить агента через доменный сервис
-        context = await self._orchestration_service.switch_agent(
+        agent = await self._coordination_service.switch_agent(
             session_id=command.session_id,
-            target_agent=target_agent_type,
+            target_type=target_agent_type,
             reason=command.reason,
             confidence=command.confidence
         )
         
         # Преобразовать в DTO
-        return AgentContextDTO.from_entity(context, include_history=True)
+        return AgentContextDTO.from_entity(agent, include_history=True)

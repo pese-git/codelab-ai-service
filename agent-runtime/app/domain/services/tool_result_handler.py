@@ -12,7 +12,7 @@ from ...models.schemas import StreamChunk
 
 if TYPE_CHECKING:
     from ..session_context.services import ConversationManagementService
-    from .agent_orchestration import AgentOrchestrationService
+    from ..agent_context.services import AgentCoordinationService
     from .helpers.agent_switch_helper import AgentSwitchHelper
     from ..interfaces.stream_handler import IStreamHandler
     from .approval_management import ApprovalManager
@@ -45,7 +45,7 @@ class ToolResultHandler:
     def __init__(
         self,
         session_service: "ConversationManagementService",
-        agent_service: "AgentOrchestrationService",
+        agent_service: "AgentCoordinationService",
         agent_router,  # AgentRouter
         stream_handler: Optional["IStreamHandler"],
         switch_helper: "AgentSwitchHelper",
@@ -147,16 +147,16 @@ class ToolResultHandler:
         # Получить сессию
         session = await self._session_service.get_or_create_conversation(session_id)
         
-        # Получить контекст агента
-        # ВАЖНО: НЕ указываем initial_agent, чтобы не сбросить существующий контекст
-        context = await self._agent_service.get_or_create_context(
+        # Получить агента
+        # ВАЖНО: НЕ указываем initial_type, чтобы не сбросить существующего агента
+        agent = await self._agent_service.get_or_create_agent(
             session_id=session_id
         )
         
         logger.info(
-            f"Загружен контекст для сессии {session_id}: "
-            f"current_agent={context.current_agent.value}, "
-            f"switch_count={context.switch_count}"
+            f"Загружен агент для сессии {session_id}: "
+            f"current_type={agent.current_type.value}, "
+            f"switch_count={agent.switch_count}"
         )
         
         # Добавить результат инструмента в сессию
@@ -170,7 +170,7 @@ class ToolResultHandler:
         logger.info(
             f"Результат инструмента добавлен в сессию {session_id}, "
             f"call_id={call_id}, has_error={error is not None}, "
-            f"продолжаем обработку с агентом {context.current_agent.value}"
+            f"продолжаем обработку с агентом {agent.current_type.value}"
         )
         
         # ✅ КРИТИЧЕСКОЕ: Проверить активный план перед вызовом agent.process()
@@ -188,12 +188,12 @@ class ToolResultHandler:
                 return
         
         # Получить текущего агента и продолжить обработку
-        current_agent = self._agent_router.get_agent(context.current_agent)
+        current_agent = self._agent_router.get_agent(agent.current_type)
         
-        logger.debug(f"Вызываем {context.current_agent.value}.process() для продолжения")
+        logger.debug(f"Вызываем {agent.current_type.value}.process() для продолжения")
         
         # Обновить сессию после добавления tool_result
-        session = await self._session_service.get_session(session_id)
+        session = await self._session_service.get_conversation(session_id)
         
         # Получить последнее user message для передачи новому агенту при переключении
         last_user_message = self._extract_last_user_message(session)
@@ -207,7 +207,7 @@ class ToolResultHandler:
         async for chunk in current_agent.process(
             session_id=session_id,
             message=None,  # None означает "не добавлять user message"
-            context=self._context_to_dict(context),
+            context=self._context_to_dict(agent),
             session=session,
             session_service=self._session_service,
             stream_handler=self._stream_handler
@@ -218,23 +218,23 @@ class ToolResultHandler:
             # Если агент запрашивает переключение, продолжить с новым агентом
             if chunk.type == "switch_agent":
                 # Обработать переключение через helper
-                context, notification_chunk = await self._switch_helper.handle_agent_switch_request(
+                agent, notification_chunk = await self._switch_helper.handle_agent_switch_request(
                     session_id=session_id,
                     chunk=chunk,
-                    current_context=context
+                    current_agent=agent
                 )
                 
                 yield notification_chunk
                 
                 # Продолжить обработку с новым агентом и ОРИГИНАЛЬНЫМ сообщением
                 # Обновить сессию после добавления tool_result
-                session = await self._session_service.get_session(session_id)
-                new_agent = self._agent_router.get_agent(context.current_agent)
+                session = await self._session_service.get_conversation(session_id)
+                new_agent = self._agent_router.get_agent(agent.current_type)
                 
                 async for new_chunk in new_agent.process(
                     session_id=session_id,
                     message=last_user_message,  # Передаем оригинальное сообщение пользователя
-                    context=self._context_to_dict(context),
+                    context=self._context_to_dict(agent),
                     session=session,
                     session_service=self._session_service,
                     stream_handler=self._stream_handler

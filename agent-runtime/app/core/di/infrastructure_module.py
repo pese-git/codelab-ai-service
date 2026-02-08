@@ -61,23 +61,15 @@ class InfrastructureModule:
         
         return self._event_publisher
     
-    def provide_llm_event_publisher(
-        self,
-        event_publisher: EventPublisherAdapter
-    ) -> LLMEventPublisher:
+    def provide_llm_event_publisher(self) -> LLMEventPublisher:
         """
         Предоставить publisher LLM событий.
         
-        Args:
-            event_publisher: Базовый publisher событий
-            
         Returns:
             LLMEventPublisher: Publisher LLM событий
         """
         if self._llm_event_publisher is None:
-            self._llm_event_publisher = LLMEventPublisher(
-                event_publisher=event_publisher
-            )
+            self._llm_event_publisher = LLMEventPublisher()
             logger.info("LLMEventPublisher создан")
         
         return self._llm_event_publisher

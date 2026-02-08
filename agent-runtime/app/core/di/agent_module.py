@@ -15,7 +15,6 @@ from app.domain.agent_context.services import (
 from app.domain.agent_context.repositories import AgentRepository
 from app.infrastructure.persistence.repositories import AgentRepositoryImpl
 from app.domain.services import (
-    AgentOrchestrationService,
     AgentRegistry,
     AgentSwitcher
 )
@@ -33,7 +32,6 @@ class AgentModule:
     - AgentRouterService
     - AgentRegistry
     - AgentSwitcher
-    - AgentOrchestrationService (legacy)
     """
     
     def __init__(self):
@@ -43,7 +41,6 @@ class AgentModule:
         self._router_service: Optional[AgentRouterService] = None
         self._agent_registry: Optional[AgentRegistry] = None
         self._agent_switcher: Optional[AgentSwitcher] = None
-        self._orchestration_service: Optional[AgentOrchestrationService] = None
         
         logger.debug("AgentModule инициализирован")
     
@@ -105,16 +102,15 @@ class AgentModule:
         Предоставить реестр агентов.
         
         Returns:
-            AgentRegistry: Реестр агентов
+            AgentRegistry: Глобальный singleton реестр агентов
         """
-        if self._agent_registry is None:
-            self._agent_registry = AgentRegistry()
-        return self._agent_registry
+        from app.domain.services.agent_registry import agent_registry
+        return agent_registry
     
     def provide_agent_switcher(
         self,
         session_service,
-        agent_context_service,
+        agent_coordination_service: AgentCoordinationService,
         event_publisher=None
     ) -> AgentSwitcher:
         """
@@ -122,7 +118,7 @@ class AgentModule:
         
         Args:
             session_service: Сервис управления сессиями
-            agent_context_service: Сервис контекста агентов
+            agent_coordination_service: Сервис координации агентов
             event_publisher: Publisher событий (опционально)
             
         Returns:
@@ -133,42 +129,12 @@ class AgentModule:
             
             switch_helper = AgentSwitchHelper(
                 session_service=session_service,
-                agent_service=agent_context_service
+                agent_service=agent_coordination_service
             )
             
             self._agent_switcher = AgentSwitcher(
-                agent_service=agent_context_service,
+                agent_service=agent_coordination_service,
                 switch_helper=switch_helper
             )
         return self._agent_switcher
     
-    def provide_orchestration_service(
-        self,
-        db: AsyncSession,
-        event_publisher=None
-    ) -> AgentOrchestrationService:
-        """
-        Предоставить legacy AgentOrchestrationService.
-        
-        Для обратной совместимости со старым кодом.
-        
-        Args:
-            db: Сессия БД
-            event_publisher: Publisher событий (опционально)
-            
-        Returns:
-            AgentOrchestrationService: Legacy сервис
-        """
-        if self._orchestration_service is None:
-            from app.infrastructure.persistence.repositories import (
-                AgentContextRepositoryImpl
-            )
-            
-            agent_context_repo = AgentContextRepositoryImpl(db)
-            
-            self._orchestration_service = AgentOrchestrationService(
-                repository=agent_context_repo,
-                event_publisher=event_publisher
-            )
-        
-        return self._orchestration_service

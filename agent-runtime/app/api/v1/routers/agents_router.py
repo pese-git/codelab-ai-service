@@ -6,6 +6,7 @@ Agents роутер.
 
 import logging
 from fastapi import APIRouter, HTTPException, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..schemas.agent_schemas import (
     SwitchAgentRequest,
@@ -17,14 +18,35 @@ from ....application.commands import SwitchAgentCommand, SwitchAgentHandler
 from ....application.queries import GetAgentContextQuery, GetAgentContextHandler
 from ....domain.services.agent_registry import agent_router
 from ....core.errors import AgentSwitchError
-from ....core.dependencies import (
-    get_switch_agent_handler,
-    get_get_agent_context_handler
-)
+from ....core.di import get_container
+from ....services.database import get_db
 
 logger = logging.getLogger("agent-runtime.api.agents")
 
 router = APIRouter(prefix="/agents", tags=["agents"])
+
+
+# ==================== Dependency Functions ====================
+
+async def get_switch_agent_handler(
+    db: AsyncSession = Depends(get_db)
+) -> SwitchAgentHandler:
+    """Получить handler для переключения агента."""
+    container = get_container()
+    agent_repository = container.agent_module.provide_agent_repository(db)
+    agent_service = container.agent_module.provide_coordination_service(agent_repository)
+    return SwitchAgentHandler(agent_service)
+
+
+async def get_get_agent_context_handler(
+    db: AsyncSession = Depends(get_db)
+) -> GetAgentContextHandler:
+    """Получить handler для получения контекста агента."""
+    from ....infrastructure.persistence.repositories import AgentRepositoryImpl
+    return GetAgentContextHandler(AgentRepositoryImpl(db))
+
+
+# ==================== Endpoints ====================
 
 
 @router.get("", response_model=ListAgentsResponse)

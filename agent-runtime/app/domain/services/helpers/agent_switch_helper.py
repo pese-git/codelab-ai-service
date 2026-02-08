@@ -9,12 +9,12 @@ import logging
 from typing import Optional, TYPE_CHECKING
 
 from ...agent_context.value_objects.agent_capabilities import AgentType
-from ...agent_context.entities.agent import Agent as AgentContext
+from ...agent_context.entities.agent import Agent
 from ....models.schemas import StreamChunk
 
 if TYPE_CHECKING:
     from ...session_context.services import ConversationManagementService
-    from ..agent_orchestration import AgentOrchestrationService
+    from ...agent_context.services.agent_coordination_service import AgentCoordinationService
 
 logger = logging.getLogger("agent-runtime.domain.helpers.agent_switch")
 
@@ -31,20 +31,20 @@ class AgentSwitchHelper:
     
     Атрибуты:
         _session_service: Сервис управления сессиями
-        _agent_service: Сервис оркестрации агентов
+        _agent_service: Сервис координации агентов
     """
     
     def __init__(
         self,
         session_service: "ConversationManagementService",
-        agent_service: "AgentOrchestrationService"
+        agent_service: "AgentCoordinationService"
     ):
         """
         Инициализация helper.
         
         Args:
             session_service: Сервис управления сессиями
-            agent_service: Сервис оркестрации агентов
+            agent_service: Сервис координации агентов
         """
         self._session_service = session_service
         self._agent_service = agent_service
@@ -65,7 +65,7 @@ class AgentSwitchHelper:
         Returns:
             call_id если найден, иначе None
         """
-        session = await self._session_service.get_session(session_id)
+        session = await self._session_service.get_conversation(session_id)
         history = session.get_history_for_llm()
         
         # Найти последний tool_call для switch_mode
@@ -118,15 +118,15 @@ class AgentSwitchHelper:
         target_agent: AgentType,
         reason: str,
         confidence: str = "medium"
-    ) -> AgentContext:
+    ) -> Agent:
         """
         Выполнить переключение агента с селективной очисткой контекста.
         
         Процесс:
-        1. Получить текущий контекст агента
+        1. Получить текущего агента
         2. Подготовить контекст сессии (очистить tool messages)
-        3. Выполнить переключение через AgentOrchestrationService
-        4. Вернуть обновленный контекст
+        3. Выполнить переключение через AgentCoordinationService
+        4. Вернуть обновленного агента
         
         Селективная очистка предотвращает дублирование tool_call_id
         между агентами и сохраняет результаты работы.
@@ -138,23 +138,23 @@ class AgentSwitchHelper:
             confidence: Уровень уверенности (high/medium/low)
             
         Returns:
-            Обновленный контекст агента
+            Обновленный Agent
         """
         logger.info(
             f"Выполняется переключение агента в сессии {session_id}: "
             f"target={target_agent.value}, reason={reason}, confidence={confidence}"
         )
         
-        # 1. Получить текущий контекст для определения from_agent
+        # 1. Получить текущего агента для определения from_agent
         try:
-            current_context = await self._agent_service.get_or_create_context(
+            current_agent = await self._agent_service.get_or_create_agent(
                 session_id=session_id,
-                initial_agent=AgentType.ORCHESTRATOR
+                initial_type=AgentType.ORCHESTRATOR
             )
-            from_agent = current_context.current_agent.value
+            from_agent = current_agent.current_type.value
         except Exception as e:
             logger.warning(
-                f"Не удалось получить текущий контекст для {session_id}: {e}, "
+                f"Не удалось получить текущего агента для {session_id}: {e}, "
                 "используем 'unknown' как from_agent"
             )
             from_agent = "unknown"
@@ -180,20 +180,20 @@ class AgentSwitchHelper:
             # Продолжаем переключение даже если очистка не удалась
         
         # 3. Выполнить переключение агента
-        context = await self._agent_service.switch_agent(
+        agent = await self._agent_service.switch_agent(
             session_id=session_id,
-            target_agent=target_agent,
+            target_type=target_agent,
             reason=reason,
             confidence=confidence
         )
         
         logger.info(
-            f"Контекст обновлен после переключения: "
-            f"current_agent={context.current_agent.value}, "
-            f"switch_count={context.switch_count}"
+            f"Агент обновлен после переключения: "
+            f"current_type={agent.current_type.value}, "
+            f"switch_count={agent.switch_count}"
         )
         
-        return context
+        return agent
     
     def create_agent_switched_chunk(
         self,
@@ -235,8 +235,8 @@ class AgentSwitchHelper:
         self,
         session_id: str,
         chunk: StreamChunk,
-        current_context: AgentContext
-    ) -> tuple[AgentContext, StreamChunk]:
+        current_agent: Agent
+    ) -> tuple[Agent, StreamChunk]:
         """
         Обработать запрос на переключение агента от агента.
         
@@ -252,17 +252,17 @@ class AgentSwitchHelper:
         Args:
             session_id: ID сессии
             chunk: StreamChunk с типом "switch_agent"
-            current_context: Текущий контекст агента
+            current_agent: Текущий агент
             
         Returns:
-            Кортеж (новый_контекст, chunk_уведомления)
+            Кортеж (новый_агент, chunk_уведомления)
         """
         # Извлечь параметры из chunk
         target_agent_str = chunk.metadata.get("target_agent")
         target_agent = AgentType(target_agent_str)
         reason = chunk.metadata.get("reason", "Agent requested switch")
         confidence = chunk.metadata.get("confidence", "medium")
-        from_agent = current_context.current_agent
+        from_agent = current_agent.current_type
         
         logger.info(
             f"Агент запросил переключение в сессии {session_id}: "
@@ -286,7 +286,7 @@ class AgentSwitchHelper:
             )
         
         # Выполнить переключение агента
-        new_context = await self.execute_agent_switch(
+        new_agent = await self.execute_agent_switch(
             session_id=session_id,
             target_agent=target_agent,
             reason=reason,
@@ -302,4 +302,4 @@ class AgentSwitchHelper:
             is_final=False
         )
         
-        return new_context, notification_chunk
+        return new_agent, notification_chunk

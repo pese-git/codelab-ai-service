@@ -2,22 +2,23 @@
 Messages роутер.
 
 Предоставляет endpoints для работы с сообщениями.
-Использует новый MessageOrchestrationService для обработки.
 """
 
 import logging
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
-from typing import Optional
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..schemas.message_schemas import MessageStreamRequest
 from ....models.schemas import StreamChunk
 from ....agents.base_agent import AgentType
-from ....core.dependencies import (
-    get_process_message_use_case,
-    get_switch_agent_use_case,
-    get_process_tool_result_use_case,
-    get_handle_approval_use_case
+from ....core.di import get_container
+from ....services.database import get_db
+from ....application.use_cases import (
+    ProcessMessageUseCase,
+    SwitchAgentUseCase,
+    ProcessToolResultUseCase,
+    HandleApprovalUseCase
 )
 from ....application.use_cases.process_message_use_case import ProcessMessageRequest
 from ....application.use_cases.switch_agent_use_case import SwitchAgentRequest
@@ -27,6 +28,39 @@ from ....application.use_cases.handle_approval_use_case import HandleApprovalReq
 logger = logging.getLogger("agent-runtime.api.messages")
 
 router = APIRouter(prefix="/agent/message", tags=["messages"])
+
+
+# ==================== Dependency Functions ====================
+
+async def get_process_message_use_case(
+    db: AsyncSession = Depends(get_db)
+) -> ProcessMessageUseCase:
+    """Получить Use Case для обработки сообщений."""
+    return get_container().get_process_message_use_case(db)
+
+
+async def get_switch_agent_use_case(
+    db: AsyncSession = Depends(get_db)
+) -> SwitchAgentUseCase:
+    """Получить Use Case для переключения агента."""
+    return get_container().get_switch_agent_use_case(db)
+
+
+async def get_process_tool_result_use_case(
+    db: AsyncSession = Depends(get_db)
+) -> ProcessToolResultUseCase:
+    """Получить Use Case для обработки результатов инструментов."""
+    return get_container().get_process_tool_result_use_case(db)
+
+
+async def get_handle_approval_use_case(
+    db: AsyncSession = Depends(get_db)
+) -> HandleApprovalUseCase:
+    """Получить Use Case для обработки approval решений."""
+    return get_container().get_handle_approval_use_case(db)
+
+
+# ==================== Endpoints ====================
 
 
 @router.post("/stream")

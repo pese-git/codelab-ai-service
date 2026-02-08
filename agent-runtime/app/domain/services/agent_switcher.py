@@ -13,7 +13,7 @@ from ...models.schemas import StreamChunk
 from ...core.errors import AgentSwitchError
 
 if TYPE_CHECKING:
-    from .agent_orchestration import AgentOrchestrationService
+    from ..agent_context.services.agent_coordination_service import AgentCoordinationService
     from .helpers.agent_switch_helper import AgentSwitchHelper
 
 logger = logging.getLogger("agent-runtime.domain.agent_switcher")
@@ -25,26 +25,26 @@ class AgentSwitcher:
     
     Ответственности:
     - Валидация запросов на переключение
-    - Выполнение переключения через AgentOrchestrationService
+    - Выполнение переключения через AgentCoordinationService
     - Генерация уведомлений о переключении
     - Получение информации о текущем агенте
     - Сброс сессии к Orchestrator
     
     Атрибуты:
-        _agent_service: Сервис оркестрации агентов
+        _agent_service: Сервис координации агентов
         _switch_helper: Helper для переключения агентов
     """
     
     def __init__(
         self,
-        agent_service: "AgentOrchestrationService",
+        agent_service: "AgentCoordinationService",
         switch_helper: "AgentSwitchHelper"
     ):
         """
         Инициализация switcher.
         
         Args:
-            agent_service: Сервис оркестрации агентов
+            agent_service: Сервис координации агентов
             switch_helper: Helper для переключения агентов
         """
         self._agent_service = agent_service
@@ -87,13 +87,13 @@ class AgentSwitcher:
         )
         
         try:
-            # Получить текущий контекст
-            context = await self._agent_service.get_or_create_context(
+            # Получить текущего агента
+            agent = await self._agent_service.get_or_create_agent(
                 session_id=session_id,
-                initial_agent=AgentType.ORCHESTRATOR
+                initial_type=AgentType.ORCHESTRATOR
             )
             
-            from_agent = context.current_agent
+            from_agent = agent.current_type
             
             # Проверить, не является ли целевой агент уже текущим
             if from_agent == target_agent:
@@ -113,7 +113,7 @@ class AgentSwitcher:
                 return
             
             # Выполнить переключение агента
-            context = await self._switch_helper.execute_agent_switch(
+            agent = await self._switch_helper.execute_agent_switch(
                 session_id=session_id,
                 target_agent=target_agent,
                 reason=reason,
@@ -152,7 +152,7 @@ class AgentSwitcher:
         logger.debug(f"Получение текущего агента для сессии {session_id}")
         
         try:
-            return await self._agent_service.get_current_agent(session_id)
+            return await self._agent_service.get_current_agent_type(session_id)
         except Exception as e:
             logger.error(
                 f"Ошибка при получении текущего агента для сессии {session_id}: {e}",
