@@ -6,13 +6,14 @@ Provides:
 - Streaming service for handling LLM responses
 - Tool call parser for extracting tool calls from LLM responses
 """
-from app.infrastructure.llm.client import LLMProxyClient, llm_proxy_client
+# Новый клиент, возвращающий LLMResponse объекты
+from app.infrastructure.llm.llm_client import LLMClient, LLMProxyClient
+
 from app.infrastructure.llm.tool_parser import parse_tool_calls, OpenAIToolCallParser
 
 __all__ = [
+    "LLMClient",
     "LLMProxyClient",
-    "llm_proxy_client",
-    "stream_response",
     "parse_tool_calls",
     "OpenAIToolCallParser",
 ]

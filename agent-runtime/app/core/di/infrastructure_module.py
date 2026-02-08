@@ -7,7 +7,7 @@ DI Module для Infrastructure Layer.
 import logging
 from typing import Optional
 
-from app.infrastructure.llm import LLMProxyClient
+from app.infrastructure.llm.llm_client import LLMProxyClient
 from app.infrastructure.events.llm_event_publisher import LLMEventPublisher
 from app.infrastructure.adapters import EventPublisherAdapter
 from app.core.config import AppConfig
@@ -42,7 +42,7 @@ class InfrastructureModule:
         """
         if self._llm_client is None:
             self._llm_client = LLMProxyClient(
-                api_url=AppConfig.LLM_PROXY_URL
+                base_url=AppConfig.LLM_PROXY_URL
             )
             logger.info(f"LLMProxyClient создан (base_url={AppConfig.LLM_PROXY_URL})")
         

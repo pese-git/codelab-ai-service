@@ -380,7 +380,7 @@ class StreamLLMResponseHandler(IStreamHandler):
         
         # 1. Сохранение сообщения через доменный сервис
         await self._session_service.add_message(
-            session_id=session_id,
+            conversation_id=session_id,
             role="assistant",
             content=processed.content
         )

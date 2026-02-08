@@ -9,7 +9,7 @@ import json
 from typing import Optional
 
 from app.domain.entities.task_classification import TaskClassification
-from app.infrastructure.llm.client import llm_proxy_client
+from app.infrastructure.llm.llm_client import LLMProxyClient
 from app.core.config import AppConfig
 
 logger = logging.getLogger("agent-runtime.task_classifier")
@@ -70,9 +70,9 @@ class TaskClassifier:
     2. Keyword-based fallback (если LLM недоступен)
     """
     
-    def __init__(self):
+    def __init__(self, llm_client: LLMProxyClient = None):
         """Инициализация классификатора"""
-        self.llm_client = llm_proxy_client
+        self.llm_client = llm_client or LLMProxyClient()
         self.model = AppConfig.LLM_MODEL
     
     async def classify(self, message: str) -> TaskClassification:
@@ -138,14 +138,12 @@ class TaskClassifier:
                     "content": prompt
                 }
             ],
-            stream=False,
-            extra_params={
-                "temperature": 0.3  # Низкая температура для консистентности
-            }
+            tools=[],
+            temperature=0.3  # Низкая температура для консистентности
         )
         
-        # Извлечь содержимое ответа
-        content = response["choices"][0]["message"]["content"]
+        # Извлечь содержимое ответа из LLMResponse объекта
+        content = response.content
         
         # Парсинг JSON (с обработкой markdown code blocks)
         classification_dict = self._parse_json_response(content)
