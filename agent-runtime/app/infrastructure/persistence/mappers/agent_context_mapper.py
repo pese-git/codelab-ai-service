@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 
 from ....domain.agent_context.entities.agent import Agent as AgentContext, AgentSwitchRecord as AgentSwitch
-from ....domain.agent_context.value_objects.agent_capabilities import AgentType
+from ....domain.agent_context.value_objects.agent_capabilities import AgentType, AgentCapabilities
 from ..models import AgentContextModel, AgentSwitchModel, SessionModel
 
 logger = logging.getLogger("agent-runtime.infrastructure.agent_context_mapper")
@@ -129,11 +129,14 @@ class AgentContextMapper:
         )
         session_id = result.scalar_one()
         
+        # Создать capabilities для текущего типа агента
+        capabilities = AgentCapabilities.for_agent_type(current_agent)
+        
         # Создать доменную сущность
         context = AgentContext(
             id=model.id,
             session_id=session_id,
-            current_agent=current_agent,
+            capabilities=capabilities,
             switch_history=switch_history,
             metadata=context_metadata,
             created_at=model.created_at,

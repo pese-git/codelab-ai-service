@@ -9,7 +9,7 @@ import logging
 from typing import Optional
 
 from ..agent_context.entities.agent import Agent as AgentContext
-from ..agent_context.value_objects.agent_capabilities import AgentType
+from ..agent_context.value_objects.agent_capabilities import AgentType, AgentCapabilities
 from ..agent_context.repositories.agent_repository import AgentRepository as AgentContextRepository
 from ..events.agent_events import (
     AgentAssigned,
@@ -85,11 +85,12 @@ class AgentOrchestrationService:
             logger.debug(f"Найден существующий контекст для сессии {session_id}")
             return context
         
-        # Создать новый контекст
+        # Создать новый контекст с capabilities для указанного типа агента
+        capabilities = AgentCapabilities.for_agent_type(initial_agent)
         context = AgentContext(
             id=str(uuid.uuid4()),
             session_id=session_id,
-            current_agent=initial_agent
+            capabilities=capabilities
         )
         
         # Сохранить
