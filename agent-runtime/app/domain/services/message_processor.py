@@ -9,6 +9,7 @@ import uuid
 import time
 import logging
 from typing import AsyncGenerator, Optional, TYPE_CHECKING
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..agent_context.value_objects.agent_capabilities import AgentType
 from ...models.schemas import StreamChunk
@@ -49,7 +50,8 @@ class MessageProcessor:
         agent_service: "AgentCoordinationService",
         agent_router,  # AgentRouter
         stream_handler: Optional["IStreamHandler"],
-        switch_helper: "AgentSwitchHelper"
+        switch_helper: "AgentSwitchHelper",
+        db: AsyncSession
     ):
         """
         Инициализация процессора сообщений.
@@ -60,12 +62,14 @@ class MessageProcessor:
             agent_router: Роутер для получения экземпляров агентов
             stream_handler: Handler для стриминга LLM ответов
             switch_helper: Helper для переключения агентов
+            db: Сессия БД для commit'ов
         """
         self._session_service = session_service
         self._agent_service = agent_service
         self._agent_router = agent_router
         self._stream_handler = stream_handler
         self._switch_helper = switch_helper
+        self._db = db
         
         logger.debug(
             f"MessageProcessor инициализирован с stream_handler={stream_handler is not None}"
@@ -109,7 +113,13 @@ class MessageProcessor:
             f"(correlation_id: {correlation_id})"
         )
         
-        # Добавить user message в сессию ПЕРЕД обработкой
+        # ИСПРАВЛЕНИЕ: Сначала получить или создать сессию
+        session = await self._session_service.get_or_create_conversation(session_id)
+        # КРИТИЧЕСКОЕ: Commit сразу после создания сессии для соблюдения FK constraints
+        await self._db.commit()
+        logger.debug(f"Session создана и зафиксирована в БД: {session_id}")
+        
+        # Затем добавить user message в сессию
         # ВАЖНО: message=None означает "не добавлять user message" (для tool_result)
         if message is not None and message != "":
             await self._session_service.add_message(
@@ -124,14 +134,14 @@ class MessageProcessor:
                 "продолжение после tool_result)"
             )
         
-        # Получить или создать сессию (теперь с user message)
-        session = await self._session_service.get_or_create_conversation(session_id)
-        
         # Получить или создать агента
         agent = await self._agent_service.get_or_create_agent(
             session_id=session_id,
             initial_type=agent_type or AgentType.ORCHESTRATOR
         )
+        # КРИТИЧЕСКОЕ: Commit после создания агента
+        await self._db.commit()
+        logger.debug(f"Agent создан и зафиксирован в БД для сессии {session_id}")
         
         # Отследить время начала обработки
         start_time = time.time()

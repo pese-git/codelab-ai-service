@@ -161,7 +161,7 @@ class ToolResultHandler:
         
         # Добавить результат инструмента в сессию
         await self._session_service.add_tool_result(
-            session_id=session_id,
+            conversation_id=session_id,  # ИСПРАВЛЕНО: conversation_id вместо session_id
             call_id=call_id,
             result=result,
             error=error

@@ -14,6 +14,7 @@ import time
 import json
 import logging
 from typing import AsyncGenerator, List, Dict, Optional, Any
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...domain.interfaces.stream_handler import IStreamHandler
 from ...domain.services.llm_response_processor import LLMResponseProcessor
@@ -77,7 +78,8 @@ class StreamLLMResponseHandler(IStreamHandler):
         response_processor: LLMResponseProcessor,
         event_publisher: LLMEventPublisher,
         session_service: ConversationManagementService,
-        approval_manager: ApprovalManager
+        approval_manager: ApprovalManager,
+        db: Optional[AsyncSession] = None
     ):
         """
         Инициализация handler.
@@ -89,6 +91,7 @@ class StreamLLMResponseHandler(IStreamHandler):
             event_publisher: Publisher для событий
             session_service: Сервис управления сессиями
             approval_manager: Unified approval manager
+            db: Сессия БД для commit'ов (опционально)
         """
         self._llm_client = llm_client
         self._tool_filter = tool_filter
@@ -96,6 +99,7 @@ class StreamLLMResponseHandler(IStreamHandler):
         self._event_publisher = event_publisher
         self._session_service = session_service
         self._approval_manager = approval_manager
+        self._db = db
         
         logger.info("StreamLLMResponseHandler initialized with ApprovalManager")
     
@@ -320,15 +324,22 @@ class StreamLLMResponseHandler(IStreamHandler):
         logger.debug(f"Tool call dict format:\n{json.dumps(tool_call_dict, indent=2, ensure_ascii=False)}")
         
         await self._session_service.add_message(
-            session_id=session_id,
+            conversation_id=session_id,
             role="assistant",
             content="",
             tool_calls=[tool_call_dict]
         )
         
-        logger.debug(
-            f"Assistant message with tool_call persisted: {tool_call.tool_name}"
-        )
+        # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Commit после сохранения assistant message
+        if self._db:
+            await self._db.commit()
+            logger.debug(
+                f"Assistant message with tool_call persisted and committed: {tool_call.tool_name}"
+            )
+        else:
+            logger.debug(
+                f"Assistant message with tool_call persisted (no db commit): {tool_call.tool_name}"
+            )
         
         # 6. Публикация события завершения LLM запроса
         await self._event_publisher.publish_request_completed(
@@ -384,6 +395,13 @@ class StreamLLMResponseHandler(IStreamHandler):
             role="assistant",
             content=processed.content
         )
+        
+        # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Commit после сохранения assistant message
+        if self._db:
+            await self._db.commit()
+            logger.debug(f"Assistant message persisted and committed (no tool calls)")
+        else:
+            logger.debug(f"Assistant message persisted (no db commit, no tool calls)")
         
         # 2. Публикация события завершения
         await self._event_publisher.publish_request_completed(

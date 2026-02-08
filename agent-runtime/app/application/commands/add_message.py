@@ -112,7 +112,7 @@ class AddMessageHandler(CommandHandler[MessageDTO]):
         """
         # Добавить сообщение через доменный сервис
         message = await self._session_service.add_message(
-            session_id=command.session_id,
+            conversation_id=command.session_id,
             role=command.role,
             content=command.content,
             name=command.name,

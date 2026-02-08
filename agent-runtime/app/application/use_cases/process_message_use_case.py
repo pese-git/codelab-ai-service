@@ -123,17 +123,17 @@ class ProcessMessageUseCase(StreamingUseCase[ProcessMessageRequest, StreamChunk]
                     yield chunk
                     
                     # Логирование важных событий
-                    if chunk.type == "agent_switched":
+                    if chunk.type == "agent_switched" and chunk.metadata:
                         logger.info(
                             f"Агент переключен: {chunk.metadata.get('from_agent')} "
                             f"-> {chunk.metadata.get('to_agent')}"
                         )
-                    elif chunk.type == "tool_call":
+                    elif chunk.type == "tool_call" and chunk.metadata:
                         logger.debug(
                             f"Tool call: {chunk.metadata.get('tool_name')} "
                             f"(call_id: {chunk.metadata.get('call_id')})"
                         )
-                    elif chunk.type == "plan_approval_required":
+                    elif chunk.type == "plan_approval_required" and chunk.metadata:
                         logger.info(
                             f"Plan approval required: {chunk.metadata.get('approval_request_id')}"
                         )

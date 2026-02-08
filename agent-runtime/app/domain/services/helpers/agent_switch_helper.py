@@ -162,7 +162,7 @@ class AgentSwitchHelper:
         # 2. Подготовить контекст сессии (селективная очистка tool messages)
         try:
             cleanup_info = await self._session_service.prepare_agent_switch_context(
-                session_id=session_id,
+                conversation_id=session_id,
                 from_agent=from_agent,
                 to_agent=target_agent.value
             )

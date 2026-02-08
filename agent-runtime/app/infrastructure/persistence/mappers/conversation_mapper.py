@@ -172,12 +172,18 @@ class ConversationMapper:
         
         # Сохранить сообщения (атомарная замена)
         from sqlalchemy import delete
+        
+        # Логирование для отладки
+        message_count = len(entity.messages.messages)
+        logger.debug(f"Saving {message_count} messages for conversation {model.id}")
+        
         await db.execute(
             delete(MessageModel).where(MessageModel.session_db_id == model.id)
         )
         
         # Добавить новые сообщения
         for message in entity.messages.messages:
+            logger.debug(f"Adding message {message.id} (role={message.role}, content_len={len(message.content) if message.content else 0})")
             msg_model = MessageModel(
                 id=message.id,
                 session_db_id=model.id,
@@ -191,4 +197,5 @@ class ConversationMapper:
             )
             db.add(msg_model)
         
+        logger.debug(f"Added {message_count} message models to session")
         return model

@@ -120,7 +120,8 @@ class DIContainer:
             response_processor=response_processor,
             event_publisher=llm_event_publisher,
             session_service=session_service,
-            approval_manager=approval_manager
+            approval_manager=approval_manager,
+            db=db  # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: передаем db для commit'ов
         )
     
     def _create_switch_helper(self, db: AsyncSession):
@@ -145,7 +146,8 @@ class DIContainer:
             agent_service=agent_coordination_service,
             agent_router=agent_registry,
             stream_handler=stream_handler,
-            switch_helper=switch_helper
+            switch_helper=switch_helper,
+            db=db  # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: передаем db для commit'ов
         )
     
     def _create_agent_switcher(self, db: AsyncSession):

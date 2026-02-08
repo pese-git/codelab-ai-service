@@ -74,10 +74,10 @@ services:
     image: postgres:16-alpine
     # Внутренний сервис - доступ только внутри Docker сети
     # Для разработки можно раскомментировать порт:
-    # ports:
-    #   - "5432:5432"
-    expose:
-      - "5432"
+    ports:
+       - "5432:5432"
+    #expose:
+    #  - "5432"
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-codelab}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-codelab_password}
