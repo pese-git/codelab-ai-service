@@ -88,7 +88,7 @@ async def lifespan(app: FastAPI):
             # Initialize session cleanup service with factory pattern
             from app.infrastructure.persistence.repositories import (
                 ConversationRepositoryImpl,
-                AgentContextRepositoryImpl
+                AgentRepositoryImpl
             )
             from app.infrastructure.persistence.database import async_session_maker
             from app.domain.session_context.services import ConversationManagementService
