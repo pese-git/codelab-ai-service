@@ -12,9 +12,6 @@ from .approval_management import ApprovalManager, get_approval_manager_with_db, 
 from .agent_registry import AgentRegistry, agent_registry, agent_router
 from .tool_registry import TOOLS_SPEC, LOCAL_TOOLS, execute_local_tool
 
-# Execution Engine
-from .execution_engine import ExecutionEngine
-
 # Специализированные сервисы
 from .helpers.agent_switch_helper import AgentSwitchHelper
 from .message_processor import MessageProcessor
@@ -37,7 +34,6 @@ __all__ = [
     "TOOLS_SPEC",
     "LOCAL_TOOLS",
     "execute_local_tool",
-    "ExecutionEngine",
     # Специализированные сервисы
     "AgentSwitchHelper",
     "MessageProcessor",

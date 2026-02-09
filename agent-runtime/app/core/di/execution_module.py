@@ -15,7 +15,6 @@ from app.domain.execution_context.services import (
 )
 from app.domain.execution_context.repositories import ExecutionPlanRepository
 from app.infrastructure.persistence.repositories import ExecutionPlanRepositoryImpl
-from app.domain.services import ExecutionEngine
 
 logger = logging.getLogger("agent-runtime.di.execution_module")
 
@@ -29,7 +28,6 @@ class ExecutionModule:
     - PlanExecutionService
     - SubtaskExecutor
     - DependencyResolver
-    - ExecutionEngine (legacy)
     """
     
     def __init__(self):
@@ -38,7 +36,6 @@ class ExecutionModule:
         self._execution_service: Optional[PlanExecutionService] = None
         self._subtask_executor: Optional[SubtaskExecutor] = None
         self._dependency_resolver: Optional[DependencyResolver] = None
-        self._execution_engine: Optional[ExecutionEngine] = None
         
         logger.debug("ExecutionModule инициализирован")
     
@@ -117,53 +114,3 @@ class ExecutionModule:
         if self._dependency_resolver is None:
             self._dependency_resolver = DependencyResolver()
         return self._dependency_resolver
-    
-    def provide_execution_engine(
-        self,
-        db: AsyncSession,
-        agent_registry,
-        session_service,
-        stream_handler=None,
-        event_publisher=None
-    ) -> ExecutionEngine:
-        """
-        Предоставить legacy ExecutionEngine.
-        
-        Для обратной совместимости со старым кодом.
-        
-        Args:
-            db: Сессия БД
-            agent_registry: Реестр агентов
-            session_service: Сервис управления сессиями
-            stream_handler: Handler для streaming (опционально)
-            event_publisher: Publisher событий (опционально)
-            
-        Returns:
-            ExecutionEngine: Legacy engine
-        """
-        if self._execution_engine is None:
-            from app.infrastructure.persistence.repositories.execution_plan_repository_impl import (
-                ExecutionPlanRepositoryImpl
-            )
-            from app.domain.services.subtask_executor import SubtaskExecutor
-            from app.domain.services.dependency_resolver import DependencyResolver
-            from app.domain.services.approval_management import ApprovalManager
-            from app.infrastructure.persistence.repositories.approval_repository_impl import ApprovalRepositoryImpl
-            
-            plan_repo = ExecutionPlanRepositoryImpl(db)
-            subtask_executor = SubtaskExecutor(plan_repository=plan_repo)
-            dependency_resolver = DependencyResolver()
-            approval_repository = ApprovalRepositoryImpl(db)
-            approval_manager = ApprovalManager(
-                approval_repository=approval_repository,
-                approval_policy=None
-            )
-            
-            self._execution_engine = ExecutionEngine(
-                plan_repository=plan_repo,
-                subtask_executor=subtask_executor,
-                dependency_resolver=dependency_resolver,
-                approval_manager=approval_manager
-            )
-        
-        return self._execution_engine

@@ -1,19 +1,18 @@
 """
 ExecutionCoordinator - Application-level coordinator для выполнения планов.
 
-Координирует взаимодействие между OrchestratorAgent и ExecutionEngine.
+Координирует взаимодействие между OrchestratorAgent и PlanExecutionService.
 Управляет lifecycle выполнения плана и обрабатывает ошибки.
 """
 
 import logging
 from typing import Dict, Any, Optional, TYPE_CHECKING, AsyncGenerator
 
-from app.domain.services.execution_engine import (
-    ExecutionEngine,
-    ExecutionResult,
-    ExecutionEngineError
+from app.domain.execution_context.services.plan_execution_service import (
+    PlanExecutionService,
+    PlanExecutionError
 )
-from app.domain.execution_context.value_objects import PlanStatus, PlanStatusEnum
+from app.domain.execution_context.value_objects import PlanId, PlanStatus, PlanStatusEnum
 from app.models.schemas import StreamChunk
 
 if TYPE_CHECKING:
@@ -34,19 +33,19 @@ class ExecutionCoordinator:
     Application-level coordinator для выполнения планов.
     
     Responsibilities:
-    - Координация выполнения плана через ExecutionEngine/ExecutionEngineAdapter
+    - Координация выполнения плана через PlanExecutionService
     - Мониторинг прогресса выполнения
     - Обработка ошибок и failures
     - Поддержка cancellation
     - Предоставление статуса выполнения
     
     Attributes:
-        execution_engine: Engine или Adapter для выполнения планов
+        plan_execution_service: Domain service для выполнения планов
         plan_repository: Repository для работы с планами
     
     Example:
         >>> coordinator = ExecutionCoordinator(
-        ...     execution_engine=engine_adapter,
+        ...     plan_execution_service=service,
         ...     plan_repository=repo
         ... )
         >>> result = await coordinator.execute_plan(
@@ -59,21 +58,20 @@ class ExecutionCoordinator:
     
     def __init__(
         self,
-        execution_engine: ExecutionEngine,
+        plan_execution_service: PlanExecutionService,
         plan_repository: "PlanRepository"
     ):
         """
         Initialize ExecutionCoordinator.
         
         Args:
-            execution_engine: Engine для выполнения планов
+            plan_execution_service: Domain service для выполнения планов
             plan_repository: Repository для работы с планами
         """
-        self.execution_engine = execution_engine
-        self.plan_repository = plan_repository
+        self._plan_execution_service = plan_execution_service
+        self._plan_repository = plan_repository
         
-        engine_type = type(execution_engine).__name__
-        logger.info(f"ExecutionCoordinator initialized with {engine_type}")
+        logger.info("ExecutionCoordinator initialized with PlanExecutionService")
     
     async def execute_plan(
         self,
@@ -86,27 +84,27 @@ class ExecutionCoordinator:
         Execute plan with coordination and monitoring.
         
         ВАЖНО: Теперь возвращает AsyncGenerator для streaming выполнения.
-        Пересылает все chunks от ExecutionEngine, включая tool_call события.
+        Пересылает все chunks от PlanExecutionService, включая tool_call события.
         
         Coordinates:
-        1. Validate plan is ready for execution
-        2. Execute through ExecutionEngine (streaming)
+        1. Validate plan exists and is ready
+        2. Execute through PlanExecutionService (streaming)
         3. Forward all chunks (including tool_call)
         4. Monitor progress
         5. Handle errors
         
         Args:
-            plan_id: ID плана для выполнения
+            plan_id: ID плана для выполнения (string)
             session_id: ID сессии
             session_service: Сервис управления сессиями
             stream_handler: Handler для стриминга
             
         Yields:
-            StreamChunk: Chunks от ExecutionEngine (tool_call, status, etc.)
+            StreamChunk: Chunks от PlanExecutionService (tool_call, status, etc.)
             
         Raises:
             ExecutionCoordinatorError: При ошибке координации
-            ExecutionEngineError: При ошибке выполнения
+            PlanExecutionError: При ошибке выполнения
         """
         logger.info(
             f"ExecutionCoordinator starting execution of plan {plan_id} "
@@ -117,10 +115,13 @@ class ExecutionCoordinator:
             # 1. Validate plan exists and is ready
             await self._validate_plan_ready(plan_id)
             
-            # 2. Execute through ExecutionEngine and forward all chunks
+            # 2. Convert string ID to typed PlanId
+            typed_plan_id = PlanId(plan_id)
+            
+            # 3. Execute through PlanExecutionService and forward all chunks
             execution_result_metadata = None
-            async for chunk in self.execution_engine.execute_plan(
-                plan_id=plan_id,
+            async for chunk in self._plan_execution_service.start_plan_execution(
+                plan_id=typed_plan_id,
                 session_id=session_id,
                 session_service=session_service,
                 stream_handler=stream_handler
@@ -129,23 +130,21 @@ class ExecutionCoordinator:
                 yield chunk
                 
                 # Сохранить metadata из финального chunk
-                if chunk.type == "execution_completed" and chunk.metadata:
+                if chunk.type == "plan_completed" and chunk.metadata:
                     execution_result_metadata = chunk.metadata
             
-            # 3. Log results
+            # 4. Log results
             if execution_result_metadata:
                 logger.info(
                     f"Plan {plan_id} execution completed: "
                     f"status={execution_result_metadata.get('status')}, "
-                    f"completed={execution_result_metadata.get('completed_subtasks')}/"
-                    f"{execution_result_metadata.get('total_subtasks')}, "
-                    f"failed={execution_result_metadata.get('failed_subtasks')}, "
+                    f"subtask_count={execution_result_metadata.get('subtask_count')}, "
                     f"duration={execution_result_metadata.get('duration_seconds', 0):.2f}s"
                 )
             
-        except ExecutionEngineError as e:
+        except PlanExecutionError as e:
             logger.error(
-                f"ExecutionEngine error for plan {plan_id}: {e}",
+                f"PlanExecutionService error for plan {plan_id}: {e}",
                 exc_info=True
             )
             # Пересылать ошибку как chunk
@@ -174,12 +173,14 @@ class ExecutionCoordinator:
         Validate plan is ready for execution.
         
         Args:
-            plan_id: ID плана
+            plan_id: ID плана (string)
             
         Raises:
             ExecutionCoordinatorError: If plan is not ready
         """
-        plan = await self.plan_repository.find_by_id(plan_id)
+        # Convert to typed ID for repository
+        typed_plan_id = PlanId(plan_id)
+        plan = await self._plan_repository.find_by_id(typed_plan_id)
         
         if not plan:
             raise ExecutionCoordinatorError(f"Plan {plan_id} not found")
@@ -206,7 +207,7 @@ class ExecutionCoordinator:
         Get current execution status of a plan.
         
         Args:
-            plan_id: ID плана
+            plan_id: ID плана (string)
             
         Returns:
             Status information dict:
@@ -214,7 +215,6 @@ class ExecutionCoordinator:
                 "plan_id": str,
                 "status": str,
                 "progress": {...},
-                "current_subtask_id": str,
                 "started_at": str,
                 "completed_at": str
             }
@@ -223,8 +223,9 @@ class ExecutionCoordinator:
             ExecutionCoordinatorError: If plan not found
         """
         try:
-            return await self.execution_engine.get_execution_status(plan_id)
-        except ExecutionEngineError as e:
+            typed_plan_id = PlanId(plan_id)
+            return await self._plan_execution_service.get_plan_status(typed_plan_id)
+        except PlanExecutionError as e:
             raise ExecutionCoordinatorError(
                 f"Failed to get status for plan {plan_id}: {str(e)}"
             ) from e
@@ -233,16 +234,13 @@ class ExecutionCoordinator:
         self,
         plan_id: str,
         reason: str
-    ) -> Dict[str, Any]:
+    ) -> None:
         """
         Cancel plan execution.
         
         Args:
-            plan_id: ID плана
+            plan_id: ID плана (string)
             reason: Причина отмены
-            
-        Returns:
-            Cancellation information dict
             
         Raises:
             ExecutionCoordinatorError: If cancellation fails
@@ -250,11 +248,12 @@ class ExecutionCoordinator:
         logger.info(f"Cancelling execution of plan {plan_id}: {reason}")
         
         try:
-            return await self.execution_engine.cancel_execution(
-                plan_id=plan_id,
+            typed_plan_id = PlanId(plan_id)
+            await self._plan_execution_service.cancel_plan_execution(
+                plan_id=typed_plan_id,
                 reason=reason
             )
-        except ExecutionEngineError as e:
+        except PlanExecutionError as e:
             raise ExecutionCoordinatorError(
                 f"Failed to cancel plan {plan_id}: {str(e)}"
             ) from e
@@ -264,7 +263,7 @@ class ExecutionCoordinator:
         Get summary of plan for presentation to user.
         
         Args:
-            plan_id: ID плана
+            plan_id: ID плана (string)
             
         Returns:
             Plan summary dict with goal, subtasks, estimates
@@ -272,22 +271,23 @@ class ExecutionCoordinator:
         Raises:
             ExecutionCoordinatorError: If plan not found
         """
-        plan = await self.plan_repository.find_by_id(plan_id)
+        typed_plan_id = PlanId(plan_id)
+        plan = await self._plan_repository.find_by_id(typed_plan_id)
         
         if not plan:
             raise ExecutionCoordinatorError(f"Plan {plan_id} not found")
         
         return {
-            "plan_id": plan.id,
+            "plan_id": plan.id.value,
             "goal": plan.goal,
             "status": plan.status.value,
             "subtasks_count": len(plan.subtasks),
             "subtasks": [
                 {
-                    "id": st.id,
+                    "id": st.id.value,
                     "description": st.description,
-                    "agent": st.agent.value,
-                    "dependencies": st.dependencies,
+                    "agent": st.agent_id.value,
+                    "dependencies": [dep.value for dep in st.dependencies],
                     "estimated_time": st.estimated_time,
                     "status": st.status.value,
                     "metadata": st.metadata  # Include metadata for dependency_indices

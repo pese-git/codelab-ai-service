@@ -205,16 +205,26 @@ class DIContainer:
         from app.infrastructure.persistence.repositories.execution_plan_repository_impl import ExecutionPlanRepositoryImpl
         
         session_service = self._get_session_service(db)
-        execution_engine = self.execution_module.provide_execution_engine(
-            db=db,
-            agent_registry=self.agent_module.provide_agent_registry(),
-            session_service=session_service,
-            event_publisher=self.infrastructure_module.provide_event_publisher()
+        agent_registry = self.agent_module.provide_agent_registry()
+        
+        # Создать зависимости для PlanExecutionService
+        plan_repository = ExecutionPlanRepositoryImpl(db)
+        subtask_executor = self.execution_module.provide_subtask_executor(
+            agent_registry=agent_registry,
+            session_service=session_service
+        )
+        dependency_resolver = self.execution_module.provide_dependency_resolver()
+        
+        # Создать PlanExecutionService
+        plan_execution_service = self.execution_module.provide_execution_service(
+            plan_repository=plan_repository,
+            subtask_executor=subtask_executor,
+            dependency_resolver=dependency_resolver
         )
         
-        plan_repository = ExecutionPlanRepositoryImpl(db)
+        # Создать ExecutionCoordinator с PlanExecutionService
         execution_coordinator = ExecutionCoordinator(
-            execution_engine=execution_engine,
+            plan_execution_service=plan_execution_service,
             plan_repository=plan_repository
         )
         

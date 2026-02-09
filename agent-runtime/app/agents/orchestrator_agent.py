@@ -22,7 +22,6 @@ if TYPE_CHECKING:
     from app.domain.interfaces.stream_handler import IStreamHandler
     from app.agents.architect_agent import ArchitectAgent
     from app.application.coordinators.execution_coordinator import ExecutionCoordinator
-    from app.domain.services.execution_engine import ExecutionResult
 
 logger = logging.getLogger("agent-runtime.orchestrator_agent")
 
@@ -748,29 +747,3 @@ class OrchestratorAgent(BaseAgent):
         
         return "\n".join(lines)
     
-    def _format_execution_result(self, result: "ExecutionResult") -> str:
-        """
-        Format execution result for user presentation.
-        
-        Args:
-            result: ExecutionResult from ExecutionCoordinator
-            
-        Returns:
-            Formatted string for display
-        """
-        lines = [
-            f"✅ **Plan Execution {'Completed' if result.status == 'completed' else 'Failed'}**",
-            f"",
-            f"**Results:**",
-            f"- Completed: {result.completed_subtasks}/{result.total_subtasks}",
-            f"- Failed: {result.failed_subtasks}",
-            f"- Duration: {result.duration_seconds:.1f}s",
-            ""
-        ]
-        
-        if result.errors:
-            lines.append("**Errors:**")
-            for subtask_id, error in result.errors.items():
-                lines.append(f"- {subtask_id}: {error}")
-        
-        return "\n".join(lines)
