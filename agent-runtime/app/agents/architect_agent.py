@@ -54,9 +54,8 @@ class ArchitectAgent(BaseAgent):
                 "list_files",
                 "search_in_code",
                 "attempt_completion",
-                "ask_followup_question"
-                # NOTE: No create_plan tool for Option 2
-                # Plan creation is done via direct method call from Orchestrator
+                "ask_followup_question",
+                "create_plan"  # Virtual tool - handled specially in agent-runtime
             ],
             file_restrictions=[r".*\.md$"]  # Only markdown files
         )

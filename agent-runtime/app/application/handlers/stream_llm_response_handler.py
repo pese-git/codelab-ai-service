@@ -13,6 +13,7 @@ Application Handler для стриминга LLM ответов.
 import time
 import json
 import logging
+import uuid
 from typing import AsyncGenerator, List, Dict, Optional, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -270,6 +271,21 @@ class StreamLLMResponseHandler(IStreamHandler):
             f"Tool call detected: {tool_call.tool_name} (call_id={tool_call.id})"
         )
         
+        # Check if this is a virtual tool that should be handled internally
+        from app.domain.services.tool_registry import VIRTUAL_TOOLS
+        if tool_call.tool_name in VIRTUAL_TOOLS:
+            logger.info(
+                f"Virtual tool detected: {tool_call.tool_name} - handling internally"
+            )
+            return await self._handle_virtual_tool(
+                session_id=session_id,
+                tool_call=tool_call,
+                processed=processed,
+                duration_ms=duration_ms,
+                history=history,
+                correlation_id=correlation_id
+            )
+        
         # 1. Извлечение текущего агента из истории
         current_agent = "unknown"
         for msg in reversed(history):
@@ -420,3 +436,293 @@ class StreamLLMResponseHandler(IStreamHandler):
             token=processed.content,
             is_final=True
         )
+    
+    async def _handle_virtual_tool(
+        self,
+        session_id: str,
+        tool_call,
+        processed: ProcessedResponse,
+        duration_ms: int,
+        history: List[Dict[str, Any]],
+        correlation_id: Optional[str]
+    ) -> StreamChunk:
+        """
+        Обработать виртуальный инструмент (attempt_completion, ask_followup_question, create_plan).
+        
+        Виртуальные инструменты не отправляются на клиент для выполнения,
+        а обрабатываются внутри agent-runtime.
+        
+        Args:
+            session_id: ID сессии
+            tool_call: Вызов виртуального инструмента
+            processed: Обработанный ответ LLM
+            duration_ms: Длительность запроса в мс
+            history: История сообщений
+            correlation_id: ID для трассировки
+            
+        Returns:
+            StreamChunk с результатом обработки виртуального инструмента
+        """
+        logger.info(
+            f"Handling virtual tool: {tool_call.tool_name} in session {session_id}"
+        )
+        
+        # Извлечение текущего агента
+        current_agent = "unknown"
+        for msg in reversed(history):
+            if msg.get("role") == "assistant" and msg.get("name"):
+                current_agent = msg["name"]
+                break
+        
+        # Публикация события
+        await self._event_publisher.publish_tool_execution_requested(
+            session_id=session_id,
+            tool_name=tool_call.tool_name,
+            arguments=tool_call.arguments,
+            call_id=tool_call.id,
+            agent=current_agent,
+            correlation_id=correlation_id
+        )
+        
+        # Сохранение assistant message с tool_call
+        tool_call_dict = tool_call.to_dict()
+        await self._session_service.add_message(
+            conversation_id=session_id,
+            role="assistant",
+            content="",
+            tool_calls=[tool_call_dict]
+        )
+        
+        if self._db:
+            await self._db.commit()
+            logger.debug(f"Virtual tool call persisted: {tool_call.tool_name}")
+        
+        # Обработка конкретного виртуального инструмента
+        if tool_call.tool_name == "create_plan":
+            result = await self._handle_create_plan(
+                session_id=session_id,
+                tool_call=tool_call,
+                current_agent=current_agent
+            )
+        elif tool_call.tool_name == "attempt_completion":
+            result = await self._handle_attempt_completion(
+                session_id=session_id,
+                tool_call=tool_call
+            )
+        elif tool_call.tool_name == "ask_followup_question":
+            result = await self._handle_ask_followup_question(
+                session_id=session_id,
+                tool_call=tool_call
+            )
+        else:
+            result = f"Unknown virtual tool: {tool_call.tool_name}"
+            logger.error(result)
+        
+        # Сохранение tool result
+        await self._session_service.add_message(
+            conversation_id=session_id,
+            role="tool",
+            content=result,
+            tool_call_id=tool_call.id
+        )
+        
+        if self._db:
+            await self._db.commit()
+            logger.debug(f"Virtual tool result persisted: {tool_call.tool_name}")
+        
+        # Публикация события завершения
+        await self._event_publisher.publish_request_completed(
+            session_id=session_id,
+            model=processed.model,
+            duration_ms=duration_ms,
+            usage=processed.usage,
+            has_tool_calls=True,
+            correlation_id=correlation_id
+        )
+        
+        # Для виртуальных инструментов возвращаем специальные типы chunk
+        if tool_call.tool_name == "create_plan":
+            # Парсим результат создания плана
+            result_data = json.loads(result)
+            
+            if "error" in result_data:
+                # Если ошибка, возвращаем как сообщение
+                return StreamChunk(
+                    type="assistant_message",
+                    content=f"Failed to create plan: {result_data['error']}",
+                    is_final=True
+                )
+            
+            # Для create_plan возвращаем plan_approval_required
+            return StreamChunk(
+                type="plan_approval_required",
+                plan_id=result_data.get("plan_id"),
+                plan_summary={
+                    "title": result_data.get("title", "Execution Plan"),
+                    "description": result_data.get("description", ""),
+                    "subtasks_count": result_data.get("subtasks_count", 0)
+                },
+                metadata={"requires_approval": True},
+                is_final=True
+            )
+        elif tool_call.tool_name == "attempt_completion":
+            # Для attempt_completion возвращаем обычное сообщение
+            result_data = json.loads(result)
+            return StreamChunk(
+                type="assistant_message",
+                content=result_data.get("result", "Task completed"),
+                is_final=True
+            )
+        elif tool_call.tool_name == "ask_followup_question":
+            # Для ask_followup_question возвращаем вопрос как сообщение
+            question_data = json.loads(result)
+            return StreamChunk(
+                type="assistant_message",
+                content=question_data.get("question", ""),
+                metadata={"suggestions": question_data.get("suggestions", [])},
+                is_final=True
+            )
+        else:
+            # Fallback для неизвестных виртуальных инструментов
+            return StreamChunk(
+                type="assistant_message",
+                content=result,
+                is_final=True
+            )
+    
+    async def _handle_create_plan(
+        self,
+        session_id: str,
+        tool_call,
+        current_agent: str
+    ) -> str:
+        """
+        Обработать create_plan - создание плана выполнения.
+        
+        Вызывает ArchitectAgent.create_plan() для создания плана в БД,
+        затем возвращает информацию о плане для approval.
+        """
+        logger.info(f"Creating execution plan for session {session_id}")
+        
+        # Извлекаем параметры из tool_call
+        title = tool_call.arguments.get("title", "Execution Plan")
+        description = tool_call.arguments.get("description", "")
+        subtasks = tool_call.arguments.get("subtasks", [])
+        
+        if not subtasks:
+            error_msg = "create_plan requires at least one subtask"
+            logger.error(error_msg)
+            return json.dumps({"error": error_msg})
+        
+        try:
+            # Создаем план напрямую, используя новую ExecutionPlan entity
+            from app.domain.execution_context.entities import ExecutionPlan, Subtask
+            from app.domain.execution_context.value_objects import PlanId, SubtaskId
+            from app.domain.session_context.value_objects import ConversationId
+            from app.domain.agent_context.value_objects import AgentId
+            from app.infrastructure.persistence.repositories.execution_plan_repository_impl import ExecutionPlanRepositoryImpl
+            
+            # Создаем plan_repository с текущей db сессией из SSEUnitOfWork
+            if not self._db:
+                raise ValueError("Database session not available in StreamLLMResponseHandler")
+            
+            plan_repository = ExecutionPlanRepositoryImpl(self._db)
+            
+            # Создаем ExecutionPlan entity
+            plan_id = str(uuid.uuid4())
+            plan = ExecutionPlan(
+                id=PlanId(plan_id),
+                conversation_id=ConversationId(session_id),
+                goal=f"{title}\n\n{description}" if description else title,
+                metadata={
+                    "created_by": "architect",
+                    "title": title,
+                    "description": description
+                }
+            )
+            
+            # Создаем subtasks с ID
+            subtask_ids = [str(uuid.uuid4()) for _ in subtasks]
+            
+            for i, subtask_data in enumerate(subtasks):
+                # Конвертируем dependency indices в IDs
+                dep_indices = subtask_data.get("dependencies", [])
+                dep_ids = []
+                for dep_idx in dep_indices:
+                    if isinstance(dep_idx, int) and 0 <= dep_idx < len(subtask_ids):
+                        dep_ids.append(SubtaskId(subtask_ids[dep_idx]))
+                
+                # Определяем agent_id из agent name
+                agent_name = subtask_data["agent"]
+                agent_id = AgentId(value=agent_name)
+                
+                subtask = Subtask(
+                    id=SubtaskId(subtask_ids[i]),
+                    description=subtask_data.get("description", subtask_data.get("title", "")),
+                    agent_id=agent_id,
+                    dependencies=dep_ids,
+                    estimated_time=f"{subtask_data.get('estimated_time_minutes', 5)} min",
+                    metadata={
+                        "index": i,
+                        "title": subtask_data.get("title", ""),
+                        "dependency_indices": dep_indices
+                    }
+                )
+                plan.add_subtask(subtask)
+            
+            # Сохраняем план в БД (в статусе DRAFT)
+            # Commit произойдет автоматически через SSEUnitOfWork
+            await plan_repository.save(plan)
+            
+            # Flush для немедленной видимости в текущей транзакции
+            await self._db.flush()
+            
+            logger.info(
+                f"Plan {plan.id.value} created successfully with {len(plan.subtasks)} subtasks"
+            )
+            
+            # Возвращаем информацию о созданном плане
+            return json.dumps({
+                "status": "plan_created",
+                "plan_id": plan.id.value,
+                "title": title,
+                "description": description,
+                "subtasks_count": len(subtasks),
+                "requires_approval": True
+            })
+            
+        except Exception as e:
+            error_msg = f"Failed to create plan: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            return json.dumps({"error": error_msg})
+    
+    async def _handle_attempt_completion(
+        self,
+        session_id: str,
+        tool_call
+    ) -> str:
+        """Обработать attempt_completion - завершение задачи."""
+        result = tool_call.arguments.get("result", "Task completed")
+        logger.info(f"Task completion for session {session_id}: {result[:100]}")
+        
+        return json.dumps({
+            "status": "completed",
+            "result": result
+        })
+    
+    async def _handle_ask_followup_question(
+        self,
+        session_id: str,
+        tool_call
+    ) -> str:
+        """Обработать ask_followup_question - запрос уточнения."""
+        question = tool_call.arguments.get("question", "")
+        suggestions = tool_call.arguments.get("suggestions", [])
+        
+        logger.info(f"Followup question for session {session_id}: {question}")
+        
+        return json.dumps({
+            "status": "question_asked",
+            "question": question,
+            "suggestions": suggestions
+        })

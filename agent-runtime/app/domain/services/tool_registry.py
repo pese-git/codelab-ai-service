@@ -2,8 +2,12 @@
 Tool registry for agent runtime.
 
 Defines available tools and their specifications for LLM.
-Local tools (echo, calculator) can be executed directly.
-Other tools (file operations, commands) are executed on IDE side via WebSocket.
+
+Tool Categories:
+1. Local tools (echo, calculator, switch_mode) - executed in agent-runtime
+2. IDE-side tools (file operations, commands) - executed on IDE side via WebSocket
+3. Virtual tools (attempt_completion, ask_followup_question, create_plan) -
+   handled specially in agent-runtime, not executed as regular tools
 """
 import logging
 from typing import Any, Callable, Dict, List, Optional
@@ -59,6 +63,14 @@ LOCAL_TOOLS: Dict[str, Callable] = {
     "echo": echo_tool,
     "calculator": calculator_tool,
     "switch_mode": switch_mode_tool
+}
+
+# Virtual tools that are handled specially in agent-runtime
+# These tools are not executed as regular tools, but trigger special behavior
+VIRTUAL_TOOLS = {
+    "attempt_completion",  # Marks task as complete, returns result to user
+    "ask_followup_question",  # Requests clarification from user
+    "create_plan"  # Creates execution plan (architect agent only)
 }
 
 
@@ -329,6 +341,121 @@ TOOLS_SPEC: List[Dict[str, Any]] = [
                 "required": ["query"]
             }
         }
+    },
+    
+    # ===== Virtual Tools (Agent-Runtime Only) =====
+    # These tools are not executed on IDE side, but handled specially in agent-runtime
+    
+    {
+        "type": "function",
+        "function": {
+            "name": "attempt_completion",
+            "description": (
+                "Present the final result of the task to the user. "
+                "Use this when you have completed the task and want to show the result. "
+                "This is a terminal operation - the conversation will be marked as complete."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "result": {
+                        "type": "string",
+                        "description": "Concise summary of what was accomplished. Be direct and conclusive."
+                    }
+                },
+                "required": ["result"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "ask_followup_question",
+            "description": (
+                "Ask the user a clarifying question when you need additional information to proceed. "
+                "Use this only when necessary information is missing and cannot be inferred from context."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "question": {
+                        "type": "string",
+                        "description": "Clear, specific question to ask the user"
+                    },
+                    "suggestions": {
+                        "type": "array",
+                        "description": "2-4 suggested answers to help the user respond quickly",
+                        "items": {
+                            "type": "string"
+                        },
+                        "minItems": 2,
+                        "maxItems": 4
+                    }
+                },
+                "required": ["question", "suggestions"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_plan",
+            "description": (
+                "Create an execution plan with subtasks for implementation. "
+                "Use this when the task requires code changes or implementation work. "
+                "Each subtask will be executed by a specialized agent (coder, debug, or ask)."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "description": "Brief title describing the plan"
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Detailed description of what will be implemented"
+                    },
+                    "subtasks": {
+                        "type": "array",
+                        "description": "List of concrete, actionable subtasks",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "title": {
+                                    "type": "string",
+                                    "description": "Brief title of the subtask"
+                                },
+                                "description": {
+                                    "type": "string",
+                                    "description": "Detailed description of what needs to be done"
+                                },
+                                "agent": {
+                                    "type": "string",
+                                    "enum": ["coder", "debug", "ask"],
+                                    "description": "Agent responsible for executing this subtask"
+                                },
+                                "estimated_time_minutes": {
+                                    "type": "integer",
+                                    "description": "Estimated time in minutes",
+                                    "minimum": 1
+                                },
+                                "dependencies": {
+                                    "type": "array",
+                                    "description": "Indices of subtasks that must complete before this one",
+                                    "items": {
+                                        "type": "integer"
+                                    }
+                                }
+                            },
+                            "required": ["title", "description", "agent", "estimated_time_minutes"]
+                        },
+                        "minItems": 1
+                    }
+                },
+                "required": ["title", "description", "subtasks"]
+            }
+        }
     }
 ]
 
@@ -383,11 +510,17 @@ class ToolRegistry:
     Предоставляет доступ к спецификациям инструментов
     и функциям для их выполнения.
     
+    Содержит три категории инструментов:
+    1. Локальные (3): echo, calculator, switch_mode
+    2. IDE-side (6): read_file, write_file, list_files, create_directory,
+                     execute_command, search_in_code
+    3. Виртуальные (3): attempt_completion, ask_followup_question, create_plan
+    
     Пример:
         >>> registry = ToolRegistry()
         >>> all_tools = registry.get_all_tools()
         >>> len(all_tools)
-        7
+        12
     """
     
     def __init__(self):
@@ -446,6 +579,24 @@ class ToolRegistry:
             Функция инструмента или None если не локальный
         """
         return self._local_tools.get(tool_name)
+    
+    def is_virtual_tool(self, tool_name: str) -> bool:
+        """
+        Проверить, является ли инструмент виртуальным.
+        
+        Виртуальные инструменты не выполняются как обычные инструменты,
+        а обрабатываются специальным образом в agent-runtime:
+        - attempt_completion: завершает задачу и возвращает результат
+        - ask_followup_question: запрашивает уточнение у пользователя
+        - create_plan: создает план выполнения (только для architect)
+        
+        Args:
+            tool_name: Имя инструмента
+            
+        Returns:
+            True если инструмент виртуальный
+        """
+        return tool_name in VIRTUAL_TOOLS
 
 
 # Singleton instance
