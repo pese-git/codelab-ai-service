@@ -235,18 +235,29 @@ async def websocket_endpoint(
     """
     WebSocket endpoint для двунаправленной связи между IDE и Agent через HTTP streaming.
     
+    Поддерживает автоматическое создание сессий:
+    - session_id может быть временным (new_*) для новых диалогов
+    - session_id может быть реальным для существующих диалогов
+    
     Flow:
     1. IDE отправляет user_message или tool_result через WebSocket
     2. Gateway пересылает в Agent через HTTP streaming (SSE)
-    3. Agent отправляет SSE события (assistant_message, tool_call)
+    3. Agent отправляет SSE события (assistant_message, tool_call, session_info)
     4. Gateway пересылает SSE события в IDE через WebSocket
+    5. Для новых сессий Agent отправляет session_info с реальным session_id
     """
-    # Регистрируем сессию
+    # Проверяем, является ли это временным session_id
+    is_temp_session = session_id.startswith("new_")
+    
+    if is_temp_session:
+        logger.info(f"[{session_id}] Temporary session ID detected, will create new session")
+    
+    # Регистрируем сессию (даже временную)
     await session_manager.add(session_id, websocket)
     
     try:
         # Делегируем обработку WebSocketHandler
-        await ws_handler.handle_connection(websocket, session_id)
+        await ws_handler.handle_connection(websocket, session_id, is_temp_session)
     finally:
         # Очищаем ресурсы при завершении соединения
         await token_buffer_manager.remove(session_id)

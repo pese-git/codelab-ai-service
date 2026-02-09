@@ -5,21 +5,14 @@ Messages роутер.
 """
 
 import logging
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..schemas.message_schemas import MessageStreamRequest
 from ....models.schemas import StreamChunk
 from ....agents.base_agent import AgentType
 from ....core.di import get_container
-from ....services.database import get_db
-from ....application.use_cases import (
-    ProcessMessageUseCase,
-    SwitchAgentUseCase,
-    ProcessToolResultUseCase,
-    HandleApprovalUseCase
-)
+from ....infrastructure.persistence.unit_of_work import SSEUnitOfWork
 from ....application.use_cases.process_message_use_case import ProcessMessageRequest
 from ....application.use_cases.switch_agent_use_case import SwitchAgentRequest
 from ....application.use_cases.process_tool_result_use_case import ProcessToolResultRequest
@@ -30,52 +23,22 @@ logger = logging.getLogger("agent-runtime.api.messages")
 router = APIRouter(prefix="/agent/message", tags=["messages"])
 
 
-# ==================== Dependency Functions ====================
-
-async def get_process_message_use_case(
-    db: AsyncSession = Depends(get_db)
-) -> ProcessMessageUseCase:
-    """Получить Use Case для обработки сообщений."""
-    return get_container().get_process_message_use_case(db)
-
-
-async def get_switch_agent_use_case(
-    db: AsyncSession = Depends(get_db)
-) -> SwitchAgentUseCase:
-    """Получить Use Case для переключения агента."""
-    return get_container().get_switch_agent_use_case(db)
-
-
-async def get_process_tool_result_use_case(
-    db: AsyncSession = Depends(get_db)
-) -> ProcessToolResultUseCase:
-    """Получить Use Case для обработки результатов инструментов."""
-    return get_container().get_process_tool_result_use_case(db)
-
-
-async def get_handle_approval_use_case(
-    db: AsyncSession = Depends(get_db)
-) -> HandleApprovalUseCase:
-    """Получить Use Case для обработки approval решений."""
-    return get_container().get_handle_approval_use_case(db)
-
-
 # ==================== Endpoints ====================
 
 
 @router.post("/stream")
 async def message_stream_sse(
-    request: MessageStreamRequest,
-    process_message_use_case=Depends(get_process_message_use_case),
-    switch_agent_use_case=Depends(get_switch_agent_use_case),
-    process_tool_result_use_case=Depends(get_process_tool_result_use_case),
-    handle_approval_use_case=Depends(get_handle_approval_use_case)
+    request: MessageStreamRequest
 ):
     """
     SSE streaming endpoint для обработки сообщений.
     
     Использует новый MessageOrchestrationService для обработки сообщений
     через систему мульти-агентов с поддержкой streaming ответов.
+    
+    **Автоматическое создание сессии:**
+    - Если `session_id` не указан → создается новая сессия автоматически
+    - Если `session_id` указан → используется существующая сессия
     
     Принимает:
     - user_message: Обычное сообщение пользователя
@@ -84,7 +47,7 @@ async def message_stream_sse(
     - hitl_decision: Решение пользователя по HITL
     
     Возвращает:
-    - SSE stream с chunks (assistant_message, tool_call, agent_switched, error)
+    - SSE stream с chunks (session_info, assistant_message, tool_call, agent_switched, error)
     
     Args:
         request: Запрос с сообщением
@@ -92,19 +55,27 @@ async def message_stream_sse(
     Returns:
         StreamingResponse: SSE stream
         
-    Пример запроса:
+    Пример запроса (новая сессия):
+        POST /agent/message/stream
+        {
+            "message": {
+                "type": "user_message",
+                "content": "Создай новый файл"
+            }
+        }
+        
+    Пример запроса (существующая сессия):
         POST /agent/message/stream
         {
             "session_id": "session-123",
             "message": {
                 "type": "user_message",
-                "content": "Создай новый файл",
-                "agent_type": "coder"  // опционально
+                "content": "Продолжаем работу"
             }
         }
         
     Пример SSE ответа:
-        data: {"type":"agent_switched","content":"Switched to coder agent",...}
+        data: {"type":"session_info","session_id":"abc-123",...}
         
         data: {"type":"assistant_message","token":"Конечно","is_final":false}
         
@@ -113,6 +84,7 @@ async def message_stream_sse(
         data: {"type":"done","is_final":true}
     """
     # Использовать MessageOrchestrationService для всех типов сообщений
+    # ✅ session_id может быть None - тогда создастся новая сессия
     session_id = request.session_id
     message_data = request.message
     message_type = message_data.get("type")
@@ -125,30 +97,44 @@ async def message_stream_sse(
         logger.info(
             f"Processing user message for session {session_id} "
             f"(agent: {agent_type.value if agent_type else 'auto'}) "
-            f"via MessageOrchestrationService"
+            f"via MessageOrchestrationService with UoW"
         )
         
         async def generate():
-            try:
-                use_case_request = ProcessMessageRequest(
-                    session_id=session_id,
-                    message=content,
-                    agent_type=agent_type
-                )
-                async for chunk in process_message_use_case.execute(use_case_request):
-                    # Преобразовать в SSE формат
-                    chunk_json = chunk.model_dump_json(exclude_none=False)
-                    if chunk.type == "plan_approval_required":
-                        logger.info(f"[SSE] Sending plan_approval_required chunk: {chunk_json}")
-                    yield f"data: {chunk_json}\n\n"
-            except Exception as e:
-                logger.error(f"Error processing message: {e}", exc_info=True)
-                error_chunk = StreamChunk(
-                    type="error",
-                    error=str(e),
-                    is_final=True
-                )
-                yield f"data: {error_chunk.model_dump_json()}\n\n"
+            # ✅ Создать НОВУЮ сессию внутри генератора через UoW
+            # Это предотвращает раннее закрытие сессии FastAPI
+            from ....infrastructure.persistence.database import async_session_maker
+            
+            # UoW создаст и управляет сессией
+            async with SSEUnitOfWork(session_factory=async_session_maker) as uow:
+                # Получить use case с сессией из UoW
+                container = get_container()
+                process_message_use_case = container.get_process_message_use_case(uow.session)
+                
+                try:
+                    use_case_request = ProcessMessageRequest(
+                        session_id=session_id,
+                        message=content,
+                        agent_type=agent_type
+                    )
+                    # ✅ Передать UoW в use case для централизованного управления транзакциями
+                    # MessageProcessor автоматически отправит session_info в первом чанке
+                    async for chunk in process_message_use_case.execute(use_case_request, uow=uow):
+                        # Преобразовать в SSE формат
+                        chunk_json = chunk.model_dump_json(exclude_none=False)
+                        if chunk.type == "session_info":
+                            logger.info(f"[SSE] Session info: {chunk.session_id}")
+                        elif chunk.type == "plan_approval_required":
+                            logger.info(f"[SSE] Sending plan_approval_required chunk: {chunk_json}")
+                        yield f"data: {chunk_json}\n\n"
+                except Exception as e:
+                    logger.error(f"Error processing message: {e}", exc_info=True)
+                    error_chunk = StreamChunk(
+                        type="error",
+                        error=str(e),
+                        is_final=True
+                    )
+                    yield f"data: {error_chunk.model_dump_json()}\n\n"
         
         return StreamingResponse(
             generate(),
@@ -178,23 +164,31 @@ async def message_stream_sse(
         )
         
         async def tool_result_generate():
-            try:
-                use_case_request = ProcessToolResultRequest(
-                    session_id=session_id,
-                    call_id=call_id,
-                    result=result,
-                    error=error
-                )
-                async for chunk in process_tool_result_use_case.execute(use_case_request):
-                    yield f"data: {chunk.model_dump_json()}\n\n"
-            except Exception as e:
-                logger.error(f"Error processing tool_result: {e}", exc_info=True)
-                error_chunk = StreamChunk(
-                    type="error",
-                    error=str(e),
-                    is_final=True
-                )
-                yield f"data: {error_chunk.model_dump_json()}\n\n"
+            # ✅ Создать НОВУЮ сессию внутри генератора через UoW
+            from ....infrastructure.persistence.database import async_session_maker
+            
+            async with SSEUnitOfWork(session_factory=async_session_maker) as uow:
+                # Получить use case с сессией из UoW
+                container = get_container()
+                process_tool_result_use_case = container.get_process_tool_result_use_case(uow.session)
+                
+                try:
+                    use_case_request = ProcessToolResultRequest(
+                        session_id=session_id,
+                        call_id=call_id,
+                        result=result,
+                        error=error
+                    )
+                    async for chunk in process_tool_result_use_case.execute(use_case_request):
+                        yield f"data: {chunk.model_dump_json()}\n\n"
+                except Exception as e:
+                    logger.error(f"Error processing tool_result: {e}", exc_info=True)
+                    error_chunk = StreamChunk(
+                        type="error",
+                        error=str(e),
+                        is_final=True
+                    )
+                    yield f"data: {error_chunk.model_dump_json()}\n\n"
         
         return StreamingResponse(
             tool_result_generate(),
@@ -230,22 +224,30 @@ async def message_stream_sse(
         )
         
         async def switch_agent_generate():
-            try:
-                # Переключаем агента через Use Case
-                use_case_request = SwitchAgentRequest(
-                    session_id=session_id,
-                    new_agent_type=agent_type
-                )
-                async for chunk in switch_agent_use_case.execute(use_case_request):
-                    yield f"data: {chunk.model_dump_json()}\n\n"
-            except Exception as e:
-                logger.error(f"Error switching agent: {e}", exc_info=True)
-                error_chunk = StreamChunk(
-                    type="error",
-                    error=str(e),
-                    is_final=True
-                )
-                yield f"data: {error_chunk.model_dump_json()}\n\n"
+            # ✅ Создать НОВУЮ сессию внутри генератора через UoW
+            from ....infrastructure.persistence.database import async_session_maker
+            
+            async with SSEUnitOfWork(session_factory=async_session_maker) as uow:
+                # Получить use case с сессией из UoW
+                container = get_container()
+                switch_agent_use_case = container.get_switch_agent_use_case(uow.session)
+                
+                try:
+                    # Переключаем агента через Use Case
+                    use_case_request = SwitchAgentRequest(
+                        session_id=session_id,
+                        new_agent_type=agent_type
+                    )
+                    async for chunk in switch_agent_use_case.execute(use_case_request):
+                        yield f"data: {chunk.model_dump_json()}\n\n"
+                except Exception as e:
+                    logger.error(f"Error switching agent: {e}", exc_info=True)
+                    error_chunk = StreamChunk(
+                        type="error",
+                        error=str(e),
+                        is_final=True
+                    )
+                    yield f"data: {error_chunk.model_dump_json()}\n\n"
         
         return StreamingResponse(
             switch_agent_generate(),
@@ -276,24 +278,32 @@ async def message_stream_sse(
         )
         
         async def hitl_decision_generate():
-            try:
-                # Обрабатываем HITL решение через Use Case
-                use_case_request = HandleApprovalRequest(
-                    session_id=session_id,
-                    approval_request_id=call_id,
-                    approved=(decision == "approved"),
-                    approval_type="hitl"
-                )
-                async for chunk in handle_approval_use_case.execute(use_case_request):
-                    yield f"data: {chunk.model_dump_json()}\n\n"
-            except Exception as e:
-                logger.error(f"Error processing HITL decision: {e}", exc_info=True)
-                error_chunk = StreamChunk(
-                    type="error",
-                    error=str(e),
-                    is_final=True
-                )
-                yield f"data: {error_chunk.model_dump_json()}\n\n"
+            # ✅ Создать НОВУЮ сессию внутри генератора через UoW
+            from ....infrastructure.persistence.database import async_session_maker
+            
+            async with SSEUnitOfWork(session_factory=async_session_maker) as uow:
+                # Получить use case с сессией из UoW
+                container = get_container()
+                handle_approval_use_case = container.get_handle_approval_use_case(uow.session)
+                
+                try:
+                    # Обрабатываем HITL решение через Use Case
+                    use_case_request = HandleApprovalRequest(
+                        session_id=session_id,
+                        approval_request_id=call_id,
+                        approved=(decision == "approved"),
+                        approval_type="hitl"
+                    )
+                    async for chunk in handle_approval_use_case.execute(use_case_request):
+                        yield f"data: {chunk.model_dump_json()}\n\n"
+                except Exception as e:
+                    logger.error(f"Error processing HITL decision: {e}", exc_info=True)
+                    error_chunk = StreamChunk(
+                        type="error",
+                        error=str(e),
+                        is_final=True
+                    )
+                    yield f"data: {error_chunk.model_dump_json()}\n\n"
         
         return StreamingResponse(
             hitl_decision_generate(),
@@ -323,24 +333,32 @@ async def message_stream_sse(
         )
         
         async def plan_decision_generate():
-            try:
-                # Обрабатываем Plan Approval решение через Use Case
-                use_case_request = HandleApprovalRequest(
-                    session_id=session_id,
-                    approval_request_id=approval_request_id,
-                    approved=(decision == "approved"),
-                    approval_type="plan"
-                )
-                async for chunk in handle_approval_use_case.execute(use_case_request):
-                    yield f"data: {chunk.model_dump_json()}\n\n"
-            except Exception as e:
-                logger.error(f"Error processing Plan Approval decision: {e}", exc_info=True)
-                error_chunk = StreamChunk(
-                    type="error",
-                    error=str(e),
-                    is_final=True
-                )
-                yield f"data: {error_chunk.model_dump_json()}\n\n"
+            # ✅ Создать НОВУЮ сессию внутри генератора через UoW
+            from ....infrastructure.persistence.database import async_session_maker
+            
+            async with SSEUnitOfWork(session_factory=async_session_maker) as uow:
+                # Получить use case с сессией из UoW
+                container = get_container()
+                handle_approval_use_case = container.get_handle_approval_use_case(uow.session)
+                
+                try:
+                    # Обрабатываем Plan Approval решение через Use Case
+                    use_case_request = HandleApprovalRequest(
+                        session_id=session_id,
+                        approval_request_id=approval_request_id,
+                        approved=(decision == "approved"),
+                        approval_type="plan"
+                    )
+                    async for chunk in handle_approval_use_case.execute(use_case_request):
+                        yield f"data: {chunk.model_dump_json()}\n\n"
+                except Exception as e:
+                    logger.error(f"Error processing Plan Approval decision: {e}", exc_info=True)
+                    error_chunk = StreamChunk(
+                        type="error",
+                        error=str(e),
+                        is_final=True
+                    )
+                    yield f"data: {error_chunk.model_dump_json()}\n\n"
         
         return StreamingResponse(
             plan_decision_generate(),

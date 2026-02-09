@@ -80,7 +80,8 @@ class MessageProcessor:
         session_id: str,
         message: Optional[str],
         agent_type: Optional[AgentType] = None,
-        correlation_id: Optional[str] = None
+        correlation_id: Optional[str] = None,
+        uow=None  # Optional[SSEUnitOfWork]
     ) -> AsyncGenerator[StreamChunk, None]:
         """
         Обработать пользовательское сообщение.
@@ -114,10 +115,23 @@ class MessageProcessor:
         )
         
         # ИСПРАВЛЕНИЕ: Сначала получить или создать сессию
-        session = await self._session_service.get_or_create_conversation(session_id)
+        session = await self._session_service.get_or_create_conversation(
+            session_id,
+            uow=uow  # ✅ Передать UoW в сервис
+        )
+        # ✅ Получить фактический session_id (может быть автогенерирован)
+        actual_session_id = session.conversation_id.value
+        logger.debug(f"Session ID: {actual_session_id} (provided: {session_id})")
+        
         # КРИТИЧЕСКОЕ: Commit сразу после создания сессии для соблюдения FK constraints
-        await self._db.commit()
-        logger.debug(f"Session создана и зафиксирована в БД: {session_id}")
+        if uow:
+            await uow.commit(operation="create_session")
+        else:
+            await self._db.commit()
+        logger.debug(f"Session создана и зафиксирована в БД: {actual_session_id}")
+        
+        # ✅ Использовать фактический session_id для дальнейшей работы
+        session_id = actual_session_id
         
         # Затем добавить user message в сессию
         # ВАЖНО: message=None означает "не добавлять user message" (для tool_result)
@@ -125,9 +139,15 @@ class MessageProcessor:
             await self._session_service.add_message(
                 conversation_id=session_id,
                 role="user",
-                content=message
+                content=message,
+                uow=uow  # ✅ Передать UoW в сервис
             )
-            logger.debug(f"User message добавлено в сессию {session_id}")
+            # КРИТИЧЕСКОЕ: Commit после добавления сообщения
+            if uow:
+                await uow.commit(operation="add_user_message")
+            else:
+                await self._db.commit()
+            logger.debug(f"User message добавлено и зафиксировано в БД для сессии {session_id}")
         elif message is None:
             logger.debug(
                 f"Пропускаем добавление user message (message=None, "
@@ -137,11 +157,23 @@ class MessageProcessor:
         # Получить или создать агента
         agent = await self._agent_service.get_or_create_agent(
             session_id=session_id,
-            initial_type=agent_type or AgentType.ORCHESTRATOR
+            initial_type=agent_type or AgentType.ORCHESTRATOR,
+            uow=uow  # ✅ Передать UoW в сервис
         )
         # КРИТИЧЕСКОЕ: Commit после создания агента
-        await self._db.commit()
+        if uow:
+            await uow.commit(operation="create_agent")
+        else:
+            await self._db.commit()
         logger.debug(f"Agent создан и зафиксирован в БД для сессии {session_id}")
+        
+        # ✅ Отправить session_info в первом чанке
+        # StreamChunk уже импортирован в начале файла (строка 15)
+        yield StreamChunk(
+            type="session_info",
+            session_id=session_id,
+            is_final=False
+        )
         
         # Отследить время начала обработки
         start_time = time.time()

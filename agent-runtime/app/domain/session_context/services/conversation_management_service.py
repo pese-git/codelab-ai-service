@@ -54,30 +54,44 @@ class ConversationManagementService:
     
     def __init__(
         self,
-        repository: ConversationRepository,
+        repository: ConversationRepository = None,
         snapshot_service: Optional[ConversationSnapshotService] = None,
         cleanup_service: Optional[ToolMessageCleanupService] = None,
-        event_publisher=None
+        event_publisher=None,
+        uow=None  # Optional[SSEUnitOfWork]
     ):
         """
         Инициализация сервиса.
         
         Args:
-            repository: Repository для работы с conversations
+            repository: Repository для работы с conversations (deprecated, используйте uow)
             snapshot_service: Service для snapshots (создается если None)
             cleanup_service: Service для cleanup (создается если None)
             event_publisher: Функция для публикации событий (опционально)
+            uow: Unit of Work для доступа к репозиториям (рекомендуется)
         """
-        self._repository = repository
+        self._repository = repository  # Для обратной совместимости
+        self._uow = uow
         self._snapshot_service = snapshot_service or ConversationSnapshotService()
         self._cleanup_service = cleanup_service or ToolMessageCleanupService()
         self._event_publisher = event_publisher
+    
+    def _get_repository(self) -> ConversationRepository:
+        """Получить repository из UoW или использовать переданный."""
+        if self._uow:
+            return self._uow.conversations
+        if self._repository:
+            return self._repository
+        raise RuntimeError(
+            "ConversationManagementService requires either uow or repository"
+        )
     
     async def create_conversation(
         self,
         conversation_id: Optional[str] = None,
         title: Optional[str] = None,
-        description: Optional[str] = None
+        description: Optional[str] = None,
+        uow=None  # Optional[SSEUnitOfWork]
     ) -> Conversation:
         """
         Создать новую conversation.
@@ -86,6 +100,7 @@ class ConversationManagementService:
             conversation_id: ID conversation (если None, генерируется автоматически)
             title: Заголовок conversation
             description: Описание conversation
+            uow: Unit of Work для доступа к репозиториям (опционально)
             
         Returns:
             Созданная conversation
@@ -94,10 +109,13 @@ class ConversationManagementService:
             SessionAlreadyExistsError: Если conversation с таким ID уже существует
             
         Пример:
-            >>> conversation = await service.create_conversation()
+            >>> conversation = await service.create_conversation(uow=uow)
             >>> conversation.is_active
             True
         """
+        # Получить repository (из UoW если передан, иначе из self)
+        repo = uow.conversations if uow else self._get_repository()
+        
         # Генерировать ID если не указан
         if not conversation_id:
             conv_id = ConversationId.generate()
@@ -105,7 +123,7 @@ class ConversationManagementService:
             conv_id = ConversationId(conversation_id)
         
         # Проверить, что conversation не существует
-        existing = await self._repository.find_by_id(conv_id)
+        existing = await repo.find_by_id(conv_id)
         if existing:
             raise SessionAlreadyExistsError(conv_id.value)
         
@@ -117,7 +135,7 @@ class ConversationManagementService:
         )
         
         # Сохранить в репозитории
-        await self._repository.save(conversation)
+        await repo.save(conversation)
         
         logger.info(f"Создана новая conversation: {conv_id.value}")
         
@@ -150,7 +168,7 @@ class ConversationManagementService:
             >>> conversation = await service.get_conversation("conv-123")
         """
         conv_id = ConversationId(conversation_id)
-        conversation = await self._repository.find_by_id(conv_id)
+        conversation = await self._get_repository().find_by_id(conv_id)
         
         if not conversation:
             raise SessionNotFoundError(conversation_id)
@@ -159,32 +177,58 @@ class ConversationManagementService:
     
     async def get_or_create_conversation(
         self,
-        conversation_id: str,
+        conversation_id: Optional[str] = None,
         title: Optional[str] = None,
-        description: Optional[str] = None
+        description: Optional[str] = None,
+        uow=None  # Optional[SSEUnitOfWork]
     ) -> Conversation:
         """
         Получить существующую conversation или создать новую.
         
         Args:
-            conversation_id: ID conversation
+            conversation_id: ID conversation (если None, создается новая)
             title: Заголовок (для новой conversation)
             description: Описание (для новой conversation)
+            uow: Unit of Work для доступа к репозиториям (опционально)
             
         Returns:
             Существующая или новая conversation
             
         Пример:
-            >>> conversation = await service.get_or_create_conversation("conv-123")
+            >>> # Создать новую conversation
+            >>> conversation = await service.get_or_create_conversation(uow=uow)
+            >>> # Получить существующую или создать
+            >>> conversation = await service.get_or_create_conversation("conv-123", uow=uow)
         """
-        try:
-            return await self.get_conversation(conversation_id)
-        except SessionNotFoundError:
+        # Если conversation_id не указан, создать новую
+        if not conversation_id:
+            logger.info("🆔 conversation_id не указан, создаем новую conversation")
             return await self.create_conversation(
-                conversation_id=conversation_id,
+                conversation_id=None,
                 title=title,
-                description=description
+                description=description,
+                uow=uow
             )
+        
+        # Получить repository (из UoW если передан, иначе из self)
+        repo = uow.conversations if uow else self._get_repository()
+        
+        # Попытаться найти существующую
+        conv_id = ConversationId(conversation_id)
+        existing = await repo.find_by_id(conv_id)
+        
+        if existing:
+            logger.debug(f"Найдена существующая conversation: {conversation_id}")
+            return existing
+        
+        # Создать новую с указанным ID
+        logger.info(f"Conversation {conversation_id} не найдена, создаем новую")
+        return await self.create_conversation(
+            conversation_id=conversation_id,
+            title=title,
+            description=description,
+            uow=uow
+        )
     
     async def add_message(
         self,
@@ -193,7 +237,8 @@ class ConversationManagementService:
         content: str,
         name: Optional[str] = None,
         tool_call_id: Optional[str] = None,
-        tool_calls: Optional[list] = None
+        tool_calls: Optional[list] = None,
+        uow=None  # Optional[SSEUnitOfWork]
     ) -> Message:
         """
         Добавить сообщение в conversation.
@@ -205,6 +250,7 @@ class ConversationManagementService:
             name: Имя отправителя (опционально)
             tool_call_id: ID вызова инструмента (опционально)
             tool_calls: Вызовы инструментов (опционально)
+            uow: Unit of Work для доступа к репозиториям (опционально)
             
         Returns:
             Созданное сообщение
@@ -216,11 +262,17 @@ class ConversationManagementService:
             >>> message = await service.add_message(
             ...     conversation_id="conv-123",
             ...     role="user",
-            ...     content="Привет!"
+            ...     content="Привет!",
+            ...     uow=uow
             ... )
         """
+        # Получить repository (из UoW если передан, иначе из self)
+        repo = uow.conversations if uow else self._get_repository()
+        
         # Получить conversation
-        conversation = await self.get_conversation(conversation_id)
+        conversation = await repo.find_by_id(ConversationId(conversation_id))
+        if not conversation:
+            raise SessionNotFoundError(f"Conversation {conversation_id} not found")
         
         # Создать сообщение
         message = Message(
@@ -236,7 +288,7 @@ class ConversationManagementService:
         conversation.add_message(message)
         
         # Сохранить conversation
-        await self._repository.save(conversation)
+        await repo.save(conversation)
         
         logger.debug(
             f"Добавлено сообщение {message.id} в conversation {conversation_id} "
@@ -337,7 +389,7 @@ class ConversationManagementService:
         conversation.deactivate(reason=reason)
         
         # Сохранить
-        await self._repository.save(conversation)
+        await self._get_repository().save(conversation)
         
         logger.info(f"Conversation {conversation_id} деактивирована: {reason}")
         
@@ -374,12 +426,12 @@ class ConversationManagementService:
             >>> conversations = await service.list_active_conversations(limit=10)
         """
         if user_id:
-            return await self._repository.find_active_by_user_id(
+            return await self._get_repository().find_active_by_user_id(
                 user_id=user_id,
                 limit=limit
             )
         else:
-            return await self._repository.find_active(limit=limit, offset=offset)
+            return await self._get_repository().find_active(limit=limit, offset=offset)
     
     async def cleanup_old_conversations(
         self,
@@ -398,7 +450,7 @@ class ConversationManagementService:
             >>> count = await service.cleanup_old_conversations(max_age_hours=24)
             >>> print(f"Очищено {count} старых conversations")
         """
-        count = await self._repository.cleanup_old(max_age_hours=max_age_hours)
+        count = await self._get_repository().cleanup_old(max_age_hours=max_age_hours)
         
         logger.info(
             f"Очищено {count} старых conversations (старше {max_age_hours} часов)"
@@ -443,7 +495,7 @@ class ConversationManagementService:
         # 1. Создать snapshot текущего состояния
         snapshot_id = f"{conversation_id}_snapshot_{subtask_id}"
         snapshot = self._snapshot_service.create_snapshot(conversation)
-        await self._repository.save_snapshot(snapshot_id, snapshot)
+        await self._get_repository().save_snapshot(snapshot_id, snapshot)
         
         logger.info(
             f"Created snapshot {snapshot_id} "
@@ -473,7 +525,7 @@ class ConversationManagementService:
             )
         
         # Сохранить изменения
-        await self._repository.save(conversation)
+        await self._get_repository().save(conversation)
         
         logger.info(
             f"Subtask context created for {subtask_id} "
@@ -511,7 +563,7 @@ class ConversationManagementService:
             ... )
         """
         conversation = await self.get_conversation(conversation_id)
-        snapshot = await self._repository.get_snapshot(snapshot_id)
+        snapshot = await self._get_repository().get_snapshot(snapshot_id)
         
         if not snapshot:
             logger.warning(
@@ -546,10 +598,10 @@ class ConversationManagementService:
             )
         
         # 4. Сохранить изменения
-        await self._repository.save(conversation)
+        await self._get_repository().save(conversation)
         
         # 5. Удалить snapshot
-        await self._repository.delete_snapshot(snapshot_id)
+        await self._get_repository().delete_snapshot(snapshot_id)
         
         logger.info(
             f"Conversation {conversation_id} restored and snapshot {snapshot_id} deleted "
@@ -606,7 +658,7 @@ class ConversationManagementService:
         )
         
         # Сохранить изменения
-        await self._repository.save(conversation)
+        await self._get_repository().save(conversation)
         
         logger.info(
             f"Agent switch context prepared for conversation {conversation_id}: "

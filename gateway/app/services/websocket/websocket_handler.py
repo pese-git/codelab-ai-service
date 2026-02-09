@@ -47,7 +47,8 @@ class WebSocketHandler:
     async def handle_connection(
         self,
         websocket: WebSocket,
-        session_id: str
+        session_id: str,
+        is_temp_session: bool = False
     ) -> None:
         """
         Обрабатывает WebSocket соединение.
@@ -58,44 +59,61 @@ class WebSocketHandler:
         3. Gateway пересылает в Agent через HTTP streaming (SSE)
         4. Agent отправляет SSE события
         5. Gateway пересылает SSE события в IDE через WebSocket
+        6. Для новых сессий Agent отправляет session_info с реальным session_id
         
         Args:
             websocket: WebSocket соединение
-            session_id: ID сессии
+            session_id: ID сессии (может быть временным new_*)
+            is_temp_session: True если session_id временный
         """
         await websocket.accept()
-        logger.info(f"[{session_id}] WebSocket connected")
+        logger.info(f"[{session_id}] WebSocket connected (temp={is_temp_session})")
+        
+        # Храним реальный session_id после получения session_info
+        actual_session_id = session_id
         
         try:
             async with httpx.AsyncClient(timeout=self._stream_timeout) as client:
                 while True:
                     # Получаем сообщение от IDE
                     raw_msg = await websocket.receive_text()
-                    logger.debug(f"[{session_id}] Received WS message: {raw_msg!r}")
+                    logger.debug(f"[{actual_session_id}] Received WS message: {raw_msg!r}")
                     
                     # Парсим и валидируем сообщение
                     try:
                         message = self._parser.parse(raw_msg)
-                        self._log_message(session_id, message)
+                        self._log_message(actual_session_id, message)
                     except ValueError as e:
-                        logger.error(f"[{session_id}] Failed to parse message: {e}")
-                        logger.error(f"[{session_id}] Raw message was: {raw_msg!r}")
+                        logger.error(f"[{actual_session_id}] Failed to parse message: {e}")
+                        logger.error(f"[{actual_session_id}] Raw message was: {raw_msg!r}")
                         await self._send_error(websocket, str(e))
                         continue
                     
                     # Пересылаем в Agent Runtime
-                    await self._forward_to_agent(
+                    # Для временных сессий передаем is_temp_session=True
+                    new_session_id = await self._forward_to_agent(
                         client,
                         websocket,
-                        session_id,
+                        actual_session_id,
                         message,
-                        raw_msg
+                        raw_msg,
+                        is_temp_session
                     )
+                    
+                    # Если получили новый session_id от Agent Runtime, обновляем
+                    if new_session_id and new_session_id != actual_session_id:
+                        logger.info(
+                            f"[{actual_session_id}] Session ID updated: "
+                            f"{actual_session_id} -> {new_session_id}"
+                        )
+                        actual_session_id = new_session_id
+                        # После первого сообщения сессия больше не временная
+                        is_temp_session = False
         
         except WebSocketDisconnect:
-            logger.info(f"[{session_id}] WebSocket disconnected")
+            logger.info(f"[{actual_session_id}] WebSocket disconnected")
         except Exception as e:
-            logger.error(f"[{session_id}] WS fatal error: {e}", exc_info=True)
+            logger.error(f"[{actual_session_id}] WS fatal error: {e}", exc_info=True)
     
     def _log_message(self, session_id: str, message: WSMessage) -> None:
         """
@@ -137,17 +155,22 @@ class WebSocketHandler:
         websocket: WebSocket,
         session_id: str,
         message: WSMessage,
-        raw_msg: str
-    ) -> None:
+        raw_msg: str,
+        is_temp_session: bool = False
+    ) -> str | None:
         """
         Пересылает сообщение в Agent Runtime через HTTP streaming.
         
         Args:
             client: HTTP клиент
             websocket: WebSocket соединение
-            session_id: ID сессии
+            session_id: ID сессии (может быть временным)
             message: Валидированное сообщение
             raw_msg: Сырое JSON сообщение (для отправки в Agent)
+            is_temp_session: True если session_id временный
+            
+        Returns:
+            Новый session_id если получен от Agent Runtime, иначе None
         """
         try:
             logger.debug(f"[{session_id}] Forwarding to Agent via HTTP streaming")
@@ -156,10 +179,21 @@ class WebSocketHandler:
             import json
             ide_msg = json.loads(raw_msg)
             
+            # Формируем payload для Agent Runtime
+            # Для временных сессий НЕ передаем session_id
+            if is_temp_session:
+                payload = {"message": ide_msg}
+                logger.info(
+                    f"[{session_id}] Temporary session - NOT sending session_id to Agent Runtime"
+                )
+            else:
+                payload = {"session_id": session_id, "message": ide_msg}
+                logger.debug(f"[{session_id}] Sending session_id to Agent Runtime")
+            
             async with client.stream(
                 "POST",
                 f"{self._agent_runtime_url}/agent/message/stream",
-                json={"session_id": session_id, "message": ide_msg},
+                json=payload,
                 headers={"X-Internal-Auth": self._internal_api_key},
             ) as response:
                 response.raise_for_status()
@@ -169,11 +203,14 @@ class WebSocketHandler:
                 )
                 
                 # Читаем SSE stream от Agent и пересылаем в IDE
-                await self._sse_handler.process_stream(
+                # SSEStreamHandler вернет новый session_id если получит session_info
+                new_session_id = await self._sse_handler.process_stream(
                     response,
                     websocket,
                     session_id
                 )
+                
+                return new_session_id
         
         except httpx.HTTPStatusError as e:
             # Для streaming response нужно прочитать содержимое перед доступом к .text
@@ -195,6 +232,7 @@ class WebSocketHandler:
                 websocket,
                 f"Agent error: {e.response.status_code}"
             )
+            return None
         
         except Exception as e:
             logger.error(
@@ -205,6 +243,7 @@ class WebSocketHandler:
                 websocket,
                 f"Streaming error: {str(e)}"
             )
+            return None
     
     async def _send_error(self, websocket: WebSocket, message: str) -> None:
         """

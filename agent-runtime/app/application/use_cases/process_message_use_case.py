@@ -85,13 +85,15 @@ class ProcessMessageUseCase(StreamingUseCase[ProcessMessageRequest, StreamChunk]
     
     async def execute(
         self,
-        request: ProcessMessageRequest
+        request: ProcessMessageRequest,
+        uow=None  # Optional[SSEUnitOfWork]
     ) -> AsyncGenerator[StreamChunk, None]:
         """
         Выполнить обработку сообщения.
         
         Args:
             request: Запрос с параметрами обработки
+            uow: Unit of Work для управления транзакциями (опционально)
             
         Yields:
             StreamChunk: Чанки для SSE streaming
@@ -118,7 +120,8 @@ class ProcessMessageUseCase(StreamingUseCase[ProcessMessageRequest, StreamChunk]
                 async for chunk in self._message_processor.process(
                     session_id=request.session_id,
                     message=request.message,
-                    agent_type=request.agent_type
+                    agent_type=request.agent_type,
+                    uow=uow  # ✅ Передать UoW в domain service
                 ):
                     yield chunk
                     

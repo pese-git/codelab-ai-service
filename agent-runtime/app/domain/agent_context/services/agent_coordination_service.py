@@ -54,23 +54,37 @@ class AgentCoordinationService:
     
     def __init__(
         self,
-        repository: AgentRepository,
-        event_publisher=None
+        repository: AgentRepository = None,
+        event_publisher=None,
+        uow=None  # Optional[SSEUnitOfWork]
     ):
         """
         Инициализация сервиса.
         
         Args:
-            repository: Repository для работы с агентами
+            repository: Repository для работы с агентами (deprecated, используйте uow)
             event_publisher: Функция для публикации событий (опционально)
+            uow: Unit of Work для доступа к репозиториям (рекомендуется)
         """
         self._repository = repository
+        self._uow = uow
         self._event_publisher = event_publisher
+    
+    def _get_repository(self) -> AgentRepository:
+        """Получить repository из UoW или использовать переданный."""
+        if self._uow:
+            return self._uow.agents
+        if self._repository:
+            return self._repository
+        raise RuntimeError(
+            "AgentCoordinationService requires either uow or repository"
+        )
     
     async def get_or_create_agent(
         self,
         session_id: str,
-        initial_type: AgentType = AgentType.ORCHESTRATOR
+        initial_type: AgentType = AgentType.ORCHESTRATOR,
+        uow=None  # Optional[SSEUnitOfWork]
     ) -> Agent:
         """
         Получить существующего агента или создать нового.
@@ -78,17 +92,21 @@ class AgentCoordinationService:
         Args:
             session_id: ID сессии
             initial_type: Начальный тип агента для новых агентов
+            uow: Unit of Work для доступа к репозиториям (опционально)
             
         Returns:
             Agent
             
         Пример:
-            >>> agent = await service.get_or_create_agent("session-1")
+            >>> agent = await service.get_or_create_agent("session-1", uow=uow)
             >>> agent.current_type
             <AgentType.ORCHESTRATOR: 'orchestrator'>
         """
+        # Получить repository (из UoW если передан, иначе из self)
+        repo = uow.agents if uow else self._get_repository()
+        
         # Попытаться найти существующего агента
-        agent = await self._repository.find_by_session_id(session_id)
+        agent = await repo.find_by_session_id(session_id)
         
         if agent:
             logger.debug(f"Найден существующий агент для сессии {session_id}")
@@ -102,7 +120,7 @@ class AgentCoordinationService:
         )
         
         # Сохранить
-        await self._repository.save(agent)
+        await repo.save(agent)
         
         logger.info(
             f"Создан новый агент для сессии {session_id} "

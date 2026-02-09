@@ -159,8 +159,11 @@ class ConversationMapper:
                 last_activity=entity.last_activity,
                 is_active=entity.is_active
             )
+            logger.debug(f"[MAPPER] Adding new SessionModel to session: {entity.conversation_id.value}")
             db.add(model)
-            await db.flush()  # Получить ID
+            logger.debug(f"[MAPPER] Model added, calling flush...")
+            await db.flush()
+            logger.debug(f"[MAPPER] Flush completed for {entity.conversation_id.value}")
             logger.debug(f"Created new SessionModel for {entity.conversation_id.value}")
         else:
             # Обновить существующую модель
@@ -168,6 +171,7 @@ class ConversationMapper:
             model.description = entity.description
             model.last_activity = entity.last_activity
             model.is_active = entity.is_active
+            await db.flush()  # ✅ Flush чтобы изменения попали в БД перед созданием связанных объектов
             logger.debug(f"Updated SessionModel for {entity.conversation_id.value}")
         
         # Сохранить сообщения (атомарная замена)
@@ -197,5 +201,7 @@ class ConversationMapper:
             )
             db.add(msg_model)
         
-        logger.debug(f"Added {message_count} message models to session")
+        # ✅ Flush чтобы сообщения попали в сессию перед commit
+        await db.flush()
+        logger.debug(f"Added {message_count} message models to session and flushed")
         return model

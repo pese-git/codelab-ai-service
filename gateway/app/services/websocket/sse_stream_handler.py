@@ -21,7 +21,7 @@ class SSEStreamHandler:
         response: httpx.Response,
         websocket: WebSocket,
         session_id: str
-    ) -> None:
+    ) -> str | None:
         """
         Читает SSE stream и пересылает события в WebSocket.
         
@@ -29,15 +29,22 @@ class SSEStreamHandler:
         event: message
         data: {"type": "assistant_message", ...}
         
+        event: message
+        data: {"type": "session_info", "session_id": "abc-123"}
+        
         event: done
         data: {"status": "completed"}
         
         Args:
             response: HTTP streaming response от Agent Runtime
             websocket: WebSocket соединение с IDE
-            session_id: ID сессии (для логирования)
+            session_id: ID сессии (для логирования, может быть временным)
+            
+        Returns:
+            Новый session_id если получен session_info чанк, иначе None
         """
         current_event_type = None
+        new_session_id = None
         
         async for line in response.aiter_lines():
             # Пустая строка - разделитель SSE событий
@@ -67,12 +74,18 @@ class SSEStreamHandler:
                     break
                 
                 # Парсим и пересылаем JSON данные
-                await self._forward_data(
+                # Может вернуть session_id если это session_info чанк
+                session_info_id = await self._forward_data(
                     data_str,
                     current_event_type,
                     websocket,
                     session_id
                 )
+                
+                # Сохраняем новый session_id если получили
+                if session_info_id:
+                    new_session_id = session_info_id
+                
                 continue
             
             # SSE комментарий (heartbeat), игнорируем
@@ -84,6 +97,7 @@ class SSEStreamHandler:
             logger.debug(f"[{session_id}] Ignoring unknown SSE line: {line}")
         
         logger.info(f"[{session_id}] Agent streaming completed successfully")
+        return new_session_id
     
     async def _forward_data(
         self,
@@ -91,7 +105,7 @@ class SSEStreamHandler:
         event_type: str,
         websocket: WebSocket,
         session_id: str
-    ) -> None:
+    ) -> str | None:
         """
         Парсит и пересылает данные в WebSocket.
         
@@ -99,7 +113,10 @@ class SSEStreamHandler:
             data_str: JSON строка с данными
             event_type: Тип SSE события
             websocket: WebSocket соединение
-            session_id: ID сессии (для логирования)
+            session_id: ID сессии (для логирования, может быть временным)
+            
+        Returns:
+            session_id если это session_info чанк, иначе None
         """
         try:
             data = json.loads(data_str)
@@ -107,6 +124,20 @@ class SSEStreamHandler:
             
             # Фильтруем null значения, чтобы не отправлять лишние поля
             filtered_data = {k: v for k, v in data.items() if v is not None}
+            
+            # Обрабатываем session_info чанк
+            if msg_type == "session_info":
+                new_session_id = data.get('session_id')
+                logger.info(
+                    f"[{session_id}] 🆔 Received session_info chunk: "
+                    f"session_id={new_session_id}"
+                )
+                
+                # Пересылаем session_info в IDE
+                await websocket.send_json(filtered_data)
+                
+                # Возвращаем новый session_id
+                return new_session_id
             
             # Логируем plan_approval_required для отладки
             if msg_type == "plan_approval_required":
@@ -127,8 +158,11 @@ class SSEStreamHandler:
             # Пересылаем событие в IDE через WebSocket
             await websocket.send_json(filtered_data)
             
+            return None
+            
         except json.JSONDecodeError as e:
             logger.warning(
                 f"[{session_id}] Failed to parse SSE data for event "
                 f"'{event_type}': {e}"
             )
+            return None

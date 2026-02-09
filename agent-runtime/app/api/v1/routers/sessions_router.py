@@ -61,63 +61,67 @@ async def get_list_sessions_handler(
 
 # ==================== Endpoints ====================
 
-@router.post("", response_model=CreateSessionResponse, status_code=201)
-async def create_session(
-    request: CreateSessionRequest = Body(default=CreateSessionRequest()),
-    handler: CreateSessionHandler = Depends(get_create_session_handler)
-) -> CreateSessionResponse:
-    """
-    Создать новую сессию.
-    
-    Args:
-        request: Запрос на создание сессии
-        handler: Command handler (инжектируется)
-        
-    Returns:
-        CreateSessionResponse: Информация о созданной сессии
-        
-    Raises:
-        HTTPException 409: Если сессия с таким ID уже существует
-        HTTPException 500: При внутренней ошибке
-        
-    Пример запроса:
-        POST /sessions
-        {
-            "session_id": "session-123"
-        }
-        
-    Пример ответа:
-        {
-            "id": "session-123",
-            "created_at": "2026-01-18T21:00:00Z",
-            "is_active": true,
-            "current_agent": "orchestrator"
-        }
-    """
-    try:
-        # Создать команду
-        command = CreateSessionCommand(session_id=request.session_id)
-        
-        # Выполнить через handler
-        session_dto = await handler.handle(command)
-        
-        logger.info(f"Created new session: {session_dto.id}")
-        
-        # Вернуть ответ в формате совместимом с Gateway
-        return CreateSessionResponse(
-            id=session_dto.id,
-            message_count=0,  # Новая сессия всегда имеет 0 сообщений
-            created_at=session_dto.created_at,
-            is_active=session_dto.is_active,
-            current_agent="orchestrator"  # Новые сессии всегда начинают с orchestrator
-        )
-        
-    except SessionAlreadyExistsError as e:
-        logger.warning(f"Session already exists: {e.message}")
-        raise HTTPException(status_code=409, detail=e.message)
-    except Exception as e:
-        logger.error(f"Error creating session: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
+# ❌ DEPRECATED: Сессии теперь создаются автоматически в /agent/message/stream
+# Используйте POST /agent/message/stream без session_id для создания новой сессии
+# @router.post("", response_model=CreateSessionResponse, status_code=201)
+# async def create_session(
+#     request: CreateSessionRequest = Body(default=CreateSessionRequest()),
+#     handler: CreateSessionHandler = Depends(get_create_session_handler)
+# ) -> CreateSessionResponse:
+#     """
+#     DEPRECATED: Используйте /agent/message/stream без session_id для создания новой сессии.
+#
+#     Создать новую сессию.
+#
+#     Args:
+#         request: Запрос на создание сессии
+#         handler: Command handler (инжектируется)
+#
+#     Returns:
+#         CreateSessionResponse: Информация о созданной сессии
+#
+#     Raises:
+#         HTTPException 409: Если сессия с таким ID уже существует
+#         HTTPException 500: При внутренней ошибке
+#
+#     Пример запроса:
+#         POST /sessions
+#         {
+#             "session_id": "session-123"
+#         }
+#
+#     Пример ответа:
+#         {
+#             "id": "session-123",
+#             "created_at": "2026-01-18T21:00:00Z",
+#             "is_active": true,
+#             "current_agent": "orchestrator"
+#         }
+#     """
+#     try:
+#         # Создать команду
+#         command = CreateSessionCommand(session_id=request.session_id)
+#
+#         # Выполнить через handler
+#         session_dto = await handler.handle(command)
+#
+#         logger.info(f"Created new session: {session_dto.id}")
+#
+#         # Вернуть ответ в формате совместимом с Gateway
+#         return CreateSessionResponse(
+#             id=session_dto.id,
+#             message_count=0,  # Новая сессия всегда имеет 0 сообщений
+#             created_at=session_dto.created_at,
+#             is_active=session_dto.is_active,
+#             current_agent="orchestrator"  # Новые сессии всегда начинают с orchestrator
+#         )
+#
+#     except SessionAlreadyExistsError as e:
+#         logger.warning(f"Session already exists: {e.message}")
+#         raise HTTPException(status_code=409, detail=e.message)
+#     except Exception as e:
+#         logger.error(f"Error creating session: {e}", exc_info=True)
+#         raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/{session_id}", response_model=GetSessionResponse)

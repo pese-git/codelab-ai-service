@@ -29,6 +29,7 @@ class StreamChunk(BaseModel):
     """SSE event chunk for streaming responses"""
     
     type: Literal[
+        "session_info",  # For session information (new/existing session)
         "assistant_message",
         "tool_call",
         "error",
@@ -49,6 +50,9 @@ class StreamChunk(BaseModel):
     content: Optional[str] = Field(default=None, description="Text content for assistant messages")
     token: Optional[str] = Field(default=None, description="Single token for streaming")
     is_final: bool = Field(default=False, description="Whether this is the final chunk")
+    
+    # For session_info type
+    session_id: Optional[str] = Field(default=None, description="Session identifier (sent in first chunk)")
     
     # For tool_call type
     call_id: Optional[str] = Field(default=None, description="Tool call identifier")
