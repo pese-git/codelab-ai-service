@@ -28,16 +28,16 @@ class TestSubtask:
     def test_create_subtask(self):
         """Создание подзадачи."""
         subtask = Subtask(
-            id=SubtaskId("subtask-1"),
+            id=SubtaskId(value="subtask-1"),
             description="Test subtask",
-            agent_id=AgentId("coder"),
+            agent_id=AgentId(value="coder"),
             dependencies=[],
             metadata={}
         )
         
         assert subtask.id.value == "subtask-1"
         assert subtask.description == "Test subtask"
-        assert subtask.agent_id == AgentId("coder")
+        assert subtask.agent_id == AgentId(value="coder")
         assert subtask.status == SubtaskStatus.PENDING
         assert subtask.dependencies == []
         assert subtask.result is None
@@ -46,9 +46,9 @@ class TestSubtask:
     def test_start_subtask(self):
         """Запуск подзадачи."""
         subtask = Subtask(
-            id=SubtaskId("subtask-1"),
+            id=SubtaskId(value="subtask-1"),
             description="Test subtask",
-            agent_id=AgentId("coder"),
+            agent_id=AgentId(value="coder"),
             dependencies=[],
             metadata={}
         )
@@ -62,9 +62,9 @@ class TestSubtask:
     def test_complete_subtask(self):
         """Завершение подзадачи."""
         subtask = Subtask(
-            id=SubtaskId("subtask-1"),
+            id=SubtaskId(value="subtask-1"),
             description="Test subtask",
-            agent_id=AgentId("coder"),
+            agent_id=AgentId(value="coder"),
             dependencies=[],
             metadata={}
         )
@@ -80,9 +80,9 @@ class TestSubtask:
     def test_fail_subtask(self):
         """Провал подзадачи."""
         subtask = Subtask(
-            id=SubtaskId("subtask-1"),
+            id=SubtaskId(value="subtask-1"),
             description="Test subtask",
-            agent_id=AgentId("coder"),
+            agent_id=AgentId(value="coder"),
             dependencies=[],
             metadata={}
         )
@@ -98,9 +98,9 @@ class TestSubtask:
     def test_reset_to_pending(self):
         """Сброс подзадачи в PENDING (для retry)."""
         subtask = Subtask(
-            id=SubtaskId("subtask-1"),
+            id=SubtaskId(value="subtask-1"),
             description="Test subtask",
-            agent_id=AgentId("coder"),
+            agent_id=AgentId(value="coder"),
             dependencies=[],
             metadata={}
         )
@@ -117,9 +117,9 @@ class TestSubtask:
     def test_cannot_start_already_started_subtask(self):
         """Нельзя запустить уже запущенную подзадачу."""
         subtask = Subtask(
-            id=SubtaskId("subtask-1"),
+            id=SubtaskId(value="subtask-1"),
             description="Test subtask",
-            agent_id=AgentId("coder"),
+            agent_id=AgentId(value="coder"),
             dependencies=[],
             metadata={}
         )
@@ -132,9 +132,9 @@ class TestSubtask:
     def test_cannot_complete_pending_subtask(self):
         """Нельзя завершить подзадачу в статусе PENDING."""
         subtask = Subtask(
-            id=SubtaskId("subtask-1"),
+            id=SubtaskId(value="subtask-1"),
             description="Test subtask",
-            agent_id=AgentId("coder"),
+            agent_id=AgentId(value="coder"),
             dependencies=[],
             metadata={}
         )
@@ -144,13 +144,13 @@ class TestSubtask:
     
     def test_subtask_with_dependencies(self):
         """Подзадача с зависимостями."""
-        dep1 = SubtaskId("subtask-dep-1")
-        dep2 = SubtaskId("subtask-dep-2")
+        dep1 = SubtaskId(value="subtask-dep-1")
+        dep2 = SubtaskId(value="subtask-dep-2")
         
         subtask = Subtask(
-            id=SubtaskId("subtask-1"),
+            id=SubtaskId(value="subtask-1"),
             description="Test subtask",
-            agent_id=AgentId("coder"),
+            agent_id=AgentId(value="coder"),
             dependencies=[dep1, dep2],
             metadata={}
         )
@@ -166,8 +166,8 @@ class TestExecutionPlan:
     def test_create_execution_plan(self):
         """Создание плана выполнения."""
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("test-session"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="test-session"),
             goal="Complete the project",
             subtasks=[],
             metadata={}
@@ -182,14 +182,14 @@ class TestExecutionPlan:
     def test_start_plan(self):
         """Запуск плана."""
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("test-session"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="test-session"),
             goal="Complete the project",
             subtasks=[
                 Subtask(
-                    id=SubtaskId("subtask-1"),
+                    id=SubtaskId(value="subtask-1"),
                     description="Task 1",
-                    agent_id=AgentId("coder")
+                    agent_id=AgentId(value="coder")
                 )
             ],
             metadata={}
@@ -205,14 +205,14 @@ class TestExecutionPlan:
     def test_complete_plan(self):
         """Завершение плана."""
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("test-session"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="test-session"),
             goal="Complete the project",
             subtasks=[
                 Subtask(
-                    id=SubtaskId("subtask-1"),
+                    id=SubtaskId(value="subtask-1"),
                     description="Task 1",
-                    agent_id=AgentId("coder")
+                    agent_id=AgentId(value="coder")
                 )
             ],
             metadata={}
@@ -229,8 +229,8 @@ class TestExecutionPlan:
     def test_fail_plan(self):
         """Провал плана."""
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("test-session"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="test-session"),
             goal="Complete the project",
             subtasks=[],
             metadata={}
@@ -246,8 +246,8 @@ class TestExecutionPlan:
     def test_cancel_plan(self):
         """Отмена плана."""
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("test-session"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="test-session"),
             goal="Complete the project",
             subtasks=[],
             metadata={}
@@ -262,17 +262,17 @@ class TestExecutionPlan:
     def test_add_subtask(self):
         """Добавление подзадачи в план."""
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("test-session"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="test-session"),
             goal="Complete the project",
             subtasks=[],
             metadata={}
         )
         
         subtask = Subtask(
-            id=SubtaskId("subtask-1"),
+            id=SubtaskId(value="subtask-1"),
             description="Test subtask",
-            agent_id=AgentId("coder"),
+            agent_id=AgentId(value="coder"),
             dependencies=[],
             metadata={}
         )
@@ -285,78 +285,78 @@ class TestExecutionPlan:
     def test_get_subtask_by_id(self):
         """Получение подзадачи по ID."""
         subtask1 = Subtask(
-            id=SubtaskId("subtask-1"),
+            id=SubtaskId(value="subtask-1"),
             description="Test subtask 1",
-            agent_id=AgentId("coder"),
+            agent_id=AgentId(value="coder"),
             dependencies=[],
             metadata={}
         )
         
         subtask2 = Subtask(
-            id=SubtaskId("subtask-2"),
+            id=SubtaskId(value="subtask-2"),
             description="Test subtask 2",
-            agent_id=AgentId("architect"),
+            agent_id=AgentId(value="architect"),
             dependencies=[],
             metadata={}
         )
         
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("test-session"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="test-session"),
             goal="Complete the project",
             subtasks=[subtask1, subtask2],
             metadata={}
         )
         
-        found = plan.get_subtask_by_id(SubtaskId("subtask-2"))
+        found = plan.get_subtask_by_id(SubtaskId(value="subtask-2"))
         
         assert found is not None
         assert found.id.value == "subtask-2"
-        assert found.agent_id == AgentId("architect")
+        assert found.agent_id == AgentId(value="architect")
     
     def test_get_subtask_by_id_not_found(self):
         """Получение несуществующей подзадачи возвращает None."""
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("test-session"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="test-session"),
             goal="Complete the project",
             subtasks=[],
             metadata={}
         )
         
-        found = plan.get_subtask_by_id(SubtaskId("nonexistent"))
+        found = plan.get_subtask_by_id(SubtaskId(value="nonexistent"))
         
         assert found is None
     
     def test_plan_with_multiple_subtasks(self):
         """План с несколькими подзадачами."""
         subtask1 = Subtask(
-            id=SubtaskId("subtask-1"),
+            id=SubtaskId(value="subtask-1"),
             description="Task 1",
-            agent_id=AgentId("coder"),
+            agent_id=AgentId(value="coder"),
             dependencies=[],
             metadata={}
         )
         
         subtask2 = Subtask(
-            id=SubtaskId("subtask-2"),
+            id=SubtaskId(value="subtask-2"),
             description="Task 2",
-            agent_id=AgentId("architect"),
-            dependencies=[SubtaskId("subtask-1")],
+            agent_id=AgentId(value="architect"),
+            dependencies=[SubtaskId(value="subtask-1")],
             metadata={}
         )
         
         subtask3 = Subtask(
-            id=SubtaskId("subtask-3"),
+            id=SubtaskId(value="subtask-3"),
             description="Task 3",
-            agent_id=AgentId("coder"),
-            dependencies=[SubtaskId("subtask-2")],
+            agent_id=AgentId(value="coder"),
+            dependencies=[SubtaskId(value="subtask-2")],
             metadata={}
         )
         
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("test-session"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="test-session"),
             goal="Complete the project",
             subtasks=[subtask1, subtask2, subtask3],
             metadata={}
@@ -369,8 +369,8 @@ class TestExecutionPlan:
     def test_domain_events_are_collected(self):
         """Domain Events собираются в плане."""
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("test-session"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="test-session"),
             goal="Complete the project",
             subtasks=[],
             metadata={}
@@ -398,8 +398,8 @@ class TestExecutionPlan:
     def test_clear_domain_events(self):
         """Очистка Domain Events."""
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("test-session"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="test-session"),
             goal="Complete the project",
             subtasks=[],
             metadata={}
@@ -428,24 +428,24 @@ class TestExecutionPlanLifecycle:
         """Полный жизненный цикл плана."""
         # Создать план с подзадачами
         subtask1 = Subtask(
-            id=SubtaskId("subtask-1"),
+            id=SubtaskId(value="subtask-1"),
             description="Task 1",
-            agent_id=AgentId("coder"),
+            agent_id=AgentId(value="coder"),
             dependencies=[],
             metadata={}
         )
         
         subtask2 = Subtask(
-            id=SubtaskId("subtask-2"),
+            id=SubtaskId(value="subtask-2"),
             description="Task 2",
-            agent_id=AgentId("coder"),
-            dependencies=[SubtaskId("subtask-1")],
+            agent_id=AgentId(value="coder"),
+            dependencies=[SubtaskId(value="subtask-1")],
             metadata={}
         )
         
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("test-session"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="test-session"),
             goal="Complete the project",
             subtasks=[subtask1, subtask2],
             metadata={}
@@ -475,16 +475,16 @@ class TestExecutionPlanLifecycle:
     def test_plan_lifecycle_with_subtask_failure(self):
         """Жизненный цикл плана с провалом подзадачи."""
         subtask = Subtask(
-            id=SubtaskId("subtask-1"),
+            id=SubtaskId(value="subtask-1"),
             description="Task 1",
-            agent_id=AgentId("coder"),
+            agent_id=AgentId(value="coder"),
             dependencies=[],
             metadata={}
         )
         
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("test-session"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="test-session"),
             goal="Complete the project",
             subtasks=[subtask],
             metadata={}

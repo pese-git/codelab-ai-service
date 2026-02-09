@@ -8,7 +8,7 @@
 
 from datetime import datetime, timezone
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class Entity(BaseModel):
@@ -48,12 +48,9 @@ class Entity(BaseModel):
         description="Время последнего обновления сущности (UTC)"
     )
     
-    class Config:
-        """Конфигурация Pydantic модели"""
-        arbitrary_types_allowed = True
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+    )
     
     def mark_updated(self) -> None:
         """

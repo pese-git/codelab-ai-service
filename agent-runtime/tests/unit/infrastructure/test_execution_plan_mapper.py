@@ -52,7 +52,7 @@ def mock_db():
 def sample_subtask():
     """Создать тестовую подзадачу."""
     return Subtask(
-        id=SubtaskId("subtask-1"),
+        id=SubtaskId(value="subtask-1"),
         description="Test subtask",
         agent_id=AgentId(value="coder"),
         dependencies=[],
@@ -65,8 +65,8 @@ def sample_subtask():
 def sample_execution_plan(sample_subtask):
     """Создать тестовый ExecutionPlan."""
     plan = ExecutionPlan(
-        id=PlanId("plan-1"),
-        conversation_id=ConversationId("conv-1"),
+        id=PlanId(value="plan-1"),
+        conversation_id=ConversationId(value="conv-1"),
         goal="Test goal",
         subtasks=[sample_subtask],
         status=PlanStatus.draft(),
@@ -139,8 +139,8 @@ class TestExecutionPlanMapper:
         # Arrange
         now = datetime.now(timezone.utc)
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("conv-1"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="conv-1"),
             goal="Test goal",
             status=PlanStatus.in_progress(),
             approved_at=now,
@@ -161,12 +161,12 @@ class TestExecutionPlanMapper:
         """Тест преобразования entity с current_subtask_id."""
         # Arrange
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("conv-1"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="conv-1"),
             goal="Test goal",
             subtasks=[sample_subtask],
             status=PlanStatus.in_progress(),
-            current_subtask_id=SubtaskId("subtask-1")
+            current_subtask_id=SubtaskId(value="subtask-1")
         )
         
         # Act
@@ -180,20 +180,20 @@ class TestExecutionPlanMapper:
         """Тест преобразования entity с несколькими подзадачами."""
         # Arrange
         subtask1 = Subtask(
-            id=SubtaskId("st-1"),
+            id=SubtaskId(value="st-1"),
             description="Subtask 1",
             agent_id=AgentId(value="coder")
         )
         subtask2 = Subtask(
-            id=SubtaskId("st-2"),
+            id=SubtaskId(value="st-2"),
             description="Subtask 2",
             agent_id=AgentId(value="debug"),
-            dependencies=[SubtaskId("st-1")]
+            dependencies=[SubtaskId(value="st-1")]
         )
         
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("conv-1"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="conv-1"),
             goal="Test goal",
             subtasks=[subtask1, subtask2]
         )
@@ -420,7 +420,7 @@ class TestExecutionPlanMapper:
             # Arrange
             plan = ExecutionPlan(
                 id=PlanId(f"plan-{status_str}"),
-                conversation_id=ConversationId("conv-1"),
+                conversation_id=ConversationId(value="conv-1"),
                 goal="Test goal",
                 status=status_obj
             )

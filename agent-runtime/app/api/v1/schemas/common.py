@@ -12,7 +12,7 @@ Note: Message is imported from domain.entities.message (full domain model)
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional, TYPE_CHECKING
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 if TYPE_CHECKING:
     from ....domain.entities.message import Message

@@ -26,21 +26,21 @@ class TestDependencyResolver:
     def test_get_ready_subtasks_no_dependencies(self):
         """Получить готовые подзадачи без зависимостей."""
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("session-1"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="session-1"),
             goal="Test goal",
             subtasks=[
                 Subtask(
-                    id=SubtaskId("subtask-1"),
+                    id=SubtaskId(value="subtask-1"),
                     description="Task 1",
-                    agent_id=AgentId("coder"),
+                    agent_id=AgentId(value="coder"),
                     dependencies=[],
                     status=SubtaskStatus.PENDING
                 ),
                 Subtask(
-                    id=SubtaskId("subtask-2"),
+                    id=SubtaskId(value="subtask-2"),
                     description="Task 2",
-                    agent_id=AgentId("coder"),
+                    agent_id=AgentId(value="coder"),
                     dependencies=[],
                     status=SubtaskStatus.PENDING
                 )
@@ -57,29 +57,29 @@ class TestDependencyResolver:
     def test_get_ready_subtasks_with_dependencies(self):
         """Получить готовые подзадачи с зависимостями."""
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("session-1"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="session-1"),
             goal="Test goal",
             subtasks=[
                 Subtask(
-                    id=SubtaskId("subtask-1"),
+                    id=SubtaskId(value="subtask-1"),
                     description="Task 1",
-                    agent_id=AgentId("coder"),
+                    agent_id=AgentId(value="coder"),
                     dependencies=[],
                     status=SubtaskStatus.DONE
                 ),
                 Subtask(
-                    id=SubtaskId("subtask-2"),
+                    id=SubtaskId(value="subtask-2"),
                     description="Task 2",
-                    agent_id=AgentId("coder"),
-                    dependencies=[SubtaskId("subtask-1")],
+                    agent_id=AgentId(value="coder"),
+                    dependencies=[SubtaskId(value="subtask-1")],
                     status=SubtaskStatus.PENDING
                 ),
                 Subtask(
-                    id=SubtaskId("subtask-3"),
+                    id=SubtaskId(value="subtask-3"),
                     description="Task 3",
-                    agent_id=AgentId("coder"),
-                    dependencies=[SubtaskId("subtask-2")],
+                    agent_id=AgentId(value="coder"),
+                    dependencies=[SubtaskId(value="subtask-2")],
                     status=SubtaskStatus.PENDING
                 )
             ]
@@ -95,21 +95,21 @@ class TestDependencyResolver:
     def test_get_ready_subtasks_skip_running(self):
         """Пропустить уже выполняющиеся подзадачи."""
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("session-1"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="session-1"),
             goal="Test goal",
             subtasks=[
                 Subtask(
-                    id=SubtaskId("subtask-1"),
+                    id=SubtaskId(value="subtask-1"),
                     description="Task 1",
-                    agent_id=AgentId("coder"),
+                    agent_id=AgentId(value="coder"),
                     dependencies=[],
                     status=SubtaskStatus.RUNNING
                 ),
                 Subtask(
-                    id=SubtaskId("subtask-2"),
+                    id=SubtaskId(value="subtask-2"),
                     description="Task 2",
-                    agent_id=AgentId("coder"),
+                    agent_id=AgentId(value="coder"),
                     dependencies=[],
                     status=SubtaskStatus.PENDING
                 )
@@ -126,22 +126,22 @@ class TestDependencyResolver:
     def test_get_ready_subtasks_blocked_by_failed(self):
         """Заблокированные подзадачи из-за failed зависимости."""
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("session-1"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="session-1"),
             goal="Test goal",
             subtasks=[
                 Subtask(
-                    id=SubtaskId("subtask-1"),
+                    id=SubtaskId(value="subtask-1"),
                     description="Task 1",
-                    agent_id=AgentId("coder"),
+                    agent_id=AgentId(value="coder"),
                     dependencies=[],
                     status=SubtaskStatus.FAILED
                 ),
                 Subtask(
-                    id=SubtaskId("subtask-2"),
+                    id=SubtaskId(value="subtask-2"),
                     description="Task 2",
-                    agent_id=AgentId("coder"),
-                    dependencies=[SubtaskId("subtask-1")],
+                    agent_id=AgentId(value="coder"),
+                    dependencies=[SubtaskId(value="subtask-1")],
                     status=SubtaskStatus.PENDING
                 )
             ]
@@ -156,27 +156,27 @@ class TestDependencyResolver:
     def test_has_cyclic_dependencies_no_cycle(self):
         """Проверка отсутствия циклических зависимостей."""
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("session-1"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="session-1"),
             goal="Test goal",
             subtasks=[
                 Subtask(
-                    id=SubtaskId("subtask-1"),
+                    id=SubtaskId(value="subtask-1"),
                     description="Task 1",
-                    agent_id=AgentId("coder"),
+                    agent_id=AgentId(value="coder"),
                     dependencies=[]
                 ),
                 Subtask(
-                    id=SubtaskId("subtask-2"),
+                    id=SubtaskId(value="subtask-2"),
                     description="Task 2",
-                    agent_id=AgentId("coder"),
-                    dependencies=[SubtaskId("subtask-1")]
+                    agent_id=AgentId(value="coder"),
+                    dependencies=[SubtaskId(value="subtask-1")]
                 ),
                 Subtask(
-                    id=SubtaskId("subtask-3"),
+                    id=SubtaskId(value="subtask-3"),
                     description="Task 3",
-                    agent_id=AgentId("coder"),
-                    dependencies=[SubtaskId("subtask-2")]
+                    agent_id=AgentId(value="coder"),
+                    dependencies=[SubtaskId(value="subtask-2")]
                 )
             ]
         )
@@ -189,27 +189,27 @@ class TestDependencyResolver:
     def test_has_cyclic_dependencies_with_cycle(self):
         """Проверка наличия циклических зависимостей."""
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("session-1"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="session-1"),
             goal="Test goal",
             subtasks=[
                 Subtask(
-                    id=SubtaskId("subtask-1"),
+                    id=SubtaskId(value="subtask-1"),
                     description="Task 1",
-                    agent_id=AgentId("coder"),
-                    dependencies=[SubtaskId("subtask-3")]
+                    agent_id=AgentId(value="coder"),
+                    dependencies=[SubtaskId(value="subtask-3")]
                 ),
                 Subtask(
-                    id=SubtaskId("subtask-2"),
+                    id=SubtaskId(value="subtask-2"),
                     description="Task 2",
-                    agent_id=AgentId("coder"),
-                    dependencies=[SubtaskId("subtask-1")]
+                    agent_id=AgentId(value="coder"),
+                    dependencies=[SubtaskId(value="subtask-1")]
                 ),
                 Subtask(
-                    id=SubtaskId("subtask-3"),
+                    id=SubtaskId(value="subtask-3"),
                     description="Task 3",
-                    agent_id=AgentId("coder"),
-                    dependencies=[SubtaskId("subtask-2")]
+                    agent_id=AgentId(value="coder"),
+                    dependencies=[SubtaskId(value="subtask-2")]
                 )
             ]
         )
@@ -222,15 +222,15 @@ class TestDependencyResolver:
     def test_has_cyclic_dependencies_self_reference(self):
         """Проверка самореференции."""
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("session-1"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="session-1"),
             goal="Test goal",
             subtasks=[
                 Subtask(
-                    id=SubtaskId("subtask-1"),
+                    id=SubtaskId(value="subtask-1"),
                     description="Task 1",
-                    agent_id=AgentId("coder"),
-                    dependencies=[SubtaskId("subtask-1")]
+                    agent_id=AgentId(value="coder"),
+                    dependencies=[SubtaskId(value="subtask-1")]
                 )
             ]
         )
@@ -243,21 +243,21 @@ class TestDependencyResolver:
     def test_validate_dependencies_success(self):
         """Валидация зависимостей - успех."""
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("session-1"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="session-1"),
             goal="Test goal",
             subtasks=[
                 Subtask(
-                    id=SubtaskId("subtask-1"),
+                    id=SubtaskId(value="subtask-1"),
                     description="Task 1",
-                    agent_id=AgentId("coder"),
+                    agent_id=AgentId(value="coder"),
                     dependencies=[]
                 ),
                 Subtask(
-                    id=SubtaskId("subtask-2"),
+                    id=SubtaskId(value="subtask-2"),
                     description="Task 2",
-                    agent_id=AgentId("coder"),
-                    dependencies=[SubtaskId("subtask-1")]
+                    agent_id=AgentId(value="coder"),
+                    dependencies=[SubtaskId(value="subtask-1")]
                 )
             ]
         )
@@ -270,15 +270,15 @@ class TestDependencyResolver:
     def test_validate_dependencies_missing_dependency(self):
         """Валидация зависимостей - отсутствующая зависимость."""
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("session-1"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="session-1"),
             goal="Test goal",
             subtasks=[
                 Subtask(
-                    id=SubtaskId("subtask-1"),
+                    id=SubtaskId(value="subtask-1"),
                     description="Task 1",
-                    agent_id=AgentId("coder"),
-                    dependencies=[SubtaskId("subtask-999")]  # Не существует
+                    agent_id=AgentId(value="coder"),
+                    dependencies=[SubtaskId(value="subtask-999")]  # Не существует
                 )
             ]
         )
@@ -293,21 +293,21 @@ class TestDependencyResolver:
     def test_validate_dependencies_cyclic(self):
         """Валидация зависимостей - циклические зависимости."""
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("session-1"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="session-1"),
             goal="Test goal",
             subtasks=[
                 Subtask(
-                    id=SubtaskId("subtask-1"),
+                    id=SubtaskId(value="subtask-1"),
                     description="Task 1",
-                    agent_id=AgentId("coder"),
-                    dependencies=[SubtaskId("subtask-2")]
+                    agent_id=AgentId(value="coder"),
+                    dependencies=[SubtaskId(value="subtask-2")]
                 ),
                 Subtask(
-                    id=SubtaskId("subtask-2"),
+                    id=SubtaskId(value="subtask-2"),
                     description="Task 2",
-                    agent_id=AgentId("coder"),
-                    dependencies=[SubtaskId("subtask-1")]
+                    agent_id=AgentId(value="coder"),
+                    dependencies=[SubtaskId(value="subtask-1")]
                 )
             ]
         )
@@ -322,43 +322,43 @@ class TestDependencyResolver:
     def test_get_ready_subtasks_complex_graph(self):
         """Получить готовые подзадачи в сложном графе зависимостей."""
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("session-1"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="session-1"),
             goal="Test goal",
             subtasks=[
                 Subtask(
-                    id=SubtaskId("subtask-1"),
+                    id=SubtaskId(value="subtask-1"),
                     description="Task 1",
-                    agent_id=AgentId("coder"),
+                    agent_id=AgentId(value="coder"),
                     dependencies=[],
                     status=SubtaskStatus.DONE
                 ),
                 Subtask(
-                    id=SubtaskId("subtask-2"),
+                    id=SubtaskId(value="subtask-2"),
                     description="Task 2",
-                    agent_id=AgentId("coder"),
+                    agent_id=AgentId(value="coder"),
                     dependencies=[],
                     status=SubtaskStatus.DONE
                 ),
                 Subtask(
-                    id=SubtaskId("subtask-3"),
+                    id=SubtaskId(value="subtask-3"),
                     description="Task 3",
-                    agent_id=AgentId("coder"),
-                    dependencies=[SubtaskId("subtask-1"), SubtaskId("subtask-2")],
+                    agent_id=AgentId(value="coder"),
+                    dependencies=[SubtaskId(value="subtask-1"), SubtaskId(value="subtask-2")],
                     status=SubtaskStatus.PENDING
                 ),
                 Subtask(
-                    id=SubtaskId("subtask-4"),
+                    id=SubtaskId(value="subtask-4"),
                     description="Task 4",
-                    agent_id=AgentId("coder"),
-                    dependencies=[SubtaskId("subtask-1")],
+                    agent_id=AgentId(value="coder"),
+                    dependencies=[SubtaskId(value="subtask-1")],
                     status=SubtaskStatus.PENDING
                 ),
                 Subtask(
-                    id=SubtaskId("subtask-5"),
+                    id=SubtaskId(value="subtask-5"),
                     description="Task 5",
-                    agent_id=AgentId("coder"),
-                    dependencies=[SubtaskId("subtask-3"), SubtaskId("subtask-4")],
+                    agent_id=AgentId(value="coder"),
+                    dependencies=[SubtaskId(value="subtask-3"), SubtaskId(value="subtask-4")],
                     status=SubtaskStatus.PENDING
                 )
             ]

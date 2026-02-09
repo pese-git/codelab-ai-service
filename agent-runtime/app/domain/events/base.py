@@ -10,7 +10,7 @@ import uuid
 from abc import ABC
 from datetime import datetime, timezone
 from typing import Any, Dict
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class DomainEvent(BaseModel, ABC):

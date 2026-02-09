@@ -92,7 +92,7 @@ class TestToolName:
     def test_repr(self):
         """Тест отладочного представления."""
         tool_name = ToolName.from_string("read_file")
-        assert repr(tool_name) == "ToolName('read_file')"
+        assert repr(tool_name) == "ToolName(value='read_file')"
 
 
 # ===== ToolCallId Tests =====

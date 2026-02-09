@@ -7,7 +7,7 @@ Command Handler обрабатывает команду и выполняет с
 
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 # Тип переменная для результата команды

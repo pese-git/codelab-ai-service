@@ -11,12 +11,12 @@ class TestConversationId:
     
     def test_create_valid_id(self):
         """Создание валидного ID"""
-        conv_id = ConversationId("conv-123")
+        conv_id = ConversationId(value="conv-123")
         assert conv_id.value == "conv-123"
     
     def test_create_with_alphanumeric(self):
         """ID с alphanumeric символами"""
-        conv_id = ConversationId("conv_123-abc")
+        conv_id = ConversationId(value="conv_123-abc")
         assert conv_id.value == "conv_123-abc"
     
     def test_generate_creates_valid_id(self):
@@ -34,7 +34,7 @@ class TestConversationId:
     def test_empty_id_raises_error(self):
         """Пустой ID вызывает ошибку"""
         with pytest.raises(ValueError, match="не может быть пустым"):
-            ConversationId("")
+            ConversationId(value="")
     
     def test_too_long_id_raises_error(self):
         """Слишком длинный ID вызывает ошибку"""
@@ -45,36 +45,36 @@ class TestConversationId:
     def test_invalid_characters_raise_error(self):
         """Недопустимые символы вызывают ошибку"""
         with pytest.raises(ValueError, match="может содержать только"):
-            ConversationId("conv@123")
+            ConversationId(value="conv@123")
     
     def test_equality(self):
         """Проверка равенства"""
-        id1 = ConversationId("conv-123")
-        id2 = ConversationId("conv-123")
+        id1 = ConversationId(value="conv-123")
+        id2 = ConversationId(value="conv-123")
         assert id1 == id2
     
     def test_inequality(self):
         """Проверка неравенства"""
-        id1 = ConversationId("conv-123")
-        id2 = ConversationId("conv-456")
+        id1 = ConversationId(value="conv-123")
+        id2 = ConversationId(value="conv-456")
         assert id1 != id2
     
     def test_hash_consistency(self):
         """Hash консистентен для одинаковых ID"""
-        id1 = ConversationId("conv-123")
-        id2 = ConversationId("conv-123")
+        id1 = ConversationId(value="conv-123")
+        id2 = ConversationId(value="conv-123")
         assert hash(id1) == hash(id2)
     
     def test_can_use_in_set(self):
         """Можно использовать в set"""
-        id1 = ConversationId("conv-123")
-        id2 = ConversationId("conv-123")
-        id3 = ConversationId("conv-456")
+        id1 = ConversationId(value="conv-123")
+        id2 = ConversationId(value="conv-123")
+        id3 = ConversationId(value="conv-456")
         
         id_set = {id1, id2, id3}
         assert len(id_set) == 2  # id1 и id2 одинаковые
     
     def test_repr(self):
         """Строковое представление"""
-        conv_id = ConversationId("conv-123")
+        conv_id = ConversationId(value="conv-123")
         assert "conv-123" in repr(conv_id)

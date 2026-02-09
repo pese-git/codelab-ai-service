@@ -65,7 +65,7 @@ def execution_plan_repository(db_session):
 def sample_subtask():
     """Создать тестовую подзадачу."""
     return Subtask(
-        id=SubtaskId("subtask-1"),
+        id=SubtaskId(value="subtask-1"),
         description="Test subtask",
         agent_id=AgentId(value="coder"),
         dependencies=[],
@@ -78,8 +78,8 @@ def sample_subtask():
 def sample_execution_plan(sample_subtask):
     """Создать тестовый ExecutionPlan."""
     plan = ExecutionPlan(
-        id=PlanId("plan-1"),
-        conversation_id=ConversationId("conv-1"),
+        id=PlanId(value="plan-1"),
+        conversation_id=ConversationId(value="conv-1"),
         goal="Test goal",
         subtasks=[sample_subtask],
         status=PlanStatus.draft(),
@@ -147,7 +147,7 @@ class TestExecutionPlanRepositoryImpl:
         found.goal = "Updated goal"
         
         new_subtask = Subtask(
-            id=SubtaskId("subtask-2"),
+            id=SubtaskId(value="subtask-2"),
             description="New subtask",
             agent_id=AgentId(value="debug")
         )
@@ -203,21 +203,21 @@ class TestExecutionPlanRepositoryImpl:
     ):
         """Тест поиска планов по conversation_id."""
         # Arrange
-        conv_id = ConversationId("conv-1")
+        conv_id = ConversationId(value="conv-1")
         
         plan1 = ExecutionPlan(
-            id=PlanId("plan-1"),
+            id=PlanId(value="plan-1"),
             conversation_id=conv_id,
             goal="Goal 1"
         )
         plan2 = ExecutionPlan(
-            id=PlanId("plan-2"),
+            id=PlanId(value="plan-2"),
             conversation_id=conv_id,
             goal="Goal 2"
         )
         plan3 = ExecutionPlan(
-            id=PlanId("plan-3"),
-            conversation_id=ConversationId("conv-2"),
+            id=PlanId(value="plan-3"),
+            conversation_id=ConversationId(value="conv-2"),
             goal="Goal 3"
         )
         
@@ -241,32 +241,32 @@ class TestExecutionPlanRepositoryImpl:
     ):
         """Тест поиска активных планов по conversation_id."""
         # Arrange
-        conv_id = ConversationId("conv-1")
+        conv_id = ConversationId(value="conv-1")
         
         # Создать планы с разными статусами
         draft_plan = ExecutionPlan(
-            id=PlanId("plan-draft"),
+            id=PlanId(value="plan-draft"),
             conversation_id=conv_id,
             goal="Draft plan",
             status=PlanStatus.draft()
         )
         
         approved_plan = ExecutionPlan(
-            id=PlanId("plan-approved"),
+            id=PlanId(value="plan-approved"),
             conversation_id=conv_id,
             goal="Approved plan",
             status=PlanStatus.approved()
         )
         
         in_progress_plan = ExecutionPlan(
-            id=PlanId("plan-in-progress"),
+            id=PlanId(value="plan-in-progress"),
             conversation_id=conv_id,
             goal="In progress plan",
             status=PlanStatus.in_progress()
         )
         
         completed_plan = ExecutionPlan(
-            id=PlanId("plan-completed"),
+            id=PlanId(value="plan-completed"),
             conversation_id=conv_id,
             goal="Completed plan",
             status=PlanStatus.completed()
@@ -297,7 +297,7 @@ class TestExecutionPlanRepositoryImpl:
     ):
         """Тест подсчета планов по conversation_id."""
         # Arrange
-        conv_id = ConversationId("conv-1")
+        conv_id = ConversationId(value="conv-1")
         
         for i in range(3):
             plan = ExecutionPlan(
@@ -309,8 +309,8 @@ class TestExecutionPlanRepositoryImpl:
         
         # Другой conversation
         other_plan = ExecutionPlan(
-            id=PlanId("plan-other"),
-            conversation_id=ConversationId("conv-2"),
+            id=PlanId(value="plan-other"),
+            conversation_id=ConversationId(value="conv-2"),
             goal="Other goal"
         )
         await execution_plan_repository.save(other_plan)
@@ -356,25 +356,25 @@ class TestExecutionPlanRepositoryImpl:
         """Тест сохранения плана с несколькими подзадачами."""
         # Arrange
         subtask1 = Subtask(
-            id=SubtaskId("st-1"),
+            id=SubtaskId(value="st-1"),
             description="Subtask 1",
             agent_id=AgentId(value="coder")
         )
         subtask2 = Subtask(
-            id=SubtaskId("st-2"),
+            id=SubtaskId(value="st-2"),
             description="Subtask 2",
             agent_id=AgentId(value="debug"),
-            dependencies=[SubtaskId("st-1")]
+            dependencies=[SubtaskId(value="st-1")]
         )
         subtask3 = Subtask(
-            id=SubtaskId("st-3"),
+            id=SubtaskId(value="st-3"),
             description="Subtask 3",
             agent_id=AgentId(value="ask")
         )
         
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("conv-1"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="conv-1"),
             goal="Complex plan",
             subtasks=[subtask1, subtask2, subtask3]
         )
@@ -399,8 +399,8 @@ class TestExecutionPlanRepositoryImpl:
         # Arrange
         now = datetime.now(timezone.utc)
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("conv-1"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="conv-1"),
             goal="Test goal",
             status=PlanStatus.completed(),
             approved_at=now,
@@ -428,12 +428,12 @@ class TestExecutionPlanRepositoryImpl:
         """Тест сохранения плана с current_subtask_id."""
         # Arrange
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("conv-1"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="conv-1"),
             goal="Test goal",
             subtasks=[sample_subtask],
             status=PlanStatus.in_progress(),
-            current_subtask_id=SubtaskId("subtask-1")
+            current_subtask_id=SubtaskId(value="subtask-1")
         )
         
         # Act
@@ -452,7 +452,7 @@ class TestExecutionPlanRepositoryImpl:
     ):
         """Тест поиска планов в пустой БД."""
         # Arrange
-        conv_id = ConversationId("conv-1")
+        conv_id = ConversationId(value="conv-1")
         
         # Act
         plans = await execution_plan_repository.find_by_conversation_id(conv_id)
@@ -467,7 +467,7 @@ class TestExecutionPlanRepositoryImpl:
     ):
         """Тест подсчета планов в пустой БД."""
         # Arrange
-        conv_id = ConversationId("conv-1")
+        conv_id = ConversationId(value="conv-1")
         
         # Act
         count = await execution_plan_repository.count_by_conversation_id(conv_id)
@@ -484,8 +484,8 @@ class TestExecutionPlanRepositoryImpl:
         """Тест сохранения metadata."""
         # Arrange
         plan = ExecutionPlan(
-            id=PlanId("plan-1"),
-            conversation_id=ConversationId("conv-1"),
+            id=PlanId(value="plan-1"),
+            conversation_id=ConversationId(value="conv-1"),
             goal="Test goal",
             metadata={
                 "key1": "value1",

@@ -161,7 +161,7 @@ class TestConversation:
     
     def test_repr(self):
         """Строковое представление"""
-        conv_id = ConversationId("conv-123")
+        conv_id = ConversationId(value="conv-123")
         conversation = Conversation.create(conv_id, title="Test Conversation")
         
         repr_str = repr(conversation)

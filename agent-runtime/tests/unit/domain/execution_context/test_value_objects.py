@@ -26,48 +26,48 @@ class TestPlanId:
     
     def test_create_valid_plan_id(self):
         """Создание валидного PlanId."""
-        plan_id = PlanId("plan-123")
+        plan_id = PlanId(value="plan-123")
         assert plan_id.value == "plan-123"
     
     def test_create_plan_id_with_empty_string_raises_error(self):
         """Создание PlanId с пустой строкой вызывает ошибку."""
         with pytest.raises(ValueError, match="Plan ID cannot be empty"):
-            PlanId("")
+            PlanId(value="")
     
     def test_create_plan_id_with_whitespace_raises_error(self):
         """Создание PlanId с пробелами вызывает ошибку."""
         with pytest.raises(ValueError, match="Plan ID cannot be empty"):
-            PlanId("   ")
+            PlanId(value="   ")
     
     def test_plan_id_equality(self):
         """Два PlanId с одинаковым значением равны."""
-        plan_id1 = PlanId("plan-123")
-        plan_id2 = PlanId("plan-123")
+        plan_id1 = PlanId(value="plan-123")
+        plan_id2 = PlanId(value="plan-123")
         assert plan_id1 == plan_id2
     
     def test_plan_id_inequality(self):
         """Два PlanId с разными значениями не равны."""
-        plan_id1 = PlanId("plan-123")
-        plan_id2 = PlanId("plan-456")
+        plan_id1 = PlanId(value="plan-123")
+        plan_id2 = PlanId(value="plan-456")
         assert plan_id1 != plan_id2
     
     def test_plan_id_hash(self):
         """PlanId можно использовать в множествах и словарях."""
-        plan_id1 = PlanId("plan-123")
-        plan_id2 = PlanId("plan-123")
-        plan_id3 = PlanId("plan-456")
+        plan_id1 = PlanId(value="plan-123")
+        plan_id2 = PlanId(value="plan-123")
+        plan_id3 = PlanId(value="plan-456")
         
         plan_set = {plan_id1, plan_id2, plan_id3}
         assert len(plan_set) == 2  # plan_id1 и plan_id2 считаются одинаковыми
     
     def test_plan_id_repr(self):
         """PlanId имеет читаемое строковое представление."""
-        plan_id = PlanId("plan-123")
+        plan_id = PlanId(value="plan-123")
         assert repr(plan_id) == "PlanId(value='plan-123')"
     
     def test_plan_id_str(self):
         """PlanId можно преобразовать в строку."""
-        plan_id = PlanId("plan-123")
+        plan_id = PlanId(value="plan-123")
         assert str(plan_id) == "plan-123"
 
 
@@ -76,25 +76,25 @@ class TestSubtaskId:
     
     def test_create_valid_subtask_id(self):
         """Создание валидного SubtaskId."""
-        subtask_id = SubtaskId("subtask-456")
+        subtask_id = SubtaskId(value="subtask-456")
         assert subtask_id.value == "subtask-456"
     
     def test_create_subtask_id_with_empty_string_raises_error(self):
         """Создание SubtaskId с пустой строкой вызывает ошибку."""
         with pytest.raises(ValueError, match="Subtask ID cannot be empty"):
-            SubtaskId("")
+            SubtaskId(value="")
     
     def test_subtask_id_equality(self):
         """Два SubtaskId с одинаковым значением равны."""
-        subtask_id1 = SubtaskId("subtask-456")
-        subtask_id2 = SubtaskId("subtask-456")
+        subtask_id1 = SubtaskId(value="subtask-456")
+        subtask_id2 = SubtaskId(value="subtask-456")
         assert subtask_id1 == subtask_id2
     
     def test_subtask_id_hash(self):
         """SubtaskId можно использовать в множествах и словарях."""
-        subtask_id1 = SubtaskId("subtask-456")
-        subtask_id2 = SubtaskId("subtask-456")
-        subtask_id3 = SubtaskId("subtask-789")
+        subtask_id1 = SubtaskId(value="subtask-456")
+        subtask_id2 = SubtaskId(value="subtask-456")
+        subtask_id3 = SubtaskId(value="subtask-789")
         
         subtask_set = {subtask_id1, subtask_id2, subtask_id3}
         assert len(subtask_set) == 2

@@ -6,7 +6,7 @@ This module provides the foundation for all domain entities following DDD princi
 
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Entity(BaseModel):
@@ -27,6 +27,10 @@ class Entity(BaseModel):
         updated_at: Last update timestamp (UTC)
     """
     
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+    )
+    
     id: str = Field(..., description="Unique identifier")
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
@@ -36,13 +40,6 @@ class Entity(BaseModel):
         None,
         description="Last update timestamp (UTC)"
     )
-    
-    class Config:
-        """Pydantic configuration."""
-        arbitrary_types_allowed = True
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
     
     def mark_updated(self) -> None:
         """Mark entity as updated (sets updated_at to current time)."""

@@ -27,7 +27,7 @@ class TestAgentCreation:
     
     def test_create_agent_with_custom_id(self):
         """Тест создания агента с кастомным ID."""
-        agent_id = AgentId("agent-custom")
+        agent_id = AgentId(value="agent-custom")
         agent = Agent.create(
             session_id="session-123",
             capabilities=AgentCapabilities.for_coder(),

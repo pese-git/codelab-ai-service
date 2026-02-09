@@ -1,0 +1,1569 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.2, pytest-9.0.2, pluggy-1.6.0 -- /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime
+configfile: pyproject.toml
+plugins: asyncio-1.3.0, anyio-3.7.1, cov-7.0.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 865 items
+
+tests/integration/infrastructure/test_agent_repository.py::TestAgentRepositoryImpl::test_save_and_find_by_id FAILED [  0%]
+tests/integration/infrastructure/test_agent_repository.py::TestAgentRepositoryImpl::test_find_by_session_id PASSED [  0%]
+tests/integration/infrastructure/test_agent_repository.py::TestAgentRepositoryImpl::test_find_by_session_id_not_found PASSED [  0%]
+tests/integration/infrastructure/test_agent_repository.py::TestAgentRepositoryImpl::test_save_with_switch_history FAILED [  0%]
+tests/integration/infrastructure/test_agent_repository.py::TestAgentRepositoryImpl::test_update_existing_agent FAILED [  0%]
+tests/integration/infrastructure/test_agent_repository.py::TestAgentRepositoryImpl::test_delete_by_id FAILED [  0%]
+tests/integration/infrastructure/test_agent_repository.py::TestAgentRepositoryImpl::test_delete_by_session_id PASSED [  0%]
+tests/integration/infrastructure/test_agent_repository.py::TestAgentRepositoryImpl::test_exists FAILED [  0%]
+tests/integration/infrastructure/test_agent_repository.py::TestAgentRepositoryImpl::test_find_by_agent_type PASSED [  1%]
+tests/integration/infrastructure/test_agent_repository.py::TestAgentRepositoryImpl::test_find_with_many_switches PASSED [  1%]
+tests/integration/infrastructure/test_agent_repository.py::TestAgentRepositoryImpl::test_count_by_type PASSED [  1%]
+tests/integration/infrastructure/test_agent_repository.py::TestAgentRepositoryImpl::test_get_agent_usage_stats FAILED [  1%]
+tests/integration/infrastructure/test_agent_repository.py::TestAgentRepositoryImpl::test_get_switch_statistics PASSED [  1%]
+tests/integration/infrastructure/test_agent_repository.py::TestAgentRepositoryImpl::test_get_recent_switches PASSED [  1%]
+tests/integration/infrastructure/test_conversation_repository.py::TestConversationRepositoryImpl::test_save_and_find_by_id PASSED [  1%]
+tests/integration/infrastructure/test_conversation_repository.py::TestConversationRepositoryImpl::test_find_by_id_not_found PASSED [  1%]
+tests/integration/infrastructure/test_conversation_repository.py::TestConversationRepositoryImpl::test_save_updates_existing PASSED [  1%]
+tests/integration/infrastructure/test_conversation_repository.py::TestConversationRepositoryImpl::test_delete PASSED [  2%]
+tests/integration/infrastructure/test_conversation_repository.py::TestConversationRepositoryImpl::test_delete_not_found PASSED [  2%]
+tests/integration/infrastructure/test_conversation_repository.py::TestConversationRepositoryImpl::test_exists PASSED [  2%]
+tests/integration/infrastructure/test_conversation_repository.py::TestConversationRepositoryImpl::test_find_active_by_user_id PASSED [  2%]
+tests/integration/infrastructure/test_conversation_repository.py::TestConversationRepositoryImpl::test_find_inactive_since PASSED [  2%]
+tests/integration/infrastructure/test_conversation_repository.py::TestConversationRepositoryImpl::test_count_by_user_id PASSED [  2%]
+tests/integration/infrastructure/test_conversation_repository.py::TestConversationRepositoryImpl::test_find_by_id_without_messages FAILED [  2%]
+tests/test_application_layer.py::TestCommands::test_create_session_command PASSED [  2%]
+tests/test_application_layer.py::TestCommands::test_create_session_command_without_id PASSED [  3%]
+tests/test_application_layer.py::TestCommands::test_add_message_command PASSED [  3%]
+tests/test_application_layer.py::TestCommands::test_switch_agent_command PASSED [  3%]
+tests/test_application_layer.py::TestQueries::test_get_session_query PASSED [  3%]
+tests/test_application_layer.py::TestQueries::test_list_sessions_query PASSED [  3%]
+tests/test_application_layer.py::TestQueries::test_list_sessions_query_defaults PASSED [  3%]
+tests/test_application_layer.py::TestQueries::test_get_agent_context_query PASSED [  3%]
+tests/test_application_layer.py::TestDTO::test_message_dto_from_entity PASSED [  3%]
+tests/test_application_layer.py::TestDTO::test_message_dto_to_llm_format PASSED [  3%]
+tests/test_application_layer.py::TestDTO::test_session_dto_from_entity FAILED [  4%]
+tests/test_application_layer.py::TestDTO::test_session_dto_with_messages FAILED [  4%]
+tests/test_application_layer.py::TestDTO::test_session_list_item_dto FAILED [  4%]
+tests/test_application_layer.py::TestDTO::test_agent_context_dto_from_entity FAILED [  4%]
+tests/test_application_layer.py::TestDTO::test_agent_context_dto_with_history FAILED [  4%]
+tests/test_application_layer.py::TestDTO::test_agent_switch_dto_from_entity FAILED [  4%]
+tests/test_approval_manager.py::TestApprovalManager::test_should_require_approval_matching_rule PASSED [  4%]
+tests/test_approval_manager.py::TestApprovalManager::test_should_require_approval_no_match PASSED [  4%]
+tests/test_approval_manager.py::TestApprovalManager::test_should_require_approval_explicit_no_approval PASSED [  4%]
+tests/test_approval_manager.py::TestApprovalManager::test_should_require_approval_disabled_globally PASSED [  5%]
+tests/test_approval_manager.py::TestApprovalManager::test_add_pending PASSED [  5%]
+tests/test_approval_manager.py::TestApprovalManager::test_get_pending_existing PASSED [  5%]
+tests/test_approval_manager.py::TestApprovalManager::test_get_pending_not_found PASSED [  5%]
+tests/test_approval_manager.py::TestApprovalManager::test_get_all_pending PASSED [  5%]
+tests/test_approval_manager.py::TestApprovalManager::test_approve PASSED [  5%]
+tests/test_approval_manager.py::TestApprovalManager::test_approve_not_found PASSED [  5%]
+tests/test_approval_manager.py::TestApprovalManager::test_reject PASSED  [  5%]
+tests/test_approval_manager.py::TestApprovalManager::test_reject_not_found PASSED [  6%]
+tests/test_approval_manager.py::TestApprovalManager::test_update_policy PASSED [  6%]
+tests/test_approval_manager.py::TestApprovalManager::test_is_enabled PASSED [  6%]
+tests/test_approval_manager.py::TestApprovalManager::test_condition_matching_greater_than PASSED [  6%]
+tests/test_approval_manager.py::TestApprovalManager::test_multiple_sessions_isolation PASSED [  6%]
+tests/test_approval_manager_integration.py::TestApprovalManagerIntegration::test_full_approval_workflow PASSED [  6%]
+tests/test_approval_manager_integration.py::TestApprovalManagerIntegration::test_rejection_workflow PASSED [  6%]
+tests/test_approval_manager_integration.py::TestApprovalManagerIntegration::test_multiple_sessions_isolation PASSED [  6%]
+tests/test_approval_manager_integration.py::TestApprovalManagerIntegration::test_filter_by_request_type PASSED [  6%]
+tests/test_approval_manager_integration.py::TestApprovalManagerIntegration::test_database_constraints PASSED [  7%]
+tests/test_approval_manager_integration.py::TestApprovalManagerIntegration::test_transaction_rollback PASSED [  7%]
+tests/test_approval_manager_integration.py::TestApprovalManagerIntegration::test_legacy_fields_compatibility PASSED [  7%]
+tests/test_approval_manager_integration.py::TestApprovalManagerIntegration::test_count_pending PASSED [  7%]
+tests/test_domain_base.py::TestEntity::test_entity_creation PASSED       [  7%]
+tests/test_domain_base.py::TestEntity::test_entity_mark_updated PASSED   [  7%]
+tests/test_domain_base.py::TestEntity::test_entity_equality PASSED       [  7%]
+tests/test_domain_base.py::TestEntity::test_entity_hash PASSED           [  7%]
+tests/test_domain_base.py::TestEntity::test_entity_repr PASSED           [  7%]
+tests/test_domain_base.py::TestRepository::test_repository_save_and_get PASSED [  8%]
+tests/test_domain_base.py::TestRepository::test_repository_get_nonexistent PASSED [  8%]
+tests/test_domain_base.py::TestRepository::test_repository_delete PASSED [  8%]
+tests/test_domain_base.py::TestRepository::test_repository_delete_nonexistent PASSED [  8%]
+tests/test_domain_base.py::TestRepository::test_repository_list PASSED   [  8%]
+tests/test_domain_base.py::TestRepository::test_repository_exists PASSED [  8%]
+tests/test_domain_base.py::TestRepository::test_repository_count PASSED  [  8%]
+tests/test_domain_base.py::TestDomainEvent::test_event_creation PASSED   [  8%]
+tests/test_domain_base.py::TestDomainEvent::test_event_immutability PASSED [  9%]
+tests/test_domain_base.py::TestDomainEvent::test_event_to_dict PASSED    [  9%]
+tests/test_domain_base.py::TestDomainEvent::test_event_get_event_name PASSED [  9%]
+tests/test_domain_base.py::TestDomainEvent::test_event_repr PASSED       [  9%]
+tests/test_event_bus.py::TestEventBus::test_subscribe_and_publish PASSED [  9%]
+tests/test_event_bus.py::TestEventBus::test_category_subscription PASSED [  9%]
+tests/test_event_bus.py::TestEventBus::test_wildcard_subscription PASSED [  9%]
+tests/test_event_bus.py::TestEventBus::test_handler_priority PASSED      [  9%]
+tests/test_event_bus.py::TestEventBus::test_error_handling_in_handlers PASSED [  9%]
+tests/test_event_bus.py::TestEventBus::test_unsubscribe PASSED           [ 10%]
+tests/test_event_bus.py::TestEventBus::test_middleware PASSED            [ 10%]
+tests/test_event_bus.py::TestEventBus::test_decorator_subscription PASSED [ 10%]
+tests/test_event_bus.py::TestEventBus::test_stats PASSED                 [ 10%]
+tests/test_event_bus.py::TestAgentEvents::test_agent_switched_event_creation PASSED [ 10%]
+tests/test_event_bus.py::TestAgentEvents::test_agent_processing_started_event PASSED [ 10%]
+tests/test_event_bus.py::TestAgentEvents::test_agent_processing_completed_event PASSED [ 10%]
+tests/test_event_bus.py::TestAgentEvents::test_agent_error_occurred_event PASSED [ 10%]
+tests/test_event_bus.py::TestToolEvents::test_tool_execution_requested_event PASSED [ 10%]
+tests/test_event_bus.py::TestToolEvents::test_tool_approval_required_event PASSED [ 11%]
+tests/test_event_bus.py::TestToolEvents::test_hitl_decision_made_event PASSED [ 11%]
+tests/test_event_bus.py::TestSessionEvents::test_session_created_event PASSED [ 11%]
+tests/test_event_bus.py::TestSessionEvents::test_message_added_event PASSED [ 11%]
+tests/test_event_bus.py::TestMetricsCollector::test_metrics_collection PASSED [ 11%]
+tests/test_event_bus.py::TestMetricsCollector::test_agent_processing_metrics PASSED [ 11%]
+tests/test_event_bus.py::TestAuditLogger::test_audit_logging PASSED      [ 11%]
+tests/test_event_bus.py::TestAuditLogger::test_audit_log_filtering PASSED [ 11%]
+tests/test_event_bus.py::TestBaseEvent::test_base_event_creation PASSED  [ 12%]
+tests/test_event_bus.py::TestBaseEvent::test_base_event_serialization PASSED [ 12%]
+tests/test_event_driven_context.py::TestAgentContextSubscriber::test_context_subscriber_initialized PASSED [ 12%]
+tests/test_event_driven_context.py::TestAgentContextSubscriber::test_subscriber_handles_event SKIPPED [ 12%]
+tests/test_event_driven_context.py::TestEventDrivenContextBehavior::test_event_updates_context_fields PASSED [ 12%]
+tests/test_event_driven_context.py::TestEventDrivenBehavior::test_always_event_driven PASSED [ 12%]
+tests/test_event_driven_context.py::TestEventDrivenBehavior::test_no_direct_calls PASSED [ 12%]
+tests/test_event_integration.py::TestMultiAgentOrchestratorEvents::test_agent_switch_event_structure PASSED [ 12%]
+tests/test_event_integration.py::TestSessionManagerEvents::test_session_created_publishes_event SKIPPED [ 12%]
+tests/test_event_integration.py::TestSessionManagerEvents::test_message_added_publishes_event SKIPPED [ 13%]
+tests/test_event_integration.py::TestEndToEndEventFlow::test_complete_event_flow PASSED [ 13%]
+tests/test_event_integration.py::TestEventBusStats::test_stats_tracking PASSED [ 13%]
+tests/test_event_integration.py::TestCorrelationIDTracking::test_correlation_id_propagation PASSED [ 13%]
+tests/test_event_integration.py::TestMetricsCollectorIntegration::test_metrics_from_multiple_events PASSED [ 13%]
+tests/test_event_integration.py::TestAuditLoggerIntegration::test_audit_logging_from_events PASSED [ 13%]
+tests/test_fsm_option2_states.py::TestPlanReviewStateTransitions::test_plan_review_to_plan_execution_on_approval PASSED [ 13%]
+tests/test_fsm_option2_states.py::TestPlanReviewStateTransitions::test_plan_review_to_idle_on_rejection PASSED [ 13%]
+tests/test_fsm_option2_states.py::TestPlanReviewStateTransitions::test_plan_review_to_architect_on_modification PASSED [ 13%]
+tests/test_fsm_option2_states.py::TestPlanReviewStateTransitions::test_plan_review_allowed_events PASSED [ 14%]
+tests/test_fsm_option2_states.py::TestPlanExecutionStateTransitions::test_plan_execution_to_completed_on_success PASSED [ 14%]
+tests/test_fsm_option2_states.py::TestPlanExecutionStateTransitions::test_plan_execution_to_error_on_failure PASSED [ 14%]
+tests/test_fsm_option2_states.py::TestPlanExecutionStateTransitions::test_plan_execution_allowed_events PASSED [ 14%]
+tests/test_fsm_option2_states.py::TestArchitectPlanningToReview::test_architect_planning_to_plan_review PASSED [ 14%]
+tests/test_fsm_option2_states.py::TestOption2CompleteWorkflow::test_successful_plan_execution_workflow PASSED [ 14%]
+tests/test_fsm_option2_states.py::TestOption2CompleteWorkflow::test_plan_rejection_workflow PASSED [ 14%]
+tests/test_fsm_option2_states.py::TestOption2CompleteWorkflow::test_plan_modification_workflow PASSED [ 14%]
+tests/test_fsm_option2_states.py::TestOption2CompleteWorkflow::test_plan_execution_failure_workflow PASSED [ 15%]
+tests/test_fsm_option2_states.py::TestOption2StateMetadata::test_plan_review_metadata PASSED [ 15%]
+tests/test_fsm_option2_states.py::TestOption2StateMetadata::test_plan_execution_metadata PASSED [ 15%]
+tests/test_fsm_option2_states.py::TestInvalidOption2Transitions::test_cannot_execute_without_approval PASSED [ 15%]
+tests/test_fsm_option2_states.py::TestInvalidOption2Transitions::test_cannot_skip_plan_review PASSED [ 15%]
+tests/test_fsm_option2_states.py::TestInvalidOption2Transitions::test_plan_execution_only_from_plan_review PASSED [ 15%]
+tests/test_fsm_option2_states.py::TestOption2EdgeCases::test_multiple_plan_modifications PASSED [ 15%]
+tests/test_fsm_option2_states.py::TestOption2EdgeCases::test_plan_execution_failure_then_replan PASSED [ 15%]
+tests/test_fsm_option2_states.py::TestOption2VsOption1Compatibility::test_atomic_task_still_works PASSED [ 15%]
+tests/test_fsm_option2_states.py::TestOption2VsOption1Compatibility::test_error_handling_still_works PASSED [ 16%]
+tests/test_fsm_orchestrator.py::TestFSMTransitionRules::test_valid_transition_idle_to_classify PASSED [ 16%]
+tests/test_fsm_orchestrator.py::TestFSMTransitionRules::test_valid_transition_classify_to_execution PASSED [ 16%]
+tests/test_fsm_orchestrator.py::TestFSMTransitionRules::test_valid_transition_classify_to_plan_required PASSED [ 16%]
+tests/test_fsm_orchestrator.py::TestFSMTransitionRules::test_invalid_transition_idle_to_execution PASSED [ 16%]
+tests/test_fsm_orchestrator.py::TestFSMTransitionRules::test_get_next_state_valid PASSED [ 16%]
+tests/test_fsm_orchestrator.py::TestFSMTransitionRules::test_get_next_state_invalid PASSED [ 16%]
+tests/test_fsm_orchestrator.py::TestFSMTransitionRules::test_get_allowed_events PASSED [ 16%]
+tests/test_fsm_orchestrator.py::TestFSMContext::test_create_context_default_state PASSED [ 16%]
+tests/test_fsm_orchestrator.py::TestFSMContext::test_transition_valid PASSED [ 17%]
+tests/test_fsm_orchestrator.py::TestFSMContext::test_transition_invalid_raises_error PASSED [ 17%]
+tests/test_fsm_orchestrator.py::TestFSMContext::test_reset_context PASSED [ 17%]
+tests/test_fsm_orchestrator.py::TestFSMContext::test_is_in_state PASSED  [ 17%]
+tests/test_fsm_orchestrator.py::TestFSMContext::test_can_transition PASSED [ 17%]
+tests/test_fsm_orchestrator.py::TestFSMOrchestrator::test_create_orchestrator PASSED [ 17%]
+tests/test_fsm_orchestrator.py::TestFSMOrchestrator::test_get_or_create_context PASSED [ 17%]
+tests/test_fsm_orchestrator.py::TestFSMOrchestrator::test_get_or_create_context_returns_same PASSED [ 17%]
+tests/test_fsm_orchestrator.py::TestFSMOrchestrator::test_get_current_state_existing PASSED [ 18%]
+tests/test_fsm_orchestrator.py::TestFSMOrchestrator::test_get_current_state_non_existing PASSED [ 18%]
+tests/test_fsm_orchestrator.py::TestFSMOrchestrator::test_transition_valid PASSED [ 18%]
+tests/test_fsm_orchestrator.py::TestFSMOrchestrator::test_transition_with_metadata PASSED [ 18%]
+tests/test_fsm_orchestrator.py::TestFSMOrchestrator::test_transition_invalid_raises_error PASSED [ 18%]
+tests/test_fsm_orchestrator.py::TestFSMOrchestrator::test_validate_transition PASSED [ 18%]
+tests/test_fsm_orchestrator.py::TestFSMOrchestrator::test_reset PASSED   [ 18%]
+tests/test_fsm_orchestrator.py::TestFSMOrchestrator::test_remove_context PASSED [ 18%]
+tests/test_fsm_orchestrator.py::TestFSMOrchestrator::test_set_and_get_metadata PASSED [ 18%]
+tests/test_fsm_orchestrator.py::TestFSMOrchestrator::test_get_all_contexts PASSED [ 19%]
+tests/test_fsm_orchestrator.py::TestFSMOrchestrator::test_get_contexts_by_state PASSED [ 19%]
+tests/test_fsm_orchestrator.py::TestFSMWorkflows::test_atomic_task_workflow PASSED [ 19%]
+tests/test_fsm_orchestrator.py::TestFSMWorkflows::test_complex_task_workflow PASSED [ 19%]
+tests/test_fsm_orchestrator.py::TestFSMWorkflows::test_error_handling_workflow PASSED [ 19%]
+tests/test_fsm_orchestrator.py::TestFSMWorkflows::test_replanning_workflow PASSED [ 19%]
+tests/test_fsm_orchestrator.py::TestFSMWorkflows::test_plan_cancellation_workflow PASSED [ 19%]
+tests/test_fsm_orchestrator.py::TestFSMOrchestratorMultipleSessions::test_multiple_sessions_independent PASSED [ 19%]
+tests/test_fsm_orchestrator.py::TestFSMOrchestratorMultipleSessions::test_remove_one_session_keeps_others PASSED [ 20%]
+tests/test_fsm_orchestrator.py::TestFSMStateTransitionMatrix::test_all_states_have_transitions PASSED [ 20%]
+tests/test_fsm_orchestrator.py::TestFSMStateTransitionMatrix::test_transition_matrix_completeness PASSED [ 20%]
+tests/test_fsm_orchestrator.py::TestFSMStateTransitionMatrix::test_no_self_loops_except_explicit PASSED [ 20%]
+tests/test_internal_auth_middleware.py::test_public_path_health_no_auth_required PASSED [ 20%]
+tests/test_internal_auth_middleware.py::test_protected_endpoint_with_valid_auth PASSED [ 20%]
+tests/test_internal_auth_middleware.py::test_protected_endpoint_without_auth_header PASSED [ 20%]
+tests/test_internal_auth_middleware.py::test_protected_endpoint_with_invalid_auth PASSED [ 20%]
+tests/test_internal_auth_middleware.py::test_protected_endpoint_with_empty_auth PASSED [ 20%]
+tests/test_internal_auth_middleware.py::test_case_insensitive_header_name PASSED [ 21%]
+tests/test_internal_auth_middleware.py::test_all_public_paths PASSED     [ 21%]
+tests/test_internal_auth_middleware.py::test_middleware_dispatch_calls_next PASSED [ 21%]
+tests/test_internal_auth_middleware.py::test_middleware_dispatch_public_path PASSED [ 21%]
+tests/test_internal_auth_middleware.py::test_middleware_dispatch_invalid_auth PASSED [ 21%]
+tests/test_internal_auth_middleware.py::test_middleware_dispatch_none_auth_header PASSED [ 21%]
+tests/test_internal_auth_middleware.py::test_middleware_with_different_api_keys PASSED [ 21%]
+tests/test_internal_auth_middleware.py::test_middleware_logging PASSED   [ 21%]
+tests/test_internal_auth_middleware.py::test_middleware_preserves_response_content PASSED [ 21%]
+tests/test_internal_auth_middleware.py::test_middleware_with_post_request PASSED [ 22%]
+tests/test_llm_response_processor.py::TestLLMResponseProcessor::test_process_simple_response PASSED [ 22%]
+tests/test_llm_response_processor.py::TestLLMResponseProcessor::test_process_response_with_single_tool_call PASSED [ 22%]
+tests/test_llm_response_processor.py::TestLLMResponseProcessor::test_process_response_with_multiple_tool_calls PASSED [ 22%]
+tests/test_llm_response_processor.py::TestLLMResponseProcessor::test_process_response_with_hitl_approval_required PASSED [ 22%]
+tests/test_llm_response_processor.py::TestLLMResponseProcessor::test_process_empty_response PASSED [ 22%]
+tests/test_llm_response_processor.py::TestLLMResponseProcessor::test_validate_tool_call_valid PASSED [ 22%]
+tests/test_llm_response_processor.py::TestLLMResponseProcessor::test_validate_tool_call_missing_id PASSED [ 22%]
+tests/test_llm_response_processor.py::TestLLMResponseProcessor::test_validate_tool_call_missing_name PASSED [ 23%]
+tests/test_main.py::test_health PASSED                                   [ 23%]
+tests/test_main.py::test_agent_message_stream_success SKIPPED (app.a...) [ 23%]
+tests/test_main.py::test_agent_message_stream_missing_session_id SKIPPED [ 23%]
+tests/test_main.py::test_agent_message_stream_unauthorized PASSED        [ 23%]
+tests/test_models.py::test_message_valid PASSED                          [ 23%]
+tests/test_models.py::test_message_invalid_missing_fields PASSED         [ 23%]
+tests/test_models.py::test_stream_chunk_assistant_message PASSED         [ 23%]
+tests/test_models.py::test_stream_chunk_tool_call PASSED                 [ 23%]
+tests/test_models.py::test_stream_chunk_error PASSED                     [ 24%]
+tests/test_models.py::test_stream_chunk_agent_switched PASSED            [ 24%]
+tests/test_resilience.py::TestSessionLockManager::test_lock_prevents_concurrent_access PASSED [ 24%]
+tests/test_resilience.py::TestSessionLockManager::test_different_sessions_can_run_parallel PASSED [ 24%]
+tests/test_resilience.py::TestSessionLockManager::test_cleanup_unused_locks PASSED [ 24%]
+tests/test_resilience.py::TestCircuitBreaker::test_circuit_opens_after_failures PASSED [ 24%]
+tests/test_resilience.py::TestCircuitBreaker::test_circuit_recovers_after_timeout PASSED [ 24%]
+tests/test_resilience.py::TestCircuitBreaker::test_circuit_resets_on_success PASSED [ 24%]
+tests/test_resilience.py::TestRetryHandler::test_retry_on_failure PASSED [ 24%]
+tests/test_resilience.py::TestRetryHandler::test_retry_gives_up_after_max_retries PASSED [ 25%]
+tests/test_resilience.py::TestRetryHandler::test_no_retry_on_success PASSED [ 25%]
+tests/test_retry_service.py::TestRetryableErrorDetection::test_timeout_is_retryable PASSED [ 25%]
+tests/test_retry_service.py::TestRetryableErrorDetection::test_rate_limit_is_retryable PASSED [ 25%]
+tests/test_retry_service.py::TestRetryableErrorDetection::test_service_unavailable_is_retryable PASSED [ 25%]
+tests/test_retry_service.py::TestRetryableErrorDetection::test_gateway_timeout_is_retryable PASSED [ 25%]
+tests/test_retry_service.py::TestRetryableErrorDetection::test_connect_error_is_retryable PASSED [ 25%]
+tests/test_retry_service.py::TestRetryableErrorDetection::test_read_timeout_is_retryable PASSED [ 25%]
+tests/test_retry_service.py::TestRetryableErrorDetection::test_400_is_not_retryable PASSED [ 26%]
+tests/test_retry_service.py::TestRetryableErrorDetection::test_404_is_not_retryable PASSED [ 26%]
+tests/test_retry_service.py::TestRetryableErrorDetection::test_500_is_not_retryable PASSED [ 26%]
+tests/test_retry_service.py::TestRetryDecorator::test_successful_call_no_retry PASSED [ 26%]
+tests/test_retry_service.py::TestRetryDecorator::test_retryable_error_triggers_retry PASSED [ 26%]
+tests/test_retry_service.py::TestRetryDecorator::test_max_retries_exceeded PASSED [ 26%]
+tests/test_retry_service.py::TestRetryDecorator::test_non_retryable_error_no_retry PASSED [ 26%]
+tests/test_retry_service.py::TestCallWithRetry::test_successful_call PASSED [ 26%]
+tests/test_retry_service.py::TestCallWithRetry::test_retryable_http_error PASSED [ 26%]
+tests/test_retry_service.py::TestCallWithRetry::test_non_retryable_http_error PASSED [ 27%]
+tests/test_retry_service.py::TestCallWithRetry::test_custom_max_attempts PASSED [ 27%]
+tests/test_retry_service.py::TestLLMProxyClientRetry::test_llm_client_retries_on_timeout PASSED [ 27%]
+tests/test_retry_service.py::TestLLMProxyClientRetry::test_llm_client_fails_on_non_retryable PASSED [ 27%]
+tests/test_task_classifier.py::TestTaskClassificationModel::test_valid_atomic_task_code PASSED [ 27%]
+tests/test_task_classifier.py::TestTaskClassificationModel::test_valid_complex_task_plan PASSED [ 27%]
+tests/test_task_classifier.py::TestTaskClassificationModel::test_rule_violation_non_atomic_must_be_plan PASSED [ 27%]
+tests/test_task_classifier.py::TestTaskClassificationModel::test_rule_violation_non_atomic_debug PASSED [ 27%]
+tests/test_task_classifier.py::TestTaskClassificationModel::test_rule_violation_non_atomic_explain PASSED [ 27%]
+tests/test_task_classifier.py::TestTaskClassificationModel::test_to_dict PASSED [ 28%]
+tests/test_task_classifier.py::TestTaskClassifierKeywordBased::test_classify_simple_code_task PASSED [ 28%]
+tests/test_task_classifier.py::TestTaskClassifierKeywordBased::test_classify_debug_task PASSED [ 28%]
+tests/test_task_classifier.py::TestTaskClassifierKeywordBased::test_classify_explain_task PASSED [ 28%]
+tests/test_task_classifier.py::TestTaskClassifierKeywordBased::test_classify_complex_task_requires_plan PASSED [ 28%]
+tests/test_task_classifier.py::TestTaskClassifierKeywordBased::test_classify_russian_complex_task PASSED [ 28%]
+tests/test_task_classifier.py::TestTaskClassifierKeywordBased::test_is_atomic_by_keywords_short_message PASSED [ 28%]
+tests/test_task_classifier.py::TestTaskClassifierKeywordBased::test_is_atomic_by_keywords_long_message PASSED [ 28%]
+tests/test_task_classifier.py::TestTaskClassifierKeywordBased::test_determine_agent_default_to_code PASSED [ 29%]
+tests/test_task_classifier.py::TestTaskClassifierLLMBased::test_classify_with_llm_atomic_task FAILED [ 29%]
+tests/test_task_classifier.py::TestTaskClassifierLLMBased::test_classify_with_llm_complex_task FAILED [ 29%]
+tests/test_task_classifier.py::TestTaskClassifierLLMBased::test_classify_with_llm_markdown_code_block FAILED [ 29%]
+tests/test_task_classifier.py::TestTaskClassifierLLMBased::test_classify_with_llm_rule_violation_auto_corrected FAILED [ 29%]
+tests/test_task_classifier.py::TestTaskClassifierLLMBased::test_parse_json_response_plain_json PASSED [ 29%]
+tests/test_task_classifier.py::TestTaskClassifierLLMBased::test_parse_json_response_with_json_marker PASSED [ 29%]
+tests/test_task_classifier.py::TestTaskClassifierLLMBased::test_parse_json_response_with_generic_marker PASSED [ 29%]
+tests/test_task_classifier.py::TestTaskClassifierIntegration::test_classify_fallback_on_llm_error PASSED [ 29%]
+tests/test_task_classifier.py::TestTaskClassifierIntegration::test_validate_classification_valid PASSED [ 30%]
+tests/test_task_classifier.py::TestTaskClassifierIntegration::test_validate_classification_invalid_agent PASSED [ 30%]
+tests/test_task_classifier.py::TestTaskClassifierIntegration::test_validate_classification_empty_reason PASSED [ 30%]
+tests/test_task_classifier.py::TestTaskClassifierEdgeCases::test_classify_empty_message PASSED [ 30%]
+tests/test_task_classifier.py::TestTaskClassifierEdgeCases::test_classify_very_long_message PASSED [ 30%]
+tests/test_task_classifier.py::TestTaskClassifierEdgeCases::test_keyword_classification_mixed_indicators PASSED [ 30%]
+tests/test_tool_filter_service.py::TestToolFilterService::test_filter_tools_all_when_none PASSED [ 30%]
+tests/test_tool_filter_service.py::TestToolFilterService::test_filter_tools_by_allowed_list PASSED [ 30%]
+tests/test_tool_filter_service.py::TestToolFilterService::test_filter_tools_empty_list PASSED [ 30%]
+tests/test_tool_filter_service.py::TestToolFilterService::test_filter_tools_unknown_tool PASSED [ 31%]
+tests/test_tool_filter_service.py::TestToolFilterService::test_get_tool_names PASSED [ 31%]
+tests/test_tool_filter_service.py::TestToolFilterService::test_is_tool_allowed_when_none PASSED [ 31%]
+tests/test_tool_filter_service.py::TestToolFilterService::test_is_tool_allowed_in_list PASSED [ 31%]
+tests/test_tool_filter_service.py::TestToolFilterService::test_validate_tool_access_valid PASSED [ 31%]
+tests/test_tool_filter_service.py::TestToolFilterService::test_validate_tool_access_not_in_registry PASSED [ 31%]
+tests/test_tool_filter_service.py::TestToolFilterService::test_validate_tool_access_not_allowed PASSED [ 31%]
+tests/test_tool_parser.py::TestOpenAIToolCallParser::test_parse_tool_calls_from_metadata PASSED [ 31%]
+tests/test_tool_parser.py::TestOpenAIToolCallParser::test_parse_multiple_tool_calls PASSED [ 32%]
+tests/test_tool_parser.py::TestOpenAIToolCallParser::test_parse_function_call_legacy PASSED [ 32%]
+tests/test_tool_parser.py::TestOpenAIToolCallParser::test_parse_empty_metadata PASSED [ 32%]
+tests/test_tool_parser.py::TestOpenAIToolCallParser::test_parse_no_metadata PASSED [ 32%]
+tests/test_tool_parser.py::TestOpenAIToolCallParser::test_parse_invalid_json_arguments PASSED [ 32%]
+tests/test_tool_parser.py::TestOpenAIToolCallParser::test_parse_missing_tool_call_id PASSED [ 32%]
+tests/test_tool_parser.py::TestOpenAIToolCallParser::test_parse_empty_tool_name_skipped PASSED [ 32%]
+tests/test_tool_parser.py::TestOpenAIToolCallParser::test_parse_list_content_without_tool_calls PASSED [ 32%]
+tests/test_tool_parser.py::TestParseToolCallsFunction::test_parse_tool_calls_function PASSED [ 32%]
+tests/test_tool_parser.py::TestParseToolCallsFunction::test_parse_tool_calls_returns_tuple PASSED [ 33%]
+tests/test_tool_parser.py::TestParseToolCallsFunction::test_parse_tool_calls_with_openai_format PASSED [ 33%]
+tests/test_tool_parser.py::TestToolCallModel::test_tool_call_construction PASSED [ 33%]
+tests/test_tool_parser.py::TestToolCallModel::test_tool_call_with_empty_arguments PASSED [ 33%]
+tests/test_tool_parser.py::TestToolCallModel::test_tool_call_serialization PASSED [ 33%]
+tests/unit/domain/agent_context/services/test_agent_coordination_service.py::TestAgentCoordinationService::test_get_or_create_agent_creates_new PASSED [ 33%]
+tests/unit/domain/agent_context/services/test_agent_coordination_service.py::TestAgentCoordinationService::test_get_or_create_agent_returns_existing PASSED [ 33%]
+tests/unit/domain/agent_context/services/test_agent_coordination_service.py::TestAgentCoordinationService::test_assign_agent_creates_new_with_type PASSED [ 33%]
+tests/unit/domain/agent_context/services/test_agent_coordination_service.py::TestAgentCoordinationService::test_assign_agent_returns_if_already_correct_type PASSED [ 33%]
+tests/unit/domain/agent_context/services/test_agent_coordination_service.py::TestAgentCoordinationService::test_switch_agent_creates_if_not_exists PASSED [ 34%]
+tests/unit/domain/agent_context/services/test_agent_coordination_service.py::TestAgentCoordinationService::test_switch_agent_switches_existing PASSED [ 34%]
+tests/unit/domain/agent_context/services/test_agent_coordination_service.py::TestAgentCoordinationService::test_switch_agent_raises_on_same_type PASSED [ 34%]
+tests/unit/domain/agent_context/services/test_agent_coordination_service.py::TestAgentCoordinationService::test_get_current_agent_type_returns_type PASSED [ 34%]
+tests/unit/domain/agent_context/services/test_agent_coordination_service.py::TestAgentCoordinationService::test_get_current_agent_type_returns_none_if_not_found PASSED [ 34%]
+tests/unit/domain/agent_context/services/test_agent_coordination_service.py::TestAgentCoordinationService::test_get_agent_returns_agent PASSED [ 34%]
+tests/unit/domain/agent_context/services/test_agent_coordination_service.py::TestAgentCoordinationService::test_get_switch_history_returns_history PASSED [ 34%]
+tests/unit/domain/agent_context/services/test_agent_coordination_service.py::TestAgentCoordinationService::test_get_switch_history_returns_empty_if_not_found PASSED [ 34%]
+tests/unit/domain/agent_context/services/test_agent_coordination_service.py::TestAgentCoordinationService::test_get_agent_usage_stats PASSED [ 35%]
+tests/unit/domain/agent_context/services/test_agent_coordination_service.py::TestAgentCoordinationService::test_get_problematic_sessions PASSED [ 35%]
+tests/unit/domain/agent_context/services/test_agent_coordination_service.py::TestAgentCoordinationService::test_can_switch_to_returns_true_if_no_agent PASSED [ 35%]
+tests/unit/domain/agent_context/services/test_agent_coordination_service.py::TestAgentCoordinationService::test_can_switch_to_checks_agent_capability PASSED [ 35%]
+tests/unit/domain/agent_context/services/test_agent_coordination_service.py::TestAgentCoordinationService::test_get_capabilities_returns_capabilities PASSED [ 35%]
+tests/unit/domain/agent_context/services/test_agent_coordination_service.py::TestAgentCoordinationService::test_get_capabilities_returns_none_if_not_found PASSED [ 35%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentCreation::test_create_agent_with_factory_method PASSED [ 35%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentCreation::test_create_agent_with_custom_id FAILED [ 35%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentCreation::test_create_agent_generates_id_from_session FAILED [ 35%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentCreation::test_create_with_empty_session_id_raises_error PASSED [ 36%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentCreation::test_create_with_invalid_capabilities_raises_error FAILED [ 36%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentSwitching::test_can_switch_to_different_type PASSED [ 36%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentSwitching::test_cannot_switch_to_same_type PASSED [ 36%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentSwitching::test_switch_to_updates_type PASSED [ 36%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentSwitching::test_switch_to_increments_count PASSED [ 36%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentSwitching::test_switch_to_creates_record PASSED [ 36%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentSwitching::test_switch_to_adds_to_history PASSED [ 36%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentSwitching::test_switch_to_same_type_raises_error PASSED [ 36%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentSwitching::test_switch_updates_last_switch_at PASSED [ 37%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentSwitchHistory::test_get_last_switch_returns_none_initially PASSED [ 37%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentSwitchHistory::test_get_last_switch_returns_last_record PASSED [ 37%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentSwitchHistory::test_get_switch_history_dict_returns_list PASSED [ 37%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentSwitchHistory::test_switch_history_is_immutable FAILED [ 37%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentReset::test_reset_to_orchestrator_switches_type PASSED [ 37%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentReset::test_reset_to_orchestrator_when_already_orchestrator PASSED [ 37%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentMetadata::test_add_metadata_stores_value PASSED [ 37%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentMetadata::test_get_metadata_returns_default_if_not_found PASSED [ 38%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentMetadata::test_metadata_property_returns_copy FAILED [ 38%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentToolSupport::test_supports_tool_returns_true_for_supported PASSED [ 38%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentToolSupport::test_supports_tool_returns_false_for_unsupported PASSED [ 38%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentProperties::test_session_id_property PASSED [ 38%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentProperties::test_capabilities_property PASSED [ 38%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentProperties::test_current_type_property PASSED [ 38%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentStringRepresentation::test_repr_shows_details PASSED [ 38%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentSwitchRecord::test_create_switch_record PASSED [ 38%]
+tests/unit/domain/agent_context/test_agent.py::TestAgentSwitchRecord::test_to_dict_returns_dict PASSED [ 39%]
+tests/unit/domain/agent_context/test_agent_capabilities.py::TestAgentCapabilitiesCreation::test_create_with_valid_parameters PASSED [ 39%]
+tests/unit/domain/agent_context/test_agent_capabilities.py::TestAgentCapabilitiesCreation::test_create_with_invalid_agent_type_raises_error FAILED [ 39%]
+tests/unit/domain/agent_context/test_agent_capabilities.py::TestAgentCapabilitiesCreation::test_create_with_negative_max_switches_raises_error PASSED [ 39%]
+tests/unit/domain/agent_context/test_agent_capabilities.py::TestAgentCapabilitiesCreation::test_create_with_too_large_max_switches_raises_error PASSED [ 39%]
+tests/unit/domain/agent_context/test_agent_capabilities.py::TestAgentCapabilitiesCreation::test_create_with_default_values PASSED [ 39%]
+tests/unit/domain/agent_context/test_agent_capabilities.py::TestAgentCapabilitiesFactoryMethods::test_for_orchestrator PASSED [ 39%]
+tests/unit/domain/agent_context/test_agent_capabilities.py::TestAgentCapabilitiesFactoryMethods::test_for_coder PASSED [ 39%]
+tests/unit/domain/agent_context/test_agent_capabilities.py::TestAgentCapabilitiesFactoryMethods::test_for_architect PASSED [ 40%]
+tests/unit/domain/agent_context/test_agent_capabilities.py::TestAgentCapabilitiesFactoryMethods::test_for_debug PASSED [ 40%]
+tests/unit/domain/agent_context/test_agent_capabilities.py::TestAgentCapabilitiesFactoryMethods::test_for_ask PASSED [ 40%]
+tests/unit/domain/agent_context/test_agent_capabilities.py::TestAgentCapabilitiesFactoryMethods::test_for_universal PASSED [ 40%]
+tests/unit/domain/agent_context/test_agent_capabilities.py::TestAgentCapabilitiesFactoryMethods::test_for_agent_type_orchestrator PASSED [ 40%]
+tests/unit/domain/agent_context/test_agent_capabilities.py::TestAgentCapabilitiesFactoryMethods::test_for_agent_type_coder PASSED [ 40%]
+tests/unit/domain/agent_context/test_agent_capabilities.py::TestAgentCapabilitiesToolSupport::test_supports_tool_returns_true_for_supported PASSED [ 40%]
+tests/unit/domain/agent_context/test_agent_capabilities.py::TestAgentCapabilitiesToolSupport::test_supports_tool_returns_false_for_unsupported PASSED [ 40%]
+tests/unit/domain/agent_context/test_agent_capabilities.py::TestAgentCapabilitiesToolSupport::test_get_tool_list_returns_sorted_list PASSED [ 40%]
+tests/unit/domain/agent_context/test_agent_capabilities.py::TestAgentCapabilitiesToolSupport::test_supported_tools_is_immutable PASSED [ 41%]
+tests/unit/domain/agent_context/test_agent_capabilities.py::TestAgentCapabilitiesEquality::test_equal_capabilities_are_equal PASSED [ 41%]
+tests/unit/domain/agent_context/test_agent_capabilities.py::TestAgentCapabilitiesEquality::test_different_capabilities_are_not_equal PASSED [ 41%]
+tests/unit/domain/agent_context/test_agent_capabilities.py::TestAgentCapabilitiesEquality::test_not_equal_to_non_capabilities PASSED [ 41%]
+tests/unit/domain/agent_context/test_agent_capabilities.py::TestAgentCapabilitiesHashing::test_can_be_used_in_set PASSED [ 41%]
+tests/unit/domain/agent_context/test_agent_capabilities.py::TestAgentCapabilitiesHashing::test_can_be_used_as_dict_key PASSED [ 41%]
+tests/unit/domain/agent_context/test_agent_capabilities.py::TestAgentCapabilitiesHashing::test_equal_capabilities_have_same_hash PASSED [ 41%]
+tests/unit/domain/agent_context/test_agent_capabilities.py::TestAgentCapabilitiesStringRepresentation::test_str_shows_type_and_tool_count PASSED [ 41%]
+tests/unit/domain/agent_context/test_agent_capabilities.py::TestAgentCapabilitiesStringRepresentation::test_repr_shows_details PASSED [ 41%]
+tests/unit/domain/agent_context/test_agent_capabilities.py::TestAgentType::test_all_agent_types_exist PASSED [ 42%]
+tests/unit/domain/agent_context/test_agent_capabilities.py::TestAgentType::test_agent_type_is_string_enum PASSED [ 42%]
+tests/unit/domain/agent_context/test_agent_capabilities.py::TestAgentType::test_can_compare_agent_types PASSED [ 42%]
+tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdCreation::test_create_with_valid_id FAILED [ 42%]
+tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdCreation::test_create_with_empty_string_raises_error FAILED [ 42%]
+tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdCreation::test_create_with_none_raises_error FAILED [ 42%]
+tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdCreation::test_create_with_non_string_raises_error FAILED [ 42%]
+tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdCreation::test_create_with_too_long_id_raises_error FAILED [ 42%]
+tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdCreation::test_create_with_whitespace_only_raises_error FAILED [ 43%]
+tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdCreation::test_create_with_invalid_characters_raises_error FAILED [ 43%]
+tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdCreation::test_create_strips_whitespace FAILED [ 43%]
+tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdGeneration::test_generate_creates_valid_id FAILED [ 43%]
+tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdGeneration::test_generate_with_custom_prefix FAILED [ 43%]
+tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdGeneration::test_generate_creates_unique_ids PASSED [ 43%]
+tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdGeneration::test_from_session_id_creates_valid_id FAILED [ 43%]
+tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdGeneration::test_from_session_id_removes_session_prefix FAILED [ 43%]
+tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdGeneration::test_from_session_id_with_empty_raises_error PASSED [ 43%]
+tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdEquality::test_equal_ids_are_equal FAILED [ 44%]
+tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdEquality::test_different_ids_are_not_equal FAILED [ 44%]
+tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdEquality::test_not_equal_to_non_agent_id FAILED [ 44%]
+tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdHashing::test_can_be_used_in_set FAILED [ 44%]
+tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdHashing::test_can_be_used_as_dict_key FAILED [ 44%]
+tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdHashing::test_equal_ids_have_same_hash FAILED [ 44%]
+tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdComparison::test_less_than_comparison FAILED [ 44%]
+tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdComparison::test_sorting FAILED [ 44%]
+tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdStringRepresentation::test_str_returns_value FAILED [ 44%]
+tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdStringRepresentation::test_repr_shows_class_and_value FAILED [ 45%]
+tests/unit/domain/approval_context/test_entities.py::TestPolicyRule::test_create_valid_rule PASSED [ 45%]
+tests/unit/domain/approval_context/test_entities.py::TestPolicyRule::test_rule_invalid_regex_raises_error PASSED [ 45%]
+tests/unit/domain/approval_context/test_entities.py::TestPolicyRule::test_rule_matches_exact_subject PASSED [ 45%]
+tests/unit/domain/approval_context/test_entities.py::TestPolicyRule::test_rule_matches_regex_pattern PASSED [ 45%]
+tests/unit/domain/approval_context/test_entities.py::TestPolicyRule::test_rule_matches_with_conditions_gt PASSED [ 45%]
+tests/unit/domain/approval_context/test_entities.py::TestPolicyRule::test_rule_matches_with_conditions_lt PASSED [ 45%]
+tests/unit/domain/approval_context/test_entities.py::TestPolicyRule::test_rule_matches_with_conditions_eq PASSED [ 45%]
+tests/unit/domain/approval_context/test_entities.py::TestPolicyRule::test_rule_matches_with_conditions_contains PASSED [ 46%]
+tests/unit/domain/approval_context/test_entities.py::TestPolicyRule::test_rule_matches_multiple_conditions PASSED [ 46%]
+tests/unit/domain/approval_context/test_entities.py::TestPolicyRule::test_rule_equality PASSED [ 46%]
+tests/unit/domain/approval_context/test_entities.py::TestPolicyRule::test_rule_hash PASSED [ 46%]
+tests/unit/domain/approval_context/test_entities.py::TestApprovalRequest::test_create_approval_request PASSED [ 46%]
+tests/unit/domain/approval_context/test_entities.py::TestApprovalRequest::test_create_generates_approval_requested_event PASSED [ 46%]
+tests/unit/domain/approval_context/test_entities.py::TestApprovalRequest::test_approve_request FAILED [ 46%]
+tests/unit/domain/approval_context/test_entities.py::TestApprovalRequest::test_approve_generates_approval_granted_event FAILED [ 46%]
+tests/unit/domain/approval_context/test_entities.py::TestApprovalRequest::test_reject_request FAILED [ 46%]
+tests/unit/domain/approval_context/test_entities.py::TestApprovalRequest::test_reject_generates_approval_rejected_event FAILED [ 47%]
+tests/unit/domain/approval_context/test_entities.py::TestApprovalRequest::test_expire_request FAILED [ 47%]
+tests/unit/domain/approval_context/test_entities.py::TestApprovalRequest::test_expire_generates_approval_expired_event FAILED [ 47%]
+tests/unit/domain/approval_context/test_entities.py::TestApprovalRequest::test_cannot_approve_already_approved FAILED [ 47%]
+tests/unit/domain/approval_context/test_entities.py::TestApprovalRequest::test_cannot_reject_already_rejected FAILED [ 47%]
+tests/unit/domain/approval_context/test_entities.py::TestApprovalRequest::test_is_expired_check PASSED [ 47%]
+tests/unit/domain/approval_context/test_entities.py::TestApprovalRequest::test_approved_request_not_expired FAILED [ 47%]
+tests/unit/domain/approval_context/test_entities.py::TestHITLPolicy::test_create_policy PASSED [ 47%]
+tests/unit/domain/approval_context/test_entities.py::TestHITLPolicy::test_add_rule_to_policy PASSED [ 47%]
+tests/unit/domain/approval_context/test_entities.py::TestHITLPolicy::test_rules_sorted_by_priority PASSED [ 48%]
+tests/unit/domain/approval_context/test_entities.py::TestHITLPolicy::test_remove_rule_from_policy PASSED [ 48%]
+tests/unit/domain/approval_context/test_entities.py::TestHITLPolicy::test_remove_nonexistent_rule_returns_false PASSED [ 48%]
+tests/unit/domain/approval_context/test_entities.py::TestHITLPolicy::test_evaluate_with_matching_rule PASSED [ 48%]
+tests/unit/domain/approval_context/test_entities.py::TestHITLPolicy::test_evaluate_without_matching_rule_uses_default PASSED [ 48%]
+tests/unit/domain/approval_context/test_entities.py::TestHITLPolicy::test_evaluate_generates_events PASSED [ 48%]
+tests/unit/domain/approval_context/test_entities.py::TestHITLPolicy::test_evaluate_inactive_policy_auto_approves PASSED [ 48%]
+tests/unit/domain/approval_context/test_entities.py::TestHITLPolicy::test_activate_deactivate_policy PASSED [ 48%]
+tests/unit/domain/approval_context/test_entities.py::TestHITLPolicy::test_evaluate_respects_rule_priority PASSED [ 49%]
+tests/unit/domain/approval_context/test_value_objects.py::TestApprovalId::test_create_valid_approval_id PASSED [ 49%]
+tests/unit/domain/approval_context/test_value_objects.py::TestApprovalId::test_approval_id_empty_raises_error PASSED [ 49%]
+tests/unit/domain/approval_context/test_value_objects.py::TestApprovalId::test_approval_id_whitespace_raises_error PASSED [ 49%]
+tests/unit/domain/approval_context/test_value_objects.py::TestApprovalId::test_approval_id_with_spaces_raises_error PASSED [ 49%]
+tests/unit/domain/approval_context/test_value_objects.py::TestApprovalId::test_approval_id_equality PASSED [ 49%]
+tests/unit/domain/approval_context/test_value_objects.py::TestApprovalId::test_approval_id_hash PASSED [ 49%]
+tests/unit/domain/approval_context/test_value_objects.py::TestApprovalId::test_approval_id_repr PASSED [ 49%]
+tests/unit/domain/approval_context/test_value_objects.py::TestApprovalStatus::test_create_valid_status PASSED [ 49%]
+tests/unit/domain/approval_context/test_value_objects.py::TestApprovalStatus::test_status_invalid_type_raises_error PASSED [ 50%]
+tests/unit/domain/approval_context/test_value_objects.py::TestApprovalStatus::test_pending_can_transition_to_approved FAILED [ 50%]
+tests/unit/domain/approval_context/test_value_objects.py::TestApprovalStatus::test_pending_can_transition_to_rejected FAILED [ 50%]
+tests/unit/domain/approval_context/test_value_objects.py::TestApprovalStatus::test_pending_can_transition_to_expired FAILED [ 50%]
+tests/unit/domain/approval_context/test_value_objects.py::TestApprovalStatus::test_approved_cannot_transition FAILED [ 50%]
+tests/unit/domain/approval_context/test_value_objects.py::TestApprovalStatus::test_rejected_cannot_transition FAILED [ 50%]
+tests/unit/domain/approval_context/test_value_objects.py::TestApprovalStatus::test_expired_cannot_transition FAILED [ 50%]
+tests/unit/domain/approval_context/test_value_objects.py::TestApprovalStatus::test_pending_is_not_terminal FAILED [ 50%]
+tests/unit/domain/approval_context/test_value_objects.py::TestApprovalStatus::test_approved_is_terminal FAILED [ 50%]
+tests/unit/domain/approval_context/test_value_objects.py::TestApprovalStatus::test_rejected_is_terminal FAILED [ 51%]
+tests/unit/domain/approval_context/test_value_objects.py::TestApprovalStatus::test_expired_is_terminal FAILED [ 51%]
+tests/unit/domain/approval_context/test_value_objects.py::TestApprovalStatus::test_status_helper_methods PASSED [ 51%]
+tests/unit/domain/approval_context/test_value_objects.py::TestApprovalStatus::test_status_equality PASSED [ 51%]
+tests/unit/domain/approval_context/test_value_objects.py::TestApprovalStatus::test_status_hash PASSED [ 51%]
+tests/unit/domain/approval_context/test_value_objects.py::TestApprovalStatus::test_status_repr PASSED [ 51%]
+tests/unit/domain/approval_context/test_value_objects.py::TestApprovalType::test_create_valid_type PASSED [ 51%]
+tests/unit/domain/approval_context/test_value_objects.py::TestApprovalType::test_type_invalid_type_raises_error PASSED [ 51%]
+tests/unit/domain/approval_context/test_value_objects.py::TestApprovalType::test_type_helper_methods PASSED [ 52%]
+tests/unit/domain/approval_context/test_value_objects.py::TestApprovalType::test_type_equality PASSED [ 52%]
+tests/unit/domain/approval_context/test_value_objects.py::TestApprovalType::test_type_hash PASSED [ 52%]
+tests/unit/domain/approval_context/test_value_objects.py::TestApprovalType::test_type_repr PASSED [ 52%]
+tests/unit/domain/approval_context/test_value_objects.py::TestPolicyAction::test_create_valid_action PASSED [ 52%]
+tests/unit/domain/approval_context/test_value_objects.py::TestPolicyAction::test_action_invalid_type_raises_error PASSED [ 52%]
+tests/unit/domain/approval_context/test_value_objects.py::TestPolicyAction::test_action_helper_methods PASSED [ 52%]
+tests/unit/domain/approval_context/test_value_objects.py::TestPolicyAction::test_action_requires_user_decision PASSED [ 52%]
+tests/unit/domain/approval_context/test_value_objects.py::TestPolicyAction::test_action_is_automatic PASSED [ 52%]
+tests/unit/domain/approval_context/test_value_objects.py::TestPolicyAction::test_action_equality PASSED [ 53%]
+tests/unit/domain/approval_context/test_value_objects.py::TestPolicyAction::test_action_hash PASSED [ 53%]
+tests/unit/domain/approval_context/test_value_objects.py::TestPolicyAction::test_action_repr PASSED [ 53%]
+tests/unit/domain/approval_context/test_value_objects.py::TestStatusTransitions::test_all_valid_transitions_from_pending FAILED [ 53%]
+tests/unit/domain/approval_context/test_value_objects.py::TestStatusTransitions::test_terminal_states_have_no_transitions FAILED [ 53%]
+tests/unit/domain/approval_context/test_value_objects.py::TestStatusTransitions::test_terminal_state_detection FAILED [ 53%]
+tests/unit/domain/execution_context/test_entities.py::TestSubtask::test_create_subtask FAILED [ 53%]
+tests/unit/domain/execution_context/test_entities.py::TestSubtask::test_start_subtask FAILED [ 53%]
+tests/unit/domain/execution_context/test_entities.py::TestSubtask::test_complete_subtask FAILED [ 53%]
+tests/unit/domain/execution_context/test_entities.py::TestSubtask::test_fail_subtask FAILED [ 54%]
+tests/unit/domain/execution_context/test_entities.py::TestSubtask::test_reset_to_pending FAILED [ 54%]
+tests/unit/domain/execution_context/test_entities.py::TestSubtask::test_cannot_start_already_started_subtask FAILED [ 54%]
+tests/unit/domain/execution_context/test_entities.py::TestSubtask::test_cannot_complete_pending_subtask FAILED [ 54%]
+tests/unit/domain/execution_context/test_entities.py::TestSubtask::test_subtask_with_dependencies FAILED [ 54%]
+tests/unit/domain/execution_context/test_entities.py::TestExecutionPlan::test_create_execution_plan FAILED [ 54%]
+tests/unit/domain/execution_context/test_entities.py::TestExecutionPlan::test_start_plan FAILED [ 54%]
+tests/unit/domain/execution_context/test_entities.py::TestExecutionPlan::test_complete_plan FAILED [ 54%]
+tests/unit/domain/execution_context/test_entities.py::TestExecutionPlan::test_fail_plan FAILED [ 55%]
+tests/unit/domain/execution_context/test_entities.py::TestExecutionPlan::test_cancel_plan FAILED [ 55%]
+tests/unit/domain/execution_context/test_entities.py::TestExecutionPlan::test_add_subtask FAILED [ 55%]
+tests/unit/domain/execution_context/test_entities.py::TestExecutionPlan::test_get_subtask_by_id FAILED [ 55%]
+tests/unit/domain/execution_context/test_entities.py::TestExecutionPlan::test_get_subtask_by_id_not_found PASSED [ 55%]
+tests/unit/domain/execution_context/test_entities.py::TestExecutionPlan::test_plan_with_multiple_subtasks FAILED [ 55%]
+tests/unit/domain/execution_context/test_entities.py::TestExecutionPlan::test_domain_events_are_collected FAILED [ 55%]
+tests/unit/domain/execution_context/test_entities.py::TestExecutionPlan::test_clear_domain_events FAILED [ 55%]
+tests/unit/domain/execution_context/test_entities.py::TestExecutionPlanLifecycle::test_complete_plan_lifecycle FAILED [ 55%]
+tests/unit/domain/execution_context/test_entities.py::TestExecutionPlanLifecycle::test_plan_lifecycle_with_subtask_failure FAILED [ 56%]
+tests/unit/domain/execution_context/test_services.py::TestDependencyResolver::test_get_ready_subtasks_no_dependencies FAILED [ 56%]
+tests/unit/domain/execution_context/test_services.py::TestDependencyResolver::test_get_ready_subtasks_with_dependencies FAILED [ 56%]
+tests/unit/domain/execution_context/test_services.py::TestDependencyResolver::test_get_ready_subtasks_skip_running FAILED [ 56%]
+tests/unit/domain/execution_context/test_services.py::TestDependencyResolver::test_get_ready_subtasks_blocked_by_failed FAILED [ 56%]
+tests/unit/domain/execution_context/test_services.py::TestDependencyResolver::test_has_cyclic_dependencies_no_cycle FAILED [ 56%]
+tests/unit/domain/execution_context/test_services.py::TestDependencyResolver::test_has_cyclic_dependencies_with_cycle FAILED [ 56%]
+tests/unit/domain/execution_context/test_services.py::TestDependencyResolver::test_has_cyclic_dependencies_self_reference FAILED [ 56%]
+tests/unit/domain/execution_context/test_services.py::TestDependencyResolver::test_validate_dependencies_success FAILED [ 56%]
+tests/unit/domain/execution_context/test_services.py::TestDependencyResolver::test_validate_dependencies_missing_dependency FAILED [ 57%]
+tests/unit/domain/execution_context/test_services.py::TestDependencyResolver::test_validate_dependencies_cyclic FAILED [ 57%]
+tests/unit/domain/execution_context/test_services.py::TestDependencyResolver::test_get_ready_subtasks_complex_graph FAILED [ 57%]
+tests/unit/domain/execution_context/test_services.py::TestPlanExecutionService::test_service_initialization PASSED [ 57%]
+tests/unit/domain/execution_context/test_services.py::TestSubtaskExecutor::test_executor_initialization PASSED [ 57%]
+tests/unit/domain/execution_context/test_value_objects.py::TestPlanId::test_create_valid_plan_id PASSED [ 57%]
+tests/unit/domain/execution_context/test_value_objects.py::TestPlanId::test_create_plan_id_with_empty_string_raises_error PASSED [ 57%]
+tests/unit/domain/execution_context/test_value_objects.py::TestPlanId::test_create_plan_id_with_whitespace_raises_error PASSED [ 57%]
+tests/unit/domain/execution_context/test_value_objects.py::TestPlanId::test_plan_id_equality PASSED [ 58%]
+tests/unit/domain/execution_context/test_value_objects.py::TestPlanId::test_plan_id_inequality PASSED [ 58%]
+tests/unit/domain/execution_context/test_value_objects.py::TestPlanId::test_plan_id_hash PASSED [ 58%]
+tests/unit/domain/execution_context/test_value_objects.py::TestPlanId::test_plan_id_repr PASSED [ 58%]
+tests/unit/domain/execution_context/test_value_objects.py::TestPlanId::test_plan_id_str PASSED [ 58%]
+tests/unit/domain/execution_context/test_value_objects.py::TestSubtaskId::test_create_valid_subtask_id PASSED [ 58%]
+tests/unit/domain/execution_context/test_value_objects.py::TestSubtaskId::test_create_subtask_id_with_empty_string_raises_error PASSED [ 58%]
+tests/unit/domain/execution_context/test_value_objects.py::TestSubtaskId::test_subtask_id_equality PASSED [ 58%]
+tests/unit/domain/execution_context/test_value_objects.py::TestSubtaskId::test_subtask_id_hash PASSED [ 58%]
+tests/unit/domain/execution_context/test_value_objects.py::TestPlanStatus::test_create_valid_plan_status PASSED [ 59%]
+tests/unit/domain/execution_context/test_value_objects.py::TestPlanStatus::test_all_plan_statuses_exist PASSED [ 59%]
+tests/unit/domain/execution_context/test_value_objects.py::TestPlanStatus::test_can_transition_from_pending_to_in_progress PASSED [ 59%]
+tests/unit/domain/execution_context/test_value_objects.py::TestPlanStatus::test_can_transition_from_in_progress_to_completed PASSED [ 59%]
+tests/unit/domain/execution_context/test_value_objects.py::TestPlanStatus::test_can_transition_from_in_progress_to_failed PASSED [ 59%]
+tests/unit/domain/execution_context/test_value_objects.py::TestPlanStatus::test_can_transition_from_in_progress_to_cancelled PASSED [ 59%]
+tests/unit/domain/execution_context/test_value_objects.py::TestPlanStatus::test_cannot_transition_from_completed_to_in_progress PASSED [ 59%]
+tests/unit/domain/execution_context/test_value_objects.py::TestPlanStatus::test_cannot_transition_from_failed_to_in_progress PASSED [ 59%]
+tests/unit/domain/execution_context/test_value_objects.py::TestPlanStatus::test_cannot_transition_from_cancelled_to_in_progress PASSED [ 60%]
+tests/unit/domain/execution_context/test_value_objects.py::TestPlanStatus::test_is_terminal_for_completed PASSED [ 60%]
+tests/unit/domain/execution_context/test_value_objects.py::TestPlanStatus::test_is_terminal_for_failed PASSED [ 60%]
+tests/unit/domain/execution_context/test_value_objects.py::TestPlanStatus::test_is_terminal_for_cancelled PASSED [ 60%]
+tests/unit/domain/execution_context/test_value_objects.py::TestPlanStatus::test_is_not_terminal_for_pending PASSED [ 60%]
+tests/unit/domain/execution_context/test_value_objects.py::TestPlanStatus::test_is_not_terminal_for_in_progress PASSED [ 60%]
+tests/unit/domain/execution_context/test_value_objects.py::TestSubtaskStatus::test_create_valid_subtask_status PASSED [ 60%]
+tests/unit/domain/execution_context/test_value_objects.py::TestSubtaskStatus::test_all_subtask_statuses_exist FAILED [ 60%]
+tests/unit/domain/execution_context/test_value_objects.py::TestSubtaskStatus::test_can_transition_from_pending_to_in_progress PASSED [ 60%]
+tests/unit/domain/execution_context/test_value_objects.py::TestSubtaskStatus::test_can_transition_from_in_progress_to_done PASSED [ 61%]
+tests/unit/domain/execution_context/test_value_objects.py::TestSubtaskStatus::test_can_transition_from_in_progress_to_failed PASSED [ 61%]
+tests/unit/domain/execution_context/test_value_objects.py::TestSubtaskStatus::test_can_transition_from_failed_to_pending PASSED [ 61%]
+tests/unit/domain/execution_context/test_value_objects.py::TestSubtaskStatus::test_cannot_transition_from_done_to_in_progress PASSED [ 61%]
+tests/unit/domain/execution_context/test_value_objects.py::TestSubtaskStatus::test_cannot_transition_from_pending_to_done PASSED [ 61%]
+tests/unit/domain/execution_context/test_value_objects.py::TestSubtaskStatus::test_is_terminal_for_done PASSED [ 61%]
+tests/unit/domain/execution_context/test_value_objects.py::TestSubtaskStatus::test_is_not_terminal_for_failed PASSED [ 61%]
+tests/unit/domain/execution_context/test_value_objects.py::TestSubtaskStatus::test_is_not_terminal_for_pending PASSED [ 61%]
+tests/unit/domain/execution_context/test_value_objects.py::TestSubtaskStatus::test_is_not_terminal_for_in_progress PASSED [ 61%]
+tests/unit/domain/execution_context/test_value_objects.py::TestStatusTransitions::test_plan_lifecycle_happy_path PASSED [ 62%]
+tests/unit/domain/execution_context/test_value_objects.py::TestStatusTransitions::test_plan_lifecycle_with_failure PASSED [ 62%]
+tests/unit/domain/execution_context/test_value_objects.py::TestStatusTransitions::test_subtask_lifecycle_with_retry PASSED [ 62%]
+tests/unit/domain/llm_context/test_entities.py::TestLLMRequest::test_create_minimal_request PASSED [ 62%]
+tests/unit/domain/llm_context/test_entities.py::TestLLMRequest::test_create_request_with_tools PASSED [ 62%]
+tests/unit/domain/llm_context/test_entities.py::TestLLMRequest::test_create_request_with_temperature PASSED [ 62%]
+tests/unit/domain/llm_context/test_entities.py::TestLLMRequest::test_validate_success PASSED [ 62%]
+tests/unit/domain/llm_context/test_entities.py::TestLLMRequest::test_validate_empty_messages PASSED [ 62%]
+tests/unit/domain/llm_context/test_entities.py::TestLLMRequest::test_validate_invalid_message_format PASSED [ 63%]
+tests/unit/domain/llm_context/test_entities.py::TestLLMRequest::test_estimate_tokens PASSED [ 63%]
+tests/unit/domain/llm_context/test_entities.py::TestLLMRequest::test_to_api_format PASSED [ 63%]
+tests/unit/domain/llm_context/test_entities.py::TestLLMRequest::test_add_message PASSED [ 63%]
+tests/unit/domain/llm_context/test_entities.py::TestLLMInteraction::test_start_interaction PASSED [ 63%]
+tests/unit/domain/llm_context/test_entities.py::TestLLMInteraction::test_complete_interaction PASSED [ 63%]
+tests/unit/domain/llm_context/test_entities.py::TestLLMInteraction::test_fail_interaction PASSED [ 63%]
+tests/unit/domain/llm_context/test_entities.py::TestLLMInteraction::test_cannot_complete_twice PASSED [ 63%]
+tests/unit/domain/llm_context/test_entities.py::TestLLMInteraction::test_cannot_fail_after_complete PASSED [ 63%]
+tests/unit/domain/llm_context/test_entities.py::TestLLMInteraction::test_get_duration_ms PASSED [ 64%]
+tests/unit/domain/llm_context/test_entities.py::TestLLMInteraction::test_get_tokens_used PASSED [ 64%]
+tests/unit/domain/llm_context/test_entities.py::TestLLMInteraction::test_get_status PASSED [ 64%]
+tests/unit/domain/llm_context/test_services.py::TestLLMRequestBuilder::test_build_chat_request PASSED [ 64%]
+tests/unit/domain/llm_context/test_services.py::TestLLMRequestBuilder::test_build_chat_request_with_custom_temperature PASSED [ 64%]
+tests/unit/domain/llm_context/test_services.py::TestLLMRequestBuilder::test_build_tool_request PASSED [ 64%]
+tests/unit/domain/llm_context/test_services.py::TestLLMRequestBuilder::test_build_tool_request_unsupported_model_raises_error PASSED [ 64%]
+tests/unit/domain/llm_context/test_services.py::TestLLMRequestBuilder::test_build_code_generation_request PASSED [ 64%]
+tests/unit/domain/llm_context/test_services.py::TestLLMRequestBuilder::test_validate_messages_success PASSED [ 64%]
+tests/unit/domain/llm_context/test_services.py::TestLLMRequestBuilder::test_validate_messages_empty PASSED [ 65%]
+tests/unit/domain/llm_context/test_services.py::TestLLMRequestBuilder::test_validate_messages_missing_role PASSED [ 65%]
+tests/unit/domain/llm_context/test_services.py::TestLLMRequestBuilder::test_optimize_context PASSED [ 65%]
+tests/unit/domain/llm_context/test_services.py::TestLLMResponseValidator::test_validate_response_with_content PASSED [ 65%]
+tests/unit/domain/llm_context/test_services.py::TestLLMResponseValidator::test_validate_response_with_tool_calls PASSED [ 65%]
+tests/unit/domain/llm_context/test_services.py::TestLLMResponseValidator::test_validate_response_empty_fails PASSED [ 65%]
+tests/unit/domain/llm_context/test_services.py::TestLLMResponseValidator::test_validate_tool_calls_multiple_warning PASSED [ 65%]
+tests/unit/domain/llm_context/test_services.py::TestLLMResponseValidator::test_validate_content_success PASSED [ 65%]
+tests/unit/domain/llm_context/test_services.py::TestLLMResponseValidator::test_validate_content_empty_fails PASSED [ 66%]
+tests/unit/domain/llm_context/test_services.py::TestLLMResponseValidator::test_check_token_usage_normal PASSED [ 66%]
+tests/unit/domain/llm_context/test_services.py::TestTokenEstimator::test_estimate_text PASSED [ 66%]
+tests/unit/domain/llm_context/test_services.py::TestTokenEstimator::test_estimate_text_empty PASSED [ 66%]
+tests/unit/domain/llm_context/test_services.py::TestTokenEstimator::test_estimate_message PASSED [ 66%]
+tests/unit/domain/llm_context/test_services.py::TestTokenEstimator::test_estimate_messages PASSED [ 66%]
+tests/unit/domain/llm_context/test_services.py::TestTokenEstimator::test_estimate_tools PASSED [ 66%]
+tests/unit/domain/llm_context/test_services.py::TestTokenEstimator::test_estimate_total PASSED [ 66%]
+tests/unit/domain/llm_context/test_services.py::TestTokenEstimator::test_will_exceed_limit_false PASSED [ 66%]
+tests/unit/domain/llm_context/test_services.py::TestTokenEstimator::test_get_recommended_max_tokens PASSED [ 67%]
+tests/unit/domain/llm_context/test_value_objects.py::TestModelName::test_create_valid_model_name PASSED [ 67%]
+tests/unit/domain/llm_context/test_value_objects.py::TestModelName::test_empty_model_name_raises_error PASSED [ 67%]
+tests/unit/domain/llm_context/test_value_objects.py::TestModelName::test_whitespace_model_name_raises_error PASSED [ 67%]
+tests/unit/domain/llm_context/test_value_objects.py::TestModelName::test_get_provider_openai PASSED [ 67%]
+tests/unit/domain/llm_context/test_value_objects.py::TestModelName::test_get_provider_anthropic PASSED [ 67%]
+tests/unit/domain/llm_context/test_value_objects.py::TestModelName::test_get_provider_with_prefix PASSED [ 67%]
+tests/unit/domain/llm_context/test_value_objects.py::TestModelName::test_supports_tools_gpt4 PASSED [ 67%]
+tests/unit/domain/llm_context/test_value_objects.py::TestModelName::test_supports_tools_claude3 PASSED [ 67%]
+tests/unit/domain/llm_context/test_value_objects.py::TestModelName::test_equality PASSED [ 68%]
+tests/unit/domain/llm_context/test_value_objects.py::TestTemperature::test_create_valid_temperature PASSED [ 68%]
+tests/unit/domain/llm_context/test_value_objects.py::TestTemperature::test_temperature_below_zero_raises_error PASSED [ 68%]
+tests/unit/domain/llm_context/test_value_objects.py::TestTemperature::test_temperature_above_two_raises_error PASSED [ 68%]
+tests/unit/domain/llm_context/test_value_objects.py::TestTemperature::test_conservative_factory PASSED [ 68%]
+tests/unit/domain/llm_context/test_value_objects.py::TestTemperature::test_balanced_factory PASSED [ 68%]
+tests/unit/domain/llm_context/test_value_objects.py::TestTemperature::test_creative_factory PASSED [ 68%]
+tests/unit/domain/llm_context/test_value_objects.py::TestTemperature::test_maximum_factory PASSED [ 68%]
+tests/unit/domain/llm_context/test_value_objects.py::TestTemperature::test_get_description PASSED [ 69%]
+tests/unit/domain/llm_context/test_value_objects.py::TestTokenLimit::test_create_valid_token_limit PASSED [ 69%]
+tests/unit/domain/llm_context/test_value_objects.py::TestTokenLimit::test_token_limit_below_minimum_raises_error PASSED [ 69%]
+tests/unit/domain/llm_context/test_value_objects.py::TestTokenLimit::test_token_limit_above_maximum_raises_error PASSED [ 69%]
+tests/unit/domain/llm_context/test_value_objects.py::TestTokenLimit::test_for_gpt35_factory PASSED [ 69%]
+tests/unit/domain/llm_context/test_value_objects.py::TestTokenLimit::test_for_gpt4_factory PASSED [ 69%]
+tests/unit/domain/llm_context/test_value_objects.py::TestTokenLimit::test_for_gpt4_turbo_factory PASSED [ 69%]
+tests/unit/domain/llm_context/test_value_objects.py::TestTokenLimit::test_for_model_gpt4 PASSED [ 69%]
+tests/unit/domain/llm_context/test_value_objects.py::TestTokenLimit::test_for_model_claude3 PASSED [ 69%]
+tests/unit/domain/llm_context/test_value_objects.py::TestTokenLimit::test_is_within_limit PASSED [ 70%]
+tests/unit/domain/llm_context/test_value_objects.py::TestTokenLimit::test_remaining_tokens PASSED [ 70%]
+tests/unit/domain/llm_context/test_value_objects.py::TestTokenLimit::test_percentage_used PASSED [ 70%]
+tests/unit/domain/llm_context/test_value_objects.py::TestLLMRequestId::test_create_valid_request_id PASSED [ 70%]
+tests/unit/domain/llm_context/test_value_objects.py::TestLLMRequestId::test_empty_request_id_raises_error PASSED [ 70%]
+tests/unit/domain/llm_context/test_value_objects.py::TestLLMRequestId::test_whitespace_request_id_raises_error PASSED [ 70%]
+tests/unit/domain/llm_context/test_value_objects.py::TestLLMRequestId::test_generate_request_id PASSED [ 70%]
+tests/unit/domain/llm_context/test_value_objects.py::TestLLMRequestId::test_from_string PASSED [ 70%]
+tests/unit/domain/llm_context/test_value_objects.py::TestLLMRequestId::test_hash PASSED [ 70%]
+tests/unit/domain/llm_context/test_value_objects.py::TestFinishReason::test_create_valid_finish_reason PASSED [ 71%]
+tests/unit/domain/llm_context/test_value_objects.py::TestFinishReason::test_stop_factory PASSED [ 71%]
+tests/unit/domain/llm_context/test_value_objects.py::TestFinishReason::test_length_factory PASSED [ 71%]
+tests/unit/domain/llm_context/test_value_objects.py::TestFinishReason::test_tool_calls_factory PASSED [ 71%]
+tests/unit/domain/llm_context/test_value_objects.py::TestFinishReason::test_error_factory PASSED [ 71%]
+tests/unit/domain/llm_context/test_value_objects.py::TestFinishReason::test_content_filter_is_error PASSED [ 71%]
+tests/unit/domain/llm_context/test_value_objects.py::TestFinishReason::test_get_description PASSED [ 71%]
+tests/unit/domain/llm_context/test_value_objects.py::TestPromptTemplate::test_create_valid_template PASSED [ 71%]
+tests/unit/domain/llm_context/test_value_objects.py::TestPromptTemplate::test_empty_template_raises_error PASSED [ 72%]
+tests/unit/domain/llm_context/test_value_objects.py::TestPromptTemplate::test_invalid_placeholder_raises_error PASSED [ 72%]
+tests/unit/domain/llm_context/test_value_objects.py::TestPromptTemplate::test_get_variables PASSED [ 72%]
+tests/unit/domain/llm_context/test_value_objects.py::TestPromptTemplate::test_get_variables_with_duplicates PASSED [ 72%]
+tests/unit/domain/llm_context/test_value_objects.py::TestPromptTemplate::test_validate_variables_success PASSED [ 72%]
+tests/unit/domain/llm_context/test_value_objects.py::TestPromptTemplate::test_validate_variables_missing PASSED [ 72%]
+tests/unit/domain/llm_context/test_value_objects.py::TestPromptTemplate::test_get_missing_variables PASSED [ 72%]
+tests/unit/domain/llm_context/test_value_objects.py::TestPromptTemplate::test_render_success PASSED [ 72%]
+tests/unit/domain/llm_context/test_value_objects.py::TestPromptTemplate::test_render_missing_variable_raises_error PASSED [ 72%]
+tests/unit/domain/llm_context/test_value_objects.py::TestPromptTemplate::test_has_variables PASSED [ 73%]
+tests/unit/domain/llm_context/test_value_objects.py::TestPromptTemplate::test_preview PASSED [ 73%]
+tests/unit/domain/session_context/services/test_conversation_management_service.py::TestConversationManagementService::test_create_conversation_generates_id_if_not_provided PASSED [ 73%]
+tests/unit/domain/session_context/services/test_conversation_management_service.py::TestConversationManagementService::test_create_conversation_with_provided_id PASSED [ 73%]
+tests/unit/domain/session_context/services/test_conversation_management_service.py::TestConversationManagementService::test_create_conversation_raises_if_exists PASSED [ 73%]
+tests/unit/domain/session_context/services/test_conversation_management_service.py::TestConversationManagementService::test_get_conversation_returns_existing PASSED [ 73%]
+tests/unit/domain/session_context/services/test_conversation_management_service.py::TestConversationManagementService::test_get_conversation_raises_if_not_found PASSED [ 73%]
+tests/unit/domain/session_context/services/test_conversation_management_service.py::TestConversationManagementService::test_get_or_create_conversation_returns_existing PASSED [ 73%]
+tests/unit/domain/session_context/services/test_conversation_management_service.py::TestConversationManagementService::test_get_or_create_conversation_creates_new PASSED [ 73%]
+tests/unit/domain/session_context/services/test_conversation_management_service.py::TestConversationManagementService::test_add_message_to_conversation PASSED [ 74%]
+tests/unit/domain/session_context/services/test_conversation_management_service.py::TestConversationManagementService::test_add_tool_result_with_success PASSED [ 74%]
+tests/unit/domain/session_context/services/test_conversation_management_service.py::TestConversationManagementService::test_add_tool_result_with_error PASSED [ 74%]
+tests/unit/domain/session_context/services/test_conversation_management_service.py::TestConversationManagementService::test_deactivate_conversation PASSED [ 74%]
+tests/unit/domain/session_context/services/test_conversation_management_service.py::TestConversationManagementService::test_list_active_conversations PASSED [ 74%]
+tests/unit/domain/session_context/services/test_conversation_management_service.py::TestConversationManagementService::test_cleanup_old_conversations PASSED [ 74%]
+tests/unit/domain/session_context/services/test_conversation_management_service.py::TestConversationManagementService::test_create_subtask_context PASSED [ 74%]
+tests/unit/domain/session_context/services/test_conversation_management_service.py::TestConversationManagementService::test_restore_from_snapshot PASSED [ 74%]
+tests/unit/domain/session_context/services/test_conversation_management_service.py::TestConversationManagementService::test_prepare_agent_switch_context PASSED [ 75%]
+tests/unit/domain/session_context/services/test_conversation_management_service.py::TestConversationManagementService::test_format_dependency_context PASSED [ 75%]
+tests/unit/domain/session_context/test_conversation.py::TestConversation::test_create_conversation FAILED [ 75%]
+tests/unit/domain/session_context/test_conversation.py::TestConversation::test_create_generates_event FAILED [ 75%]
+tests/unit/domain/session_context/test_conversation.py::TestConversation::test_add_message PASSED [ 75%]
+tests/unit/domain/session_context/test_conversation.py::TestConversation::test_add_message_generates_event FAILED [ 75%]
+tests/unit/domain/session_context/test_conversation.py::TestConversation::test_add_message_sets_title_from_first_user_message PASSED [ 75%]
+tests/unit/domain/session_context/test_conversation.py::TestConversation::test_add_message_to_inactive_raises_error PASSED [ 75%]
+tests/unit/domain/session_context/test_conversation.py::TestConversation::test_deactivate PASSED [ 75%]
+tests/unit/domain/session_context/test_conversation.py::TestConversation::test_deactivate_generates_event FAILED [ 76%]
+tests/unit/domain/session_context/test_conversation.py::TestConversation::test_activate PASSED [ 76%]
+tests/unit/domain/session_context/test_conversation.py::TestConversation::test_clear_messages PASSED [ 76%]
+tests/unit/domain/session_context/test_conversation.py::TestConversation::test_clear_messages_generates_event FAILED [ 76%]
+tests/unit/domain/session_context/test_conversation.py::TestConversation::test_get_duration_seconds PASSED [ 76%]
+tests/unit/domain/session_context/test_conversation.py::TestConversation::test_repr PASSED [ 76%]
+tests/unit/domain/session_context/test_conversation_id.py::TestConversationId::test_create_valid_id PASSED [ 76%]
+tests/unit/domain/session_context/test_conversation_id.py::TestConversationId::test_create_with_alphanumeric PASSED [ 76%]
+tests/unit/domain/session_context/test_conversation_id.py::TestConversationId::test_generate_creates_valid_id PASSED [ 76%]
+tests/unit/domain/session_context/test_conversation_id.py::TestConversationId::test_generate_creates_unique_ids PASSED [ 77%]
+tests/unit/domain/session_context/test_conversation_id.py::TestConversationId::test_empty_id_raises_error FAILED [ 77%]
+tests/unit/domain/session_context/test_conversation_id.py::TestConversationId::test_too_long_id_raises_error FAILED [ 77%]
+tests/unit/domain/session_context/test_conversation_id.py::TestConversationId::test_invalid_characters_raise_error FAILED [ 77%]
+tests/unit/domain/session_context/test_conversation_id.py::TestConversationId::test_equality FAILED [ 77%]
+tests/unit/domain/session_context/test_conversation_id.py::TestConversationId::test_inequality FAILED [ 77%]
+tests/unit/domain/session_context/test_conversation_id.py::TestConversationId::test_hash_consistency PASSED [ 77%]
+tests/unit/domain/session_context/test_conversation_id.py::TestConversationId::test_can_use_in_set FAILED [ 77%]
+tests/unit/domain/session_context/test_conversation_id.py::TestConversationId::test_repr PASSED [ 78%]
+tests/unit/domain/session_context/test_message_collection.py::TestMessageCollection::test_create_empty_collection PASSED [ 78%]
+tests/unit/domain/session_context/test_message_collection.py::TestMessageCollection::test_add_message PASSED [ 78%]
+tests/unit/domain/session_context/test_message_collection.py::TestMessageCollection::test_add_multiple_messages PASSED [ 78%]
+tests/unit/domain/session_context/test_message_collection.py::TestMessageCollection::test_add_exceeds_limit_raises_error PASSED [ 78%]
+tests/unit/domain/session_context/test_message_collection.py::TestMessageCollection::test_is_full PASSED [ 78%]
+tests/unit/domain/session_context/test_message_collection.py::TestMessageCollection::test_get_recent_messages PASSED [ 78%]
+tests/unit/domain/session_context/test_message_collection.py::TestMessageCollection::test_filter_by_role PASSED [ 78%]
+tests/unit/domain/session_context/test_message_collection.py::TestMessageCollection::test_clear_tool_messages PASSED [ 78%]
+tests/unit/domain/session_context/test_message_collection.py::TestMessageCollection::test_get_last_assistant_message PASSED [ 79%]
+tests/unit/domain/session_context/test_message_collection.py::TestMessageCollection::test_to_llm_format PASSED [ 79%]
+tests/unit/domain/session_context/test_message_collection.py::TestMessageCollection::test_to_llm_format_with_limit PASSED [ 79%]
+tests/unit/domain/session_context/test_message_collection.py::TestMessageCollection::test_clear PASSED [ 79%]
+tests/unit/domain/session_context/test_message_collection.py::TestMessageCollection::test_iteration PASSED [ 79%]
+tests/unit/domain/session_context/test_message_collection.py::TestMessageCollection::test_indexing PASSED [ 79%]
+tests/unit/domain/session_context/test_message_collection.py::TestMessageCollection::test_len PASSED [ 79%]
+tests/unit/domain/tool_context/test_entities.py::TestToolCall::test_create_tool_call PASSED [ 79%]
+tests/unit/domain/tool_context/test_entities.py::TestToolCall::test_create_with_custom_id PASSED [ 80%]
+tests/unit/domain/tool_context/test_entities.py::TestToolCall::test_create_with_requires_approval PASSED [ 80%]
+tests/unit/domain/tool_context/test_entities.py::TestToolCall::test_create_generates_domain_event PASSED [ 80%]
+tests/unit/domain/tool_context/test_entities.py::TestToolCall::test_validate_success PASSED [ 80%]
+tests/unit/domain/tool_context/test_entities.py::TestToolCall::test_validate_name_mismatch PASSED [ 80%]
+tests/unit/domain/tool_context/test_entities.py::TestToolCall::test_mark_approved_success PASSED [ 80%]
+tests/unit/domain/tool_context/test_entities.py::TestToolCall::test_mark_approved_without_requires_approval_raises_error PASSED [ 80%]
+tests/unit/domain/tool_context/test_entities.py::TestToolCall::test_mark_approved_twice_raises_error PASSED [ 80%]
+tests/unit/domain/tool_context/test_entities.py::TestToolCall::test_mark_rejected PASSED [ 80%]
+tests/unit/domain/tool_context/test_entities.py::TestToolCall::test_to_llm_format PASSED [ 81%]
+tests/unit/domain/tool_context/test_entities.py::TestToolCall::test_to_dict PASSED [ 81%]
+tests/unit/domain/tool_context/test_entities.py::TestToolSpecification::test_create_specification PASSED [ 81%]
+tests/unit/domain/tool_context/test_entities.py::TestToolSpecification::test_create_generates_domain_event PASSED [ 81%]
+tests/unit/domain/tool_context/test_entities.py::TestToolSpecification::test_validate_arguments_success PASSED [ 81%]
+tests/unit/domain/tool_context/test_entities.py::TestToolSpecification::test_to_openai_format PASSED [ 81%]
+tests/unit/domain/tool_context/test_entities.py::TestToolSpecification::test_is_dangerous_for_file_system PASSED [ 81%]
+tests/unit/domain/tool_context/test_entities.py::TestToolSpecification::test_is_not_dangerous_for_utility PASSED [ 81%]
+tests/unit/domain/tool_context/test_entities.py::TestToolSpecification::test_requires_approval_for_command PASSED [ 81%]
+tests/unit/domain/tool_context/test_entities.py::TestToolSpecification::test_is_local_tool PASSED [ 82%]
+tests/unit/domain/tool_context/test_entities.py::TestToolSpecification::test_is_ide_tool PASSED [ 82%]
+tests/unit/domain/tool_context/test_entities.py::TestToolSpecification::test_update_description PASSED [ 82%]
+tests/unit/domain/tool_context/test_entities.py::TestToolSpecification::test_update_parameters PASSED [ 82%]
+tests/unit/domain/tool_context/test_entities.py::TestToolExecution::test_start_execution PASSED [ 82%]
+tests/unit/domain/tool_context/test_entities.py::TestToolExecution::test_start_generates_domain_event PASSED [ 82%]
+tests/unit/domain/tool_context/test_entities.py::TestToolExecution::test_complete_with_success PASSED [ 82%]
+tests/unit/domain/tool_context/test_entities.py::TestToolExecution::test_complete_with_error_result PASSED [ 82%]
+tests/unit/domain/tool_context/test_entities.py::TestToolExecution::test_complete_twice_raises_error PASSED [ 83%]
+tests/unit/domain/tool_context/test_entities.py::TestToolExecution::test_fail_execution PASSED [ 83%]
+tests/unit/domain/tool_context/test_entities.py::TestToolExecution::test_fail_generates_domain_event PASSED [ 83%]
+tests/unit/domain/tool_context/test_entities.py::TestToolExecution::test_get_duration_ms_when_running PASSED [ 83%]
+tests/unit/domain/tool_context/test_entities.py::TestToolExecution::test_get_duration_ms_when_completed PASSED [ 83%]
+tests/unit/domain/tool_context/test_entities.py::TestToolExecution::test_get_result_content_when_running PASSED [ 83%]
+tests/unit/domain/tool_context/test_entities.py::TestToolExecution::test_get_result_content_when_completed PASSED [ 83%]
+tests/unit/domain/tool_context/test_entities.py::TestToolExecution::test_to_dict PASSED [ 83%]
+tests/unit/domain/tool_context/test_services.py::TestToolValidator::test_validate_tool_call_success PASSED [ 83%]
+tests/unit/domain/tool_context/test_services.py::TestToolValidator::test_validate_tool_call_name_mismatch PASSED [ 84%]
+tests/unit/domain/tool_context/test_services.py::TestToolValidator::test_validate_tool_call_missing_required_field PASSED [ 84%]
+tests/unit/domain/tool_context/test_services.py::TestToolValidator::test_validate_arguments_success PASSED [ 84%]
+tests/unit/domain/tool_context/test_services.py::TestToolValidator::test_validate_arguments_missing_required PASSED [ 84%]
+tests/unit/domain/tool_context/test_services.py::TestToolValidator::test_validate_permissions_allowed PASSED [ 84%]
+tests/unit/domain/tool_context/test_services.py::TestToolValidator::test_validate_permissions_denied PASSED [ 84%]
+tests/unit/domain/tool_context/test_services.py::TestToolValidator::test_validate_required_fields_success PASSED [ 84%]
+tests/unit/domain/tool_context/test_services.py::TestToolValidator::test_validate_required_fields_missing PASSED [ 84%]
+tests/unit/domain/tool_context/test_services.py::TestToolValidator::test_validate_field_types_success PASSED [ 84%]
+tests/unit/domain/tool_context/test_services.py::TestToolValidator::test_validate_field_types_wrong_type PASSED [ 85%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolName::test_create_valid_tool_name PASSED [ 85%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolName::test_from_string PASSED [ 85%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolName::test_empty_name_raises_error PASSED [ 85%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolName::test_too_long_name_raises_error PASSED [ 85%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolName::test_invalid_format_raises_error PASSED [ 85%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolName::test_invalid_format_with_spaces PASSED [ 85%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolName::test_is_local_tool_for_echo PASSED [ 85%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolName::test_is_local_tool_for_calculator PASSED [ 86%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolName::test_is_local_tool_for_switch_mode PASSED [ 86%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolName::test_is_ide_tool_for_read_file PASSED [ 86%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolName::test_equality PASSED [ 86%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolName::test_repr PASSED [ 86%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolCallId::test_generate_creates_valid_id PASSED [ 86%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolCallId::test_generate_creates_unique_ids PASSED [ 86%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolCallId::test_from_string_with_call_format PASSED [ 86%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolCallId::test_from_string_with_uuid_format PASSED [ 86%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolCallId::test_empty_id_raises_error PASSED [ 87%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolCallId::test_too_long_id_raises_error PASSED [ 87%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolCallId::test_invalid_format_raises_error PASSED [ 87%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolCallId::test_hash_works PASSED [ 87%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolCallId::test_can_use_in_set PASSED [ 87%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolArguments::test_from_dict PASSED [ 87%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolArguments::test_from_json PASSED [ 87%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolArguments::test_from_json_invalid_raises_error PASSED [ 87%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolArguments::test_from_json_non_object_raises_error PASSED [ 87%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolArguments::test_empty_creates_empty_arguments PASSED [ 88%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolArguments::test_get_with_default PASSED [ 88%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolArguments::test_has_returns_true_for_existing PASSED [ 88%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolArguments::test_has_returns_false_for_missing PASSED [ 88%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolArguments::test_to_dict_returns_copy PASSED [ 88%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolArguments::test_to_json_returns_valid_json PASSED [ 88%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolArguments::test_validate_against_schema_success PASSED [ 88%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolArguments::test_validate_against_schema_missing_required PASSED [ 88%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolArguments::test_validate_against_schema_wrong_type PASSED [ 89%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolArguments::test_too_large_arguments_raises_error PASSED [ 89%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolResult::test_success_creates_successful_result PASSED [ 89%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolResult::test_error_creates_error_result PASSED [ 89%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolResult::test_success_with_metadata PASSED [ 89%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolResult::test_error_with_metadata PASSED [ 89%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolResult::test_get_metadata_with_default PASSED [ 89%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolResult::test_has_metadata_returns_true_for_existing PASSED [ 89%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolResult::test_has_metadata_returns_false_for_missing PASSED [ 89%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolResult::test_truncate_short_content PASSED [ 90%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolResult::test_truncate_long_content PASSED [ 90%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolResult::test_too_large_content_raises_error PASSED [ 90%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolCategory::test_file_system_factory PASSED [ 90%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolCategory::test_command_factory PASSED [ 90%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolCategory::test_search_factory PASSED [ 90%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolCategory::test_agent_factory PASSED [ 90%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolCategory::test_utility_factory PASSED [ 90%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolCategory::test_from_string PASSED [ 90%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolCategory::test_invalid_category_raises_error PASSED [ 91%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolCategory::test_file_system_is_dangerous PASSED [ 91%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolCategory::test_command_is_dangerous PASSED [ 91%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolCategory::test_utility_is_not_dangerous PASSED [ 91%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolCategory::test_file_system_requires_approval PASSED [ 91%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolCategory::test_search_does_not_require_approval PASSED [ 91%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolCategory::test_equality PASSED [ 91%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolExecutionMode::test_local_factory PASSED [ 91%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolExecutionMode::test_ide_factory PASSED [ 92%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolExecutionMode::test_remote_factory PASSED [ 92%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolExecutionMode::test_from_string PASSED [ 92%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolExecutionMode::test_invalid_mode_raises_error PASSED [ 92%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolExecutionMode::test_local_is_not_ide PASSED [ 92%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolExecutionMode::test_equality PASSED [ 92%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolPermission::test_read_only_factory PASSED [ 92%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolPermission::test_read_write_factory PASSED [ 92%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolPermission::test_execute_factory PASSED [ 92%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolPermission::test_admin_factory PASSED [ 93%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolPermission::test_from_string PASSED [ 93%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolPermission::test_invalid_permission_raises_error PASSED [ 93%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolPermission::test_read_write_allows_read_only PASSED [ 93%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolPermission::test_read_only_does_not_allow_read_write PASSED [ 93%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolPermission::test_execute_allows_read_write PASSED [ 93%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolPermission::test_admin_allows_all PASSED [ 93%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolPermission::test_get_level_number PASSED [ 93%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolPermission::test_comparison_operators PASSED [ 93%]
+tests/unit/domain/tool_context/test_value_objects.py::TestToolPermission::test_equality PASSED [ 94%]
+tests/unit/infrastructure/test_execution_plan_mapper.py::TestExecutionPlanMapper::test_to_model_basic PASSED [ 94%]
+tests/unit/infrastructure/test_execution_plan_mapper.py::TestExecutionPlanMapper::test_to_model_with_timestamps PASSED [ 94%]
+tests/unit/infrastructure/test_execution_plan_mapper.py::TestExecutionPlanMapper::test_to_model_with_current_subtask PASSED [ 94%]
+tests/unit/infrastructure/test_execution_plan_mapper.py::TestExecutionPlanMapper::test_to_model_with_multiple_subtasks PASSED [ 94%]
+tests/unit/infrastructure/test_execution_plan_mapper.py::TestExecutionPlanMapper::test_to_entity_basic PASSED [ 94%]
+tests/unit/infrastructure/test_execution_plan_mapper.py::TestExecutionPlanMapper::test_to_entity_with_timestamps PASSED [ 94%]
+tests/unit/infrastructure/test_execution_plan_mapper.py::TestExecutionPlanMapper::test_to_entity_with_current_subtask PASSED [ 94%]
+tests/unit/infrastructure/test_execution_plan_mapper.py::TestExecutionPlanMapper::test_to_entity_with_multiple_subtasks PASSED [ 95%]
+tests/unit/infrastructure/test_execution_plan_mapper.py::TestExecutionPlanMapper::test_to_entity_empty_metadata PASSED [ 95%]
+tests/unit/infrastructure/test_execution_plan_mapper.py::TestExecutionPlanMapper::test_roundtrip_conversion FAILED [ 95%]
+tests/unit/infrastructure/test_execution_plan_mapper.py::TestExecutionPlanMapper::test_subtask_to_entity_with_result PASSED [ 95%]
+tests/unit/infrastructure/test_execution_plan_mapper.py::TestExecutionPlanMapper::test_subtask_to_entity_with_error PASSED [ 95%]
+tests/unit/infrastructure/test_execution_plan_mapper.py::TestExecutionPlanMapper::test_to_model_preserves_all_statuses PASSED [ 95%]
+tests/unit/infrastructure/test_execution_plan_repository_impl.py::TestExecutionPlanRepositoryImpl::test_save_and_find_by_id PASSED [ 95%]
+tests/unit/infrastructure/test_execution_plan_repository_impl.py::TestExecutionPlanRepositoryImpl::test_find_by_id_not_found PASSED [ 95%]
+tests/unit/infrastructure/test_execution_plan_repository_impl.py::TestExecutionPlanRepositoryImpl::test_save_updates_existing PASSED [ 95%]
+tests/unit/infrastructure/test_execution_plan_repository_impl.py::TestExecutionPlanRepositoryImpl::test_delete PASSED [ 96%]
+tests/unit/infrastructure/test_execution_plan_repository_impl.py::TestExecutionPlanRepositoryImpl::test_delete_not_found PASSED [ 96%]
+tests/unit/infrastructure/test_execution_plan_repository_impl.py::TestExecutionPlanRepositoryImpl::test_find_by_conversation_id PASSED [ 96%]
+tests/unit/infrastructure/test_execution_plan_repository_impl.py::TestExecutionPlanRepositoryImpl::test_find_active_by_conversation_id PASSED [ 96%]
+tests/unit/infrastructure/test_execution_plan_repository_impl.py::TestExecutionPlanRepositoryImpl::test_count_by_conversation_id PASSED [ 96%]
+tests/unit/infrastructure/test_execution_plan_repository_impl.py::TestExecutionPlanRepositoryImpl::test_exists PASSED [ 96%]
+tests/unit/infrastructure/test_execution_plan_repository_impl.py::TestExecutionPlanRepositoryImpl::test_save_with_multiple_subtasks PASSED [ 96%]
+tests/unit/infrastructure/test_execution_plan_repository_impl.py::TestExecutionPlanRepositoryImpl::test_save_with_timestamps PASSED [ 96%]
+tests/unit/infrastructure/test_execution_plan_repository_impl.py::TestExecutionPlanRepositoryImpl::test_save_with_current_subtask_id PASSED [ 96%]
+tests/unit/infrastructure/test_execution_plan_repository_impl.py::TestExecutionPlanRepositoryImpl::test_find_by_conversation_id_empty PASSED [ 97%]
+tests/unit/infrastructure/test_execution_plan_repository_impl.py::TestExecutionPlanRepositoryImpl::test_count_by_conversation_id_zero PASSED [ 97%]
+tests/unit/infrastructure/test_execution_plan_repository_impl.py::TestExecutionPlanRepositoryImpl::test_save_preserves_metadata PASSED [ 97%]
+tests/unit/infrastructure/test_execution_plan_repository_impl.py::TestExecutionPlanRepositoryImpl::test_delete_cascades_to_subtasks PASSED [ 97%]
+tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkInitialization::test_init_with_session_factory FAILED [ 97%]
+tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkInitialization::test_init_with_existing_session FAILED [ 97%]
+tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkInitialization::test_init_without_arguments_raises_error FAILED [ 97%]
+tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkContextManager::test_enter_with_session_factory PASSED [ 97%]
+tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkContextManager::test_enter_with_existing_session FAILED [ 98%]
+tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkContextManager::test_exit_closes_owned_session PASSED [ 98%]
+tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkContextManager::test_exit_does_not_close_external_session FAILED [ 98%]
+tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkContextManager::test_exit_rollback_on_exception FAILED [ 98%]
+tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkSession::test_session_property_in_context FAILED [ 98%]
+tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkSession::test_session_property_outside_context_raises_error FAILED [ 98%]
+tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkCommit::test_commit_success FAILED [ 98%]
+tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkCommit::test_commit_outside_context_raises_error FAILED [ 98%]
+tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkCommit::test_commit_records_metrics FAILED [ 98%]
+tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkCommit::test_commit_records_error_metric FAILED [ 99%]
+tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkCommit::test_commit_warns_on_slow_transaction FAILED [ 99%]
+tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkFlush::test_flush_success FAILED [ 99%]
+tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkFlush::test_flush_outside_context_raises_error FAILED [ 99%]
+tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkRollback::test_rollback_success FAILED [ 99%]
+tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkRollback::test_rollback_outside_context_raises_error FAILED [ 99%]
+tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkIntegration::test_multiple_commits_in_single_context FAILED [ 99%]
+tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkIntegration::test_commit_flush_commit_sequence FAILED [ 99%]
+tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkIntegration::test_error_after_commit_triggers_rollback FAILED [100%]
+
+=================================== FAILURES ===================================
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/integration/infrastructure/test_agent_repository.py:79: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/integration/infrastructure/test_agent_repository.py:141: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/integration/infrastructure/test_agent_repository.py:165: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/integration/infrastructure/test_agent_repository.py:188: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/integration/infrastructure/test_agent_repository.py:231: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   sqlite3.IntegrityError: UNIQUE constraint failed: agent_contexts.session_db_id
+
+The above exception was the direct cause of the following exception:
+E   sqlalchemy.exc.IntegrityError: (sqlite3.IntegrityError) UNIQUE constraint failed: agent_contexts.session_db_id
+    [SQL: INSERT INTO agent_contexts (id, session_db_id, current_agent, created_at, updated_at, switch_count, metadata_json) VALUES (?, ?, ?, ?, ?, ?, ?)]
+    [parameters: ('bb1a246b-2c8a-4dba-9922-ee689cde6246', 'session-coder', 'coder', '2026-02-09 20:31:07.940393', '2026-02-09 20:31:07.940843', 0, None)]
+    (Background on this error at: https://sqlalche.me/e/20/gkpj)
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/aiosqlite/core.py:63: sqlalchemy.exc.IntegrityError: (sqlite3.IntegrityError) UNIQUE constraint failed: agent_contexts.session_db_id
+E   AttributeError: 'ConversationId' object has no attribute '__pydantic_extra__'. Did you mean: '__pydantic_fields__'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1023: AttributeError: 'ConversationId' object has no attribute '__pydantic_extra__'. Did you mean: '__pydantic_fields__'?
+E   pydantic_core._pydantic_core.ValidationError: 1 validation error for Conversation
+    conversation_id
+      Field required [type=missing, input_value={'id': 'session-1'}, input_type=dict]
+        For further information visit https://errors.pydantic.dev/2.12/v/missing
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/test_application_layer.py:162: pydantic_core._pydantic_core.ValidationError: 1 validation error for Conversation
+E   pydantic_core._pydantic_core.ValidationError: 1 validation error for Conversation
+    conversation_id
+      Field required [type=missing, input_value={'id': 'session-1'}, input_type=dict]
+        For further information visit https://errors.pydantic.dev/2.12/v/missing
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/test_application_layer.py:174: pydantic_core._pydantic_core.ValidationError: 1 validation error for Conversation
+E   pydantic_core._pydantic_core.ValidationError: 1 validation error for Conversation
+    conversation_id
+      Field required [type=missing, input_value={'id': 'session-1', 'title': 'Test Session'}, input_type=dict]
+        For further information visit https://errors.pydantic.dev/2.12/v/missing
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/test_application_layer.py:185: pydantic_core._pydantic_core.ValidationError: 1 validation error for Conversation
+E   pydantic_core._pydantic_core.ValidationError: 1 validation error for Agent
+    capabilities
+      Field required [type=missing, input_value={'id': 'ctx-1', 'session_...entType.CODER: 'coder'>}, input_type=dict]
+        For further information visit https://errors.pydantic.dev/2.12/v/missing
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/test_application_layer.py:195: pydantic_core._pydantic_core.ValidationError: 1 validation error for Agent
+E   pydantic_core._pydantic_core.ValidationError: 1 validation error for Agent
+    capabilities
+      Field required [type=missing, input_value={'id': 'ctx-1', 'session_id': 'session-1'}, input_type=dict]
+        For further information visit https://errors.pydantic.dev/2.12/v/missing
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/test_application_layer.py:211: pydantic_core._pydantic_core.ValidationError: 1 validation error for Agent
+E   pydantic_core._pydantic_core.ValidationError: 1 validation error for Agent
+    capabilities
+      Field required [type=missing, input_value={'id': 'ctx-1', 'session_id': 'session-1'}, input_type=dict]
+        For further information visit https://errors.pydantic.dev/2.12/v/missing
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/test_application_layer.py:225: pydantic_core._pydantic_core.ValidationError: 1 validation error for Agent
+E   AttributeError: 'dict' object has no attribute 'content'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/services/task_classifier.py:146: AttributeError: 'dict' object has no attribute 'content'
+E   AttributeError: 'dict' object has no attribute 'content'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/services/task_classifier.py:146: AttributeError: 'dict' object has no attribute 'content'
+E   AttributeError: 'dict' object has no attribute 'content'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/services/task_classifier.py:146: AttributeError: 'dict' object has no attribute 'content'
+E   AttributeError: 'dict' object has no attribute 'content'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/services/task_classifier.py:146: AttributeError: 'dict' object has no attribute 'content'
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/agent_context/test_agent.py:30: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   AssertionError: assert 'agent-' in '24c73677-063e-4c53-89e7-58cad75b11a1'
+     +  where '24c73677-063e-4c53-89e7-58cad75b11a1' = <Agent(id='24c73677-063e-4c53-89e7-58cad75b11a1', session_id='session-123', type='coder', switches=0)>.id
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/agent_context/test_agent.py:44: AssertionError: assert 'agent-' in '24c73677-063e-4c53-89e7-58cad75b11a1'
+E   pydantic_core._pydantic_core.ValidationError: 1 validation error for Agent
+    capabilities
+      Input should be a valid dictionary or instance of AgentCapabilities [type=model_type, input_value='invalid', input_type=str]
+        For further information visit https://errors.pydantic.dev/2.12/v/model_type
+
+During handling of the above exception, another exception occurred:
+E   AssertionError: Regex pattern did not match.
+      Expected regex: 'capabilities должен быть AgentCapabilities'
+      Actual message: "1 validation error for Agent\ncapabilities\n  Input should be a valid dictionary or instance of AgentCapabilities [type=model_type, input_value='invalid', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/model_type"
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/agent_context/test_agent.py:57: AssertionError: Regex pattern did not match.
+E   assert [AgentSwitchRecord(id=7923411a-69b8-430e-9965-5286054cddea)] is not [AgentSwitchRecord(id=7923411a-69b8-430e-9965-5286054cddea)]
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/agent_context/test_agent.py:191: assert [AgentSwitchRecord(id=7923411a-69b8-430e-9965-5286054cddea)] is not [AgentSwitchRecord(id=7923411a-69b8-430e-9965-5286054cddea)]
+E   AssertionError: assert {'key': 'value'} is not {'key': 'value'}
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/agent_context/test_agent.py:247: AssertionError: assert {'key': 'value'} is not {'key': 'value'}
+E   ValueError: 'invalid' is not a valid AgentType
+
+During handling of the above exception, another exception occurred:
+E   ValueError: Невалидный тип агента: invalid. Допустимые значения: orchestrator, coder, architect, debug, ask, universal
+
+During handling of the above exception, another exception occurred:
+E   AssertionError: Regex pattern did not match.
+      Expected regex: 'agent_type должен быть AgentType'
+      Actual message: 'Невалидный тип агента: invalid. Допустимые значения: orchestrator, coder, architect, debug, ask, universal'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/agent_context/test_agent_capabilities.py:28: AssertionError: Regex pattern did not match.
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/agent_context/test_agent_id.py:14: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/agent_context/test_agent_id.py:20: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/agent_context/test_agent_id.py:25: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/agent_context/test_agent_id.py:30: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/agent_context/test_agent_id.py:36: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/agent_context/test_agent_id.py:41: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/agent_context/test_agent_id.py:46: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/agent_context/test_agent_id.py:50: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   assert False
+     +  where False = <built-in method startswith of str object at 0x108019160>('agent-')
+     +    where <built-in method startswith of str object at 0x108019160> = 'cbc038f8-f065-487d-8c46-aa3f14ab055d'.startswith
+     +      where 'cbc038f8-f065-487d-8c46-aa3f14ab055d' = <[AttributeError("'AgentId' object has no attribute '_value'") raised in repr()] AgentId object at 0x10852e710>.value
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/agent_context/test_agent_id.py:60: assert False
+E   TypeError: AgentId.generate() got an unexpected keyword argument 'prefix'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/agent_context/test_agent_id.py:65: TypeError: AgentId.generate() got an unexpected keyword argument 'prefix'
+E   AssertionError: assert 'a16272e6-d3a...-2cc89814db80' == 'agent-123'
+      
+      - agent-123
+      + a16272e6-d3ac-485e-8492-2cc89814db80
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/agent_context/test_agent_id.py:77: AssertionError: assert 'a16272e6-d3a...-2cc89814db80' == 'agent-123'
+E   AssertionError: assert '24aa0308-318...-d299f73d13a6' == 'agent-abc-def'
+      
+      - agent-abc-def
+      + 24aa0308-3185-47f6-a3a5-d299f73d13a6
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/agent_context/test_agent_id.py:82: AssertionError: assert '24aa0308-318...-d299f73d13a6' == 'agent-abc-def'
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/agent_context/test_agent_id.py:95: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/agent_context/test_agent_id.py:101: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/agent_context/test_agent_id.py:107: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/agent_context/test_agent_id.py:118: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/agent_context/test_agent_id.py:127: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/agent_context/test_agent_id.py:136: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/agent_context/test_agent_id.py:146: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/agent_context/test_agent_id.py:152: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/agent_context/test_agent_id.py:167: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/agent_context/test_agent_id.py:172: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1023: AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+E   AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1023: AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+E   AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1023: AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+E   AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1023: AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+E   AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1023: AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+E   AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1023: AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+E   AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1023: AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+E   AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1023: AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+E   AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1023: AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+E   AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1023: AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+E   AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1023: AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+E   AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1023: AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+E   AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1023: AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+E   AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1023: AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+E   AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1023: AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+E   AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1023: AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+E   AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1023: AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+E   AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1023: AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+E   AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1023: AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+E   AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1023: AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+E   AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1023: AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+E   AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1023: AttributeError: 'ApprovalStatus' object has no attribute '__pydantic_private__'. Did you mean: '__pydantic_complete__'?
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/execution_context/test_entities.py:33: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/execution_context/test_entities.py:51: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/execution_context/test_entities.py:67: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/execution_context/test_entities.py:85: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/execution_context/test_entities.py:103: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/execution_context/test_entities.py:122: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/execution_context/test_entities.py:137: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/execution_context/test_entities.py:153: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   AttributeError: 'ExecutionPlan' object has no attribute 'error'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1026: AttributeError: 'ExecutionPlan' object has no attribute 'error'
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/execution_context/test_entities.py:192: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/execution_context/test_entities.py:215: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   ValueError: Cannot start execution of plan in status draft. Expected status: APPROVED
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/execution_context/entities/execution_plan.py:185: ValueError: Cannot start execution of plan in status draft. Expected status: APPROVED
+E   ValueError: Cannot start execution of plan in status draft. Expected status: APPROVED
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/execution_context/entities/execution_plan.py:185: ValueError: Cannot start execution of plan in status draft. Expected status: APPROVED
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/execution_context/test_entities.py:275: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/execution_context/test_entities.py:290: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/execution_context/test_entities.py:336: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   ImportError: cannot import name 'PlanStarted' from 'app.domain.execution_context.events' (/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/execution_context/events/__init__.py)
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/execution_context/test_entities.py:384: ImportError: cannot import name 'PlanStarted' from 'app.domain.execution_context.events' (/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/execution_context/events/__init__.py)
+E   ImportError: cannot import name 'PlanStarted' from 'app.domain.execution_context.events' (/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/execution_context/events/__init__.py)
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/execution_context/test_entities.py:408: ImportError: cannot import name 'PlanStarted' from 'app.domain.execution_context.events' (/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/execution_context/events/__init__.py)
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/execution_context/test_entities.py:433: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/execution_context/test_entities.py:480: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/execution_context/test_services.py:36: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/execution_context/test_services.py:67: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/execution_context/test_services.py:105: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/execution_context/test_services.py:136: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/execution_context/test_services.py:166: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/execution_context/test_services.py:199: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/execution_context/test_services.py:232: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/execution_context/test_services.py:253: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/execution_context/test_services.py:280: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/execution_context/test_services.py:303: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/execution_context/test_services.py:332: TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+E   AssertionError: assert <SubtaskStatu...NG: 'running'> == 'in_progress'
+      
+      - in_progress
+      + running
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/execution_context/test_value_objects.py:179: AssertionError: assert <SubtaskStatu...NG: 'running'> == 'in_progress'
+E   AttributeError: 'ConversationId' object has no attribute '__pydantic_extra__'. Did you mean: '__pydantic_fields__'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1023: AttributeError: 'ConversationId' object has no attribute '__pydantic_extra__'. Did you mean: '__pydantic_fields__'?
+E   AttributeError: 'Conversation' object has no attribute 'get_domain_events'. Did you mean: '_domain_events'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1026: AttributeError: 'Conversation' object has no attribute 'get_domain_events'. Did you mean: '_domain_events'?
+E   AttributeError: 'Conversation' object has no attribute 'get_domain_events'. Did you mean: '_domain_events'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1026: AttributeError: 'Conversation' object has no attribute 'get_domain_events'. Did you mean: '_domain_events'?
+E   AttributeError: 'Conversation' object has no attribute 'get_domain_events'. Did you mean: '_domain_events'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1026: AttributeError: 'Conversation' object has no attribute 'get_domain_events'. Did you mean: '_domain_events'?
+E   AttributeError: 'Conversation' object has no attribute 'get_domain_events'. Did you mean: '_domain_events'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1026: AttributeError: 'Conversation' object has no attribute 'get_domain_events'. Did you mean: '_domain_events'?
+E   ValueError: Conversation ID cannot be empty
+
+During handling of the above exception, another exception occurred:
+E   AssertionError: Regex pattern did not match.
+      Expected regex: 'не может быть пустым'
+      Actual message: 'Conversation ID cannot be empty'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/session_context/test_conversation_id.py:36: AssertionError: Regex pattern did not match.
+E   ValueError: Conversation ID cannot exceed 255 characters, got 256
+
+During handling of the above exception, another exception occurred:
+E   AssertionError: Regex pattern did not match.
+      Expected regex: 'не может превышать 255 символов'
+      Actual message: 'Conversation ID cannot exceed 255 characters, got 256'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/session_context/test_conversation_id.py:42: AssertionError: Regex pattern did not match.
+E   ValueError: Conversation ID must contain only alphanumeric characters, hyphens, and underscores. Got: conv@123
+
+During handling of the above exception, another exception occurred:
+E   AssertionError: Regex pattern did not match.
+      Expected regex: 'может содержать только'
+      Actual message: 'Conversation ID must contain only alphanumeric characters, hyphens, and underscores. Got: conv@123'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/domain/session_context/test_conversation_id.py:47: AssertionError: Regex pattern did not match.
+E   AttributeError: 'ConversationId' object has no attribute '__pydantic_extra__'. Did you mean: '__pydantic_fields__'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1023: AttributeError: 'ConversationId' object has no attribute '__pydantic_extra__'. Did you mean: '__pydantic_fields__'?
+E   AttributeError: 'ConversationId' object has no attribute '__pydantic_extra__'. Did you mean: '__pydantic_fields__'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1023: AttributeError: 'ConversationId' object has no attribute '__pydantic_extra__'. Did you mean: '__pydantic_fields__'?
+E   AttributeError: 'ConversationId' object has no attribute '__pydantic_extra__'. Did you mean: '__pydantic_fields__'?
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:1023: AttributeError: 'ConversationId' object has no attribute '__pydantic_extra__'. Did you mean: '__pydantic_fields__'?
+E   assert 0 == 1
+     +  where 0 = len([])
+     +    where [] = <ExecutionPlan(id='plan-1', conversation_id='conv-1', status='draft', subtasks=0)>.subtasks
+     +  and   1 = len([<[AttributeError("'AgentId' object has no attribute '_value'") raised in repr()] Subtask object at 0x108891860>])
+     +    where [<[AttributeError("'AgentId' object has no attribute '_value'") raised in repr()] Subtask object at 0x108891860>] = <ExecutionPlan(id='plan-1', conversation_id='conv-1', status='draft', subtasks=1)>.subtasks
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/infrastructure/test_execution_plan_mapper.py:352: assert 0 == 1
+E   AttributeError: 'SSEUnitOfWork' object has no attribute '_owns_session'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/infrastructure/test_unit_of_work.py:29: AttributeError: 'SSEUnitOfWork' object has no attribute '_owns_session'
+E   TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/infrastructure/test_unit_of_work.py:34: TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+E   TypeError: SSEUnitOfWork.__init__() missing 1 required positional argument: 'session_factory'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/infrastructure/test_unit_of_work.py:43: TypeError: SSEUnitOfWork.__init__() missing 1 required positional argument: 'session_factory'
+E   TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/infrastructure/test_unit_of_work.py:67: TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+E   TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/infrastructure/test_unit_of_work.py:91: TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+E   TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/infrastructure/test_unit_of_work.py:103: TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+E   TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/infrastructure/test_unit_of_work.py:122: TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+E   TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/infrastructure/test_unit_of_work.py:130: TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+E   TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/infrastructure/test_unit_of_work.py:144: TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+E   TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/infrastructure/test_unit_of_work.py:155: TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+E   TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/infrastructure/test_unit_of_work.py:172: TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+E   TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/infrastructure/test_unit_of_work.py:194: TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+E   TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/infrastructure/test_unit_of_work.py:217: TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+E   TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/infrastructure/test_unit_of_work.py:238: TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+E   TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/infrastructure/test_unit_of_work.py:249: TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+E   TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/infrastructure/test_unit_of_work.py:263: TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+E   TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/infrastructure/test_unit_of_work.py:274: TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+E   TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/infrastructure/test_unit_of_work.py:288: TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+E   TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/infrastructure/test_unit_of_work.py:302: TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+E   TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+/Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/unit/infrastructure/test_unit_of_work.py:317: TypeError: SSEUnitOfWork.__init__() got an unexpected keyword argument 'existing_session'
+=============================== warnings summary ===============================
+app/domain/shared/base_entity.py:12
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/shared/base_entity.py:12: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class Entity(BaseModel):
+
+.venv/lib/python3.12/site-packages/pydantic/_internal/_generate_schema.py:319: 83 warnings
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/_internal/_generate_schema.py:319: PydanticDeprecatedSince20: `json_encoders` is deprecated. See https://docs.pydantic.dev/2.12/concepts/serialization/#custom-serializers for alternatives. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    warnings.warn(
+
+app/domain/entities/base.py:14
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/entities/base.py:14: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class Entity(BaseModel):
+
+app/domain/entities/hitl.py:26
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/entities/hitl.py:26: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class HITLPolicyRule(BaseModel):
+
+app/domain/entities/hitl.py:42
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/entities/hitl.py:42: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class HITLPolicy(BaseModel):
+
+app/domain/entities/hitl.py:77
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/entities/hitl.py:77: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class HITLUserDecision(BaseModel):
+
+app/domain/entities/hitl.py:115
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/entities/hitl.py:115: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class HITLAuditLog(BaseModel):
+
+app/domain/entities/hitl.py:139
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/entities/hitl.py:139: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class HITLPendingState(BaseModel):
+
+app/domain/entities/approval.py:26
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/entities/approval.py:26: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class ApprovalPolicyRule(BaseModel):
+
+app/domain/entities/approval.py:72
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/entities/approval.py:72: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class ApprovalPolicy(BaseModel):
+
+app/domain/entities/approval.py:140
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/entities/approval.py:140: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class PendingApprovalState(Entity):
+
+app/domain/events/base.py:16
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/events/base.py:16: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class DomainEvent(BaseModel, ABC):
+
+app/events/base_event.py:13
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/events/base_event.py:13: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class BaseEvent(BaseModel):
+
+app/api/v1/schemas/session_schemas.py:99
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/api/v1/schemas/session_schemas.py:99: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class PlanDecisionRequest(BaseModel):
+
+app/api/v1/schemas/common.py:28
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/api/v1/schemas/common.py:28: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class StreamChunk(BaseModel):
+
+app/api/v1/schemas/common.py:121
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/api/v1/schemas/common.py:121: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class AgentInfo(BaseModel):
+
+app/application/commands/base.py:17
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/application/commands/base.py:17: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class Command(BaseModel, ABC):
+
+app/application/queries/base.py:17
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/application/queries/base.py:17: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class Query(BaseModel, ABC):
+
+tests/test_domain_base.py:18
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/test_domain_base.py:18: PytestCollectionWarning: cannot collect test class 'TestUser' because it has a __init__ constructor (from: tests/test_domain_base.py)
+    class TestUser(Entity):
+
+tests/test_domain_base.py:24
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/test_domain_base.py:24: PytestCollectionWarning: cannot collect test class 'TestUserCreated' because it has a __init__ constructor (from: tests/test_domain_base.py)
+    class TestUserCreated(DomainEvent):
+
+tests/test_domain_base.py:30
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/test_domain_base.py:30: PytestCollectionWarning: cannot collect test class 'TestUserRepository' because it has a __init__ constructor (from: tests/test_domain_base.py)
+    class TestUserRepository(Repository[TestUser]):
+
+tests/integration/infrastructure/test_conversation_repository.py::TestConversationRepositoryImpl::test_delete
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/infrastructure/persistence/repositories/conversation_repository_impl.py:243: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    model.deleted_at = datetime.utcnow()
+
+tests/test_approval_manager.py: 3 warnings
+tests/test_approval_manager_integration.py: 16 warnings
+tests/test_event_bus.py: 33 warnings
+tests/test_event_integration.py: 20 warnings
+tests/unit/domain/llm_context/test_entities.py: 17 warnings
+tests/unit/domain/llm_context/test_services.py: 6 warnings
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/.venv/lib/python3.12/site-packages/pydantic/main.py:250: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+
+tests/test_approval_manager_integration.py: 16 warnings
+tests/test_event_bus.py: 22 warnings
+tests/test_event_integration.py: 20 warnings
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/events/event_bus.py:199: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    self._stats.last_event_time = datetime.utcnow()
+
+tests/test_domain_base.py::TestDomainEvent::test_event_to_dict
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/events/base.py:87: PydanticDeprecatedSince20: The `dict` method is deprecated; use `model_dump` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    return self.dict()
+
+tests/test_event_bus.py: 20 warnings
+tests/test_event_integration.py: 10 warnings
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/events/agent_events.py:34: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "timestamp": datetime.utcnow().isoformat()
+
+tests/test_event_bus.py::TestBaseEvent::test_base_event_serialization
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/events/base_event.py:46: PydanticDeprecatedSince20: The `dict` method is deprecated; use `model_dump` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    d = super().dict(**kwargs)
+
+tests/test_event_bus.py::TestBaseEvent::test_base_event_serialization
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/test_event_bus.py:736: PydanticDeprecatedSince20: The `json` method is deprecated; use `model_dump_json` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    event_json = event.json()
+
+tests/test_event_driven_context.py::TestEventDrivenContextBehavior::test_event_updates_context_fields
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/tests/test_event_driven_context.py:57: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "timestamp": datetime.utcnow().isoformat()
+
+tests/test_task_classifier.py::TestTaskClassifierEdgeCases::test_keyword_classification_mixed_indicators
+  tests/test_task_classifier.py:451: PytestWarning: The test <Function test_keyword_classification_mixed_indicators> is marked with '@pytest.mark.asyncio' but it is not an async function. Please remove the asyncio mark. If the test is not marked explicitly, check for global marks applied via 'pytestmark'.
+    def test_keyword_classification_mixed_indicators(self):
+
+tests/unit/domain/approval_context/test_entities.py: 11 warnings
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/approval_context/events/approval_events.py:46: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    self._requested_at = requested_at or datetime.utcnow()
+
+tests/unit/domain/approval_context/test_entities.py::TestHITLPolicy::test_evaluate_with_matching_rule
+tests/unit/domain/approval_context/test_entities.py::TestHITLPolicy::test_evaluate_generates_events
+tests/unit/domain/approval_context/test_entities.py::TestHITLPolicy::test_evaluate_respects_rule_priority
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/approval_context/events/approval_events.py:241: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    self._matched_at = matched_at or datetime.utcnow()
+
+tests/unit/domain/approval_context/test_entities.py::TestHITLPolicy::test_evaluate_with_matching_rule
+tests/unit/domain/approval_context/test_entities.py::TestHITLPolicy::test_evaluate_without_matching_rule_uses_default
+tests/unit/domain/approval_context/test_entities.py::TestHITLPolicy::test_evaluate_generates_events
+tests/unit/domain/approval_context/test_entities.py::TestHITLPolicy::test_evaluate_respects_rule_priority
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/approval_context/events/approval_events.py:198: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    self._evaluated_at = evaluated_at or datetime.utcnow()
+
+tests/unit/domain/llm_context/test_entities.py::TestLLMRequest::test_validate_success
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/llm_context/entities/llm_request.py:180: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    timestamp=datetime.utcnow()
+
+tests/unit/domain/llm_context/test_entities.py::TestLLMInteraction::test_start_interaction
+tests/unit/domain/llm_context/test_entities.py::TestLLMInteraction::test_complete_interaction
+tests/unit/domain/llm_context/test_entities.py::TestLLMInteraction::test_fail_interaction
+tests/unit/domain/llm_context/test_entities.py::TestLLMInteraction::test_cannot_complete_twice
+tests/unit/domain/llm_context/test_entities.py::TestLLMInteraction::test_cannot_fail_after_complete
+tests/unit/domain/llm_context/test_entities.py::TestLLMInteraction::test_get_duration_ms
+tests/unit/domain/llm_context/test_entities.py::TestLLMInteraction::test_get_tokens_used
+tests/unit/domain/llm_context/test_entities.py::TestLLMInteraction::test_get_status
+tests/unit/domain/llm_context/test_entities.py::TestLLMInteraction::test_get_status
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/llm_context/entities/llm_interaction.py:87: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    now = datetime.utcnow()
+
+tests/unit/domain/llm_context/test_entities.py::TestLLMInteraction::test_complete_interaction
+tests/unit/domain/llm_context/test_entities.py::TestLLMInteraction::test_cannot_complete_twice
+tests/unit/domain/llm_context/test_entities.py::TestLLMInteraction::test_cannot_fail_after_complete
+tests/unit/domain/llm_context/test_entities.py::TestLLMInteraction::test_get_duration_ms
+tests/unit/domain/llm_context/test_entities.py::TestLLMInteraction::test_get_tokens_used
+tests/unit/domain/llm_context/test_entities.py::TestLLMInteraction::test_get_status
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/llm_context/entities/llm_interaction.py:127: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    self.completed_at = datetime.utcnow()
+
+tests/unit/domain/llm_context/test_entities.py::TestLLMInteraction::test_fail_interaction
+tests/unit/domain/llm_context/test_entities.py::TestLLMInteraction::test_get_status
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/llm_context/entities/llm_interaction.py:163: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    self.completed_at = datetime.utcnow()
+
+tests/unit/domain/tool_context/test_entities.py: 24 warnings
+tests/unit/domain/tool_context/test_services.py: 3 warnings
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/tool_context/entities/tool_call.py:83: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    created_at=datetime.utcnow(),
+
+tests/unit/domain/tool_context/test_entities.py: 13 warnings
+tests/unit/domain/tool_context/test_services.py: 5 warnings
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/tool_context/entities/tool_specification.py:98: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    created_at=datetime.utcnow()
+
+tests/unit/domain/tool_context/test_entities.py::TestToolCall::test_validate_success
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/tool_context/entities/tool_call.py:139: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    occurred_at=datetime.utcnow()
+
+tests/unit/domain/tool_context/test_entities.py::TestToolCall::test_mark_approved_success
+tests/unit/domain/tool_context/test_entities.py::TestToolCall::test_mark_approved_twice_raises_error
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/tool_context/entities/tool_call.py:171: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    occurred_at=datetime.utcnow()
+
+tests/unit/domain/tool_context/test_entities.py::TestToolCall::test_mark_rejected
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/tool_context/entities/tool_call.py:196: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    occurred_at=datetime.utcnow()
+
+tests/unit/domain/tool_context/test_entities.py::TestToolSpecification::test_update_description
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/tool_context/entities/tool_specification.py:224: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    occurred_at=datetime.utcnow()
+
+tests/unit/domain/tool_context/test_entities.py::TestToolSpecification::test_update_parameters
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/tool_context/entities/tool_specification.py:248: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    occurred_at=datetime.utcnow()
+
+tests/unit/domain/tool_context/test_entities.py: 12 warnings
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/tool_context/entities/tool_execution.py:65: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    started_at=datetime.utcnow(),
+
+tests/unit/domain/tool_context/test_entities.py::TestToolExecution::test_complete_with_success
+tests/unit/domain/tool_context/test_entities.py::TestToolExecution::test_complete_with_error_result
+tests/unit/domain/tool_context/test_entities.py::TestToolExecution::test_complete_twice_raises_error
+tests/unit/domain/tool_context/test_entities.py::TestToolExecution::test_get_duration_ms_when_completed
+tests/unit/domain/tool_context/test_entities.py::TestToolExecution::test_get_result_content_when_completed
+tests/unit/domain/tool_context/test_entities.py::TestToolExecution::test_to_dict
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/tool_context/entities/tool_execution.py:103: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    self.completed_at = datetime.utcnow()
+
+tests/unit/domain/tool_context/test_entities.py::TestToolExecution::test_fail_execution
+tests/unit/domain/tool_context/test_entities.py::TestToolExecution::test_fail_generates_domain_event
+  /Users/sergey/Projects/OpenIdeaLab/codelab-workspace/codelab-ai-service/agent-runtime/app/domain/tool_context/entities/tool_execution.py:143: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    self.completed_at = datetime.utcnow()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/integration/infrastructure/test_agent_repository.py::TestAgentRepositoryImpl::test_save_and_find_by_id
+FAILED tests/integration/infrastructure/test_agent_repository.py::TestAgentRepositoryImpl::test_save_with_switch_history
+FAILED tests/integration/infrastructure/test_agent_repository.py::TestAgentRepositoryImpl::test_update_existing_agent
+FAILED tests/integration/infrastructure/test_agent_repository.py::TestAgentRepositoryImpl::test_delete_by_id
+FAILED tests/integration/infrastructure/test_agent_repository.py::TestAgentRepositoryImpl::test_exists
+FAILED tests/integration/infrastructure/test_agent_repository.py::TestAgentRepositoryImpl::test_get_agent_usage_stats
+FAILED tests/integration/infrastructure/test_conversation_repository.py::TestConversationRepositoryImpl::test_find_by_id_without_messages
+FAILED tests/test_application_layer.py::TestDTO::test_session_dto_from_entity
+FAILED tests/test_application_layer.py::TestDTO::test_session_dto_with_messages
+FAILED tests/test_application_layer.py::TestDTO::test_session_list_item_dto
+FAILED tests/test_application_layer.py::TestDTO::test_agent_context_dto_from_entity
+FAILED tests/test_application_layer.py::TestDTO::test_agent_context_dto_with_history
+FAILED tests/test_application_layer.py::TestDTO::test_agent_switch_dto_from_entity
+FAILED tests/test_task_classifier.py::TestTaskClassifierLLMBased::test_classify_with_llm_atomic_task
+FAILED tests/test_task_classifier.py::TestTaskClassifierLLMBased::test_classify_with_llm_complex_task
+FAILED tests/test_task_classifier.py::TestTaskClassifierLLMBased::test_classify_with_llm_markdown_code_block
+FAILED tests/test_task_classifier.py::TestTaskClassifierLLMBased::test_classify_with_llm_rule_violation_auto_corrected
+FAILED tests/unit/domain/agent_context/test_agent.py::TestAgentCreation::test_create_agent_with_custom_id
+FAILED tests/unit/domain/agent_context/test_agent.py::TestAgentCreation::test_create_agent_generates_id_from_session
+FAILED tests/unit/domain/agent_context/test_agent.py::TestAgentCreation::test_create_with_invalid_capabilities_raises_error
+FAILED tests/unit/domain/agent_context/test_agent.py::TestAgentSwitchHistory::test_switch_history_is_immutable
+FAILED tests/unit/domain/agent_context/test_agent.py::TestAgentMetadata::test_metadata_property_returns_copy
+FAILED tests/unit/domain/agent_context/test_agent_capabilities.py::TestAgentCapabilitiesCreation::test_create_with_invalid_agent_type_raises_error
+FAILED tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdCreation::test_create_with_valid_id
+FAILED tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdCreation::test_create_with_empty_string_raises_error
+FAILED tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdCreation::test_create_with_none_raises_error
+FAILED tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdCreation::test_create_with_non_string_raises_error
+FAILED tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdCreation::test_create_with_too_long_id_raises_error
+FAILED tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdCreation::test_create_with_whitespace_only_raises_error
+FAILED tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdCreation::test_create_with_invalid_characters_raises_error
+FAILED tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdCreation::test_create_strips_whitespace
+FAILED tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdGeneration::test_generate_creates_valid_id
+FAILED tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdGeneration::test_generate_with_custom_prefix
+FAILED tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdGeneration::test_from_session_id_creates_valid_id
+FAILED tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdGeneration::test_from_session_id_removes_session_prefix
+FAILED tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdEquality::test_equal_ids_are_equal
+FAILED tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdEquality::test_different_ids_are_not_equal
+FAILED tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdEquality::test_not_equal_to_non_agent_id
+FAILED tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdHashing::test_can_be_used_in_set
+FAILED tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdHashing::test_can_be_used_as_dict_key
+FAILED tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdHashing::test_equal_ids_have_same_hash
+FAILED tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdComparison::test_less_than_comparison
+FAILED tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdComparison::test_sorting
+FAILED tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdStringRepresentation::test_str_returns_value
+FAILED tests/unit/domain/agent_context/test_agent_id.py::TestAgentIdStringRepresentation::test_repr_shows_class_and_value
+FAILED tests/unit/domain/approval_context/test_entities.py::TestApprovalRequest::test_approve_request
+FAILED tests/unit/domain/approval_context/test_entities.py::TestApprovalRequest::test_approve_generates_approval_granted_event
+FAILED tests/unit/domain/approval_context/test_entities.py::TestApprovalRequest::test_reject_request
+FAILED tests/unit/domain/approval_context/test_entities.py::TestApprovalRequest::test_reject_generates_approval_rejected_event
+FAILED tests/unit/domain/approval_context/test_entities.py::TestApprovalRequest::test_expire_request
+FAILED tests/unit/domain/approval_context/test_entities.py::TestApprovalRequest::test_expire_generates_approval_expired_event
+FAILED tests/unit/domain/approval_context/test_entities.py::TestApprovalRequest::test_cannot_approve_already_approved
+FAILED tests/unit/domain/approval_context/test_entities.py::TestApprovalRequest::test_cannot_reject_already_rejected
+FAILED tests/unit/domain/approval_context/test_entities.py::TestApprovalRequest::test_approved_request_not_expired
+FAILED tests/unit/domain/approval_context/test_value_objects.py::TestApprovalStatus::test_pending_can_transition_to_approved
+FAILED tests/unit/domain/approval_context/test_value_objects.py::TestApprovalStatus::test_pending_can_transition_to_rejected
+FAILED tests/unit/domain/approval_context/test_value_objects.py::TestApprovalStatus::test_pending_can_transition_to_expired
+FAILED tests/unit/domain/approval_context/test_value_objects.py::TestApprovalStatus::test_approved_cannot_transition
+FAILED tests/unit/domain/approval_context/test_value_objects.py::TestApprovalStatus::test_rejected_cannot_transition
+FAILED tests/unit/domain/approval_context/test_value_objects.py::TestApprovalStatus::test_expired_cannot_transition
+FAILED tests/unit/domain/approval_context/test_value_objects.py::TestApprovalStatus::test_pending_is_not_terminal
+FAILED tests/unit/domain/approval_context/test_value_objects.py::TestApprovalStatus::test_approved_is_terminal
+FAILED tests/unit/domain/approval_context/test_value_objects.py::TestApprovalStatus::test_rejected_is_terminal
+FAILED tests/unit/domain/approval_context/test_value_objects.py::TestApprovalStatus::test_expired_is_terminal
+FAILED tests/unit/domain/approval_context/test_value_objects.py::TestStatusTransitions::test_all_valid_transitions_from_pending
+FAILED tests/unit/domain/approval_context/test_value_objects.py::TestStatusTransitions::test_terminal_states_have_no_transitions
+FAILED tests/unit/domain/approval_context/test_value_objects.py::TestStatusTransitions::test_terminal_state_detection
+FAILED tests/unit/domain/execution_context/test_entities.py::TestSubtask::test_create_subtask
+FAILED tests/unit/domain/execution_context/test_entities.py::TestSubtask::test_start_subtask
+FAILED tests/unit/domain/execution_context/test_entities.py::TestSubtask::test_complete_subtask
+FAILED tests/unit/domain/execution_context/test_entities.py::TestSubtask::test_fail_subtask
+FAILED tests/unit/domain/execution_context/test_entities.py::TestSubtask::test_reset_to_pending
+FAILED tests/unit/domain/execution_context/test_entities.py::TestSubtask::test_cannot_start_already_started_subtask
+FAILED tests/unit/domain/execution_context/test_entities.py::TestSubtask::test_cannot_complete_pending_subtask
+FAILED tests/unit/domain/execution_context/test_entities.py::TestSubtask::test_subtask_with_dependencies
+FAILED tests/unit/domain/execution_context/test_entities.py::TestExecutionPlan::test_create_execution_plan
+FAILED tests/unit/domain/execution_context/test_entities.py::TestExecutionPlan::test_start_plan
+FAILED tests/unit/domain/execution_context/test_entities.py::TestExecutionPlan::test_complete_plan
+FAILED tests/unit/domain/execution_context/test_entities.py::TestExecutionPlan::test_fail_plan
+FAILED tests/unit/domain/execution_context/test_entities.py::TestExecutionPlan::test_cancel_plan
+FAILED tests/unit/domain/execution_context/test_entities.py::TestExecutionPlan::test_add_subtask
+FAILED tests/unit/domain/execution_context/test_entities.py::TestExecutionPlan::test_get_subtask_by_id
+FAILED tests/unit/domain/execution_context/test_entities.py::TestExecutionPlan::test_plan_with_multiple_subtasks
+FAILED tests/unit/domain/execution_context/test_entities.py::TestExecutionPlan::test_domain_events_are_collected
+FAILED tests/unit/domain/execution_context/test_entities.py::TestExecutionPlan::test_clear_domain_events
+FAILED tests/unit/domain/execution_context/test_entities.py::TestExecutionPlanLifecycle::test_complete_plan_lifecycle
+FAILED tests/unit/domain/execution_context/test_entities.py::TestExecutionPlanLifecycle::test_plan_lifecycle_with_subtask_failure
+FAILED tests/unit/domain/execution_context/test_services.py::TestDependencyResolver::test_get_ready_subtasks_no_dependencies
+FAILED tests/unit/domain/execution_context/test_services.py::TestDependencyResolver::test_get_ready_subtasks_with_dependencies
+FAILED tests/unit/domain/execution_context/test_services.py::TestDependencyResolver::test_get_ready_subtasks_skip_running
+FAILED tests/unit/domain/execution_context/test_services.py::TestDependencyResolver::test_get_ready_subtasks_blocked_by_failed
+FAILED tests/unit/domain/execution_context/test_services.py::TestDependencyResolver::test_has_cyclic_dependencies_no_cycle
+FAILED tests/unit/domain/execution_context/test_services.py::TestDependencyResolver::test_has_cyclic_dependencies_with_cycle
+FAILED tests/unit/domain/execution_context/test_services.py::TestDependencyResolver::test_has_cyclic_dependencies_self_reference
+FAILED tests/unit/domain/execution_context/test_services.py::TestDependencyResolver::test_validate_dependencies_success
+FAILED tests/unit/domain/execution_context/test_services.py::TestDependencyResolver::test_validate_dependencies_missing_dependency
+FAILED tests/unit/domain/execution_context/test_services.py::TestDependencyResolver::test_validate_dependencies_cyclic
+FAILED tests/unit/domain/execution_context/test_services.py::TestDependencyResolver::test_get_ready_subtasks_complex_graph
+FAILED tests/unit/domain/execution_context/test_value_objects.py::TestSubtaskStatus::test_all_subtask_statuses_exist
+FAILED tests/unit/domain/session_context/test_conversation.py::TestConversation::test_create_conversation
+FAILED tests/unit/domain/session_context/test_conversation.py::TestConversation::test_create_generates_event
+FAILED tests/unit/domain/session_context/test_conversation.py::TestConversation::test_add_message_generates_event
+FAILED tests/unit/domain/session_context/test_conversation.py::TestConversation::test_deactivate_generates_event
+FAILED tests/unit/domain/session_context/test_conversation.py::TestConversation::test_clear_messages_generates_event
+FAILED tests/unit/domain/session_context/test_conversation_id.py::TestConversationId::test_empty_id_raises_error
+FAILED tests/unit/domain/session_context/test_conversation_id.py::TestConversationId::test_too_long_id_raises_error
+FAILED tests/unit/domain/session_context/test_conversation_id.py::TestConversationId::test_invalid_characters_raise_error
+FAILED tests/unit/domain/session_context/test_conversation_id.py::TestConversationId::test_equality
+FAILED tests/unit/domain/session_context/test_conversation_id.py::TestConversationId::test_inequality
+FAILED tests/unit/domain/session_context/test_conversation_id.py::TestConversationId::test_can_use_in_set
+FAILED tests/unit/infrastructure/test_execution_plan_mapper.py::TestExecutionPlanMapper::test_roundtrip_conversion
+FAILED tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkInitialization::test_init_with_session_factory
+FAILED tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkInitialization::test_init_with_existing_session
+FAILED tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkInitialization::test_init_without_arguments_raises_error
+FAILED tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkContextManager::test_enter_with_existing_session
+FAILED tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkContextManager::test_exit_does_not_close_external_session
+FAILED tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkContextManager::test_exit_rollback_on_exception
+FAILED tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkSession::test_session_property_in_context
+FAILED tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkSession::test_session_property_outside_context_raises_error
+FAILED tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkCommit::test_commit_success
+FAILED tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkCommit::test_commit_outside_context_raises_error
+FAILED tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkCommit::test_commit_records_metrics
+FAILED tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkCommit::test_commit_records_error_metric
+FAILED tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkCommit::test_commit_warns_on_slow_transaction
+FAILED tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkFlush::test_flush_success
+FAILED tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkFlush::test_flush_outside_context_raises_error
+FAILED tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkRollback::test_rollback_success
+FAILED tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkRollback::test_rollback_outside_context_raises_error
+FAILED tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkIntegration::test_multiple_commits_in_single_context
+FAILED tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkIntegration::test_commit_flush_commit_sequence
+FAILED tests/unit/infrastructure/test_unit_of_work.py::TestSSEUnitOfWorkIntegration::test_error_after_commit_triggers_rollback
+========== 131 failed, 729 passed, 5 skipped, 399 warnings in 54.55s ===========

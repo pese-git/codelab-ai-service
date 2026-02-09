@@ -249,8 +249,8 @@ class TestConversationManagementService:
         """Тест: получение списка активных conversations."""
         # Arrange
         conversations = [
-            Conversation.create(ConversationId("conv-1")),
-            Conversation.create(ConversationId("conv-2"))
+            Conversation.create(ConversationId(value="conv-1")),
+            Conversation.create(ConversationId(value="conv-2"))
         ]
         mock_repository.find_active.return_value = conversations
         
