@@ -59,6 +59,29 @@ async def get_list_sessions_handler(
     return ListSessionsHandler(ConversationRepositoryImpl(db), AgentRepositoryImpl(db))
 
 
+async def get_approval_manager(
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Получить ApprovalManager с database session.
+    
+    Args:
+        db: Database session (инжектируется)
+        
+    Returns:
+        ApprovalManager: Настроенный экземпляр approval manager
+    """
+    from ....infrastructure.persistence.repositories.approval_repository_impl import ApprovalRepositoryImpl
+    from ....domain.services.approval_management import ApprovalManager
+    from ....domain.entities.approval import ApprovalPolicy
+    
+    approval_repo = ApprovalRepositoryImpl(db)
+    return ApprovalManager(
+        approval_repository=approval_repo,
+        approval_policy=ApprovalPolicy.default()
+    )
+
+
 # ==================== Endpoints ====================
 
 # ❌ DEPRECATED: Сессии теперь создаются автоматически в /agent/message/stream
@@ -378,6 +401,7 @@ async def get_session_history(
 @router.get("/{session_id}/pending-approvals")
 async def get_pending_approvals(
     session_id: str,
+    approval_manager = Depends(get_approval_manager),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -434,16 +458,7 @@ async def get_pending_approvals(
                 detail=f"Session {session_id} not found"
             )
         
-        # Получить pending approvals из ApprovalManager (загружает из БД)
-        from app.infrastructure.persistence.repositories.approval_repository_impl import ApprovalRepositoryImpl
-        from app.domain.services.approval_management import ApprovalManager
-        from app.domain.entities.approval import ApprovalPolicy
-        
-        approval_repo = ApprovalRepositoryImpl(db)
-        approval_manager = ApprovalManager(
-            approval_repository=approval_repo,
-            approval_policy=ApprovalPolicy.default()
-        )
+        # Получить pending approvals из ApprovalManager (инжектируется через DI)
         pending_approvals = await approval_manager.get_all_pending(session_id)
         
         return {
