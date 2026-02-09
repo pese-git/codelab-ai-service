@@ -16,7 +16,7 @@ from ....infrastructure.persistence.unit_of_work import SSEUnitOfWork
 from ....application.use_cases.process_message_use_case import ProcessMessageRequest
 from ....application.use_cases.switch_agent_use_case import SwitchAgentRequest
 from ....application.use_cases.process_tool_result_use_case import ProcessToolResultRequest
-from ....application.use_cases.handle_approval_use_case import HandleApprovalRequest
+from ....application.use_cases.handle_approval_use_case import HandleApprovalRequest, ApprovalType
 
 logger = logging.getLogger("agent-runtime.api.messages")
 
@@ -290,9 +290,9 @@ async def message_stream_sse(
                     # Обрабатываем HITL решение через Use Case
                     use_case_request = HandleApprovalRequest(
                         session_id=session_id,
-                        approval_request_id=call_id,
-                        approved=(decision == "approved"),
-                        approval_type="hitl"
+                        approval_type=ApprovalType.HITL,
+                        approval_id=call_id,
+                        decision=decision
                     )
                     async for chunk in handle_approval_use_case.execute(use_case_request):
                         yield f"data: {chunk.model_dump_json()}\n\n"

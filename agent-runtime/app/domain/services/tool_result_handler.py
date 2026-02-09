@@ -252,12 +252,13 @@ class ToolResultHandler:
         Извлечь последнее user message из сессии.
         
         Args:
-            session: Объект сессии
+            session: Объект сессии (Conversation)
             
         Returns:
             Содержимое последнего user message или пустая строка
         """
-        user_messages = session.get_messages_by_role("user")
+        # Используем filter_by_role из MessageCollection
+        user_messages = session.messages.filter_by_role("user")
         return user_messages[-1].content if user_messages else ""
     
     def _context_to_dict(self, context) -> dict:
