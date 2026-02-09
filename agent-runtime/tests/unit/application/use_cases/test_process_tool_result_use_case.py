@@ -11,7 +11,7 @@ from app.application.use_cases.process_tool_result_use_case import (
     ProcessToolResultRequest
 )
 from app.models.schemas import StreamChunk
-from app.domain.entities.plan import PlanStatus
+from app.domain.execution_context.value_objects import PlanStatus
 
 
 @pytest.fixture

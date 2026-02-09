@@ -13,7 +13,7 @@ from app.domain.services.execution_engine import (
     ExecutionResult,
     ExecutionEngineError
 )
-from app.domain.entities.plan import PlanStatus
+from app.domain.execution_context.value_objects import PlanStatus, PlanStatusEnum
 from app.models.schemas import StreamChunk
 
 if TYPE_CHECKING:
@@ -185,7 +185,7 @@ class ExecutionCoordinator:
             raise ExecutionCoordinatorError(f"Plan {plan_id} not found")
         
         # ✅ ИСПРАВЛЕНИЕ: Разрешить APPROVED и IN_PROGRESS (для resumable execution)
-        if plan.status not in [PlanStatus.APPROVED, PlanStatus.IN_PROGRESS]:
+        if not (plan.status.is_approved() or plan.status.is_in_progress()):
             raise ExecutionCoordinatorError(
                 f"Plan {plan_id} cannot be executed (status: {plan.status.value}). "
                 "Only approved or in-progress plans can be executed."

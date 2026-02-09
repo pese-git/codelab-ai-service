@@ -12,7 +12,11 @@ from app.agents.base_agent import BaseAgent, AgentType
 from app.agents.prompts.architect import ARCHITECT_PROMPT
 from app.models.schemas import StreamChunk
 from app.domain.session_context.entities.conversation import Conversation as Session
-from app.domain.entities.plan import Plan, Subtask
+from app.domain.execution_context.entities.execution_plan import ExecutionPlan
+from app.domain.execution_context.entities.subtask import Subtask
+from app.domain.execution_context.value_objects import PlanId, SubtaskId
+from app.domain.session_context.value_objects import ConversationId
+from app.domain.agent_context.value_objects import AgentId
 from app.domain.session_context.services import ConversationManagementService
 from app.core.config import AppConfig
 
@@ -189,10 +193,10 @@ class ArchitectAgent(BaseAgent):
             # 2. Validate analysis
             self._validate_plan_analysis(analysis)
             
-            # 3. Create Plan entity with generated ID
-            plan = Plan(
-                id=str(uuid.uuid4()),
-                session_id=session_id,
+            # 3. Create ExecutionPlan entity with generated ID
+            plan = ExecutionPlan(
+                id=PlanId(str(uuid.uuid4())),
+                conversation_id=ConversationId(session_id),
                 goal=task,
                 metadata={
                     "created_by": "architect",
@@ -223,10 +227,10 @@ class ArchitectAgent(BaseAgent):
                         )
                 
                 subtask = Subtask(
-                    id=subtask_ids[i],
+                    id=SubtaskId(subtask_ids[i]),
                     description=subtask_data["description"],
-                    agent=AgentType(subtask_data["agent"]),
-                    dependencies=dep_ids,
+                    agent_id=AgentId(subtask_data["agent"]),
+                    dependencies=[SubtaskId(dep_id) for dep_id in dep_ids],
                     estimated_time=subtask_data.get("estimated_time", "5 min"),
                     metadata={
                         "index": i,

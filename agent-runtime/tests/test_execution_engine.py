@@ -12,7 +12,9 @@ from app.domain.services.execution_engine import (
     ExecutionEngineError,
     ExecutionResult
 )
-from app.domain.entities.plan import Plan, Subtask, PlanStatus, SubtaskStatus
+from app.domain.execution_context.entities.execution_plan import ExecutionPlan as Plan
+from app.domain.execution_context.entities.subtask import Subtask
+from app.domain.execution_context.value_objects import PlanStatus, SubtaskStatus
 from app.domain.entities.agent_context import AgentType
 from app.domain.services.dependency_resolver import DependencyResolver
 from app.domain.services.subtask_executor import SubtaskExecutor

@@ -12,7 +12,8 @@ import logging
 from typing import Dict, Any, Optional, TYPE_CHECKING, AsyncGenerator
 from datetime import datetime, timezone
 
-from app.domain.entities.plan import Subtask, SubtaskStatus
+from app.domain.execution_context.entities.subtask import Subtask
+from app.domain.execution_context.value_objects import SubtaskStatus
 from app.domain.agent_context.value_objects.agent_capabilities import AgentType
 from app.domain.services.agent_registry import agent_registry
 from app.models.schemas import StreamChunk
@@ -108,7 +109,7 @@ class SubtaskExecutor:
             )
         
         # Проверить статус подзадачи
-        if subtask.status != SubtaskStatus.PENDING:
+        if not subtask.status.is_pending():
             raise SubtaskExecutionError(
                 f"Subtask {subtask_id} is not in PENDING status "
                 f"(current: {subtask.status.value})"
@@ -224,7 +225,7 @@ class SubtaskExecutor:
                 
                 logger.info(
                     f"Subtask {subtask_id} completed successfully "
-                    f"by {subtask.agent.value} agent"
+                    f"by {subtask.agent_id.value} agent"
                 )
                 
                 # Отправить финальный chunk с результатом выполнения подзадачи
@@ -256,7 +257,7 @@ class SubtaskExecutor:
             plan = await self.plan_repository.find_by_id(plan_id)
             if plan:
                 subtask = plan.get_subtask_by_id(subtask_id)
-                if subtask and subtask.status not in [SubtaskStatus.DONE, SubtaskStatus.FAILED]:
+                if subtask and not (subtask.status.is_done() or subtask.status.is_failed()):
                     subtask.fail(error=error_message)
                     await self.plan_repository.save(plan)
                     logger.info(f"Subtask {subtask_id} marked as failed")
@@ -317,7 +318,7 @@ class SubtaskExecutor:
             return agent
         except ValueError as e:
             raise SubtaskExecutionError(
-                f"Agent {subtask.agent.value} not available: {e}"
+                f"Agent {subtask.agent_id.value} not available: {e}"
             ) from e
     
     def _prepare_agent_context(
@@ -339,7 +340,7 @@ class SubtaskExecutor:
         dependency_results = {}
         for dep_id in subtask.dependencies:
             dep_subtask = plan.get_subtask_by_id(dep_id)
-            if dep_subtask and dep_subtask.status == SubtaskStatus.DONE:
+            if dep_subtask and dep_subtask.status.is_done():
                 dependency_results[dep_id] = {
                     "description": dep_subtask.description,
                     "result": dep_subtask.result,
@@ -434,14 +435,14 @@ class SubtaskExecutor:
             )
         
         # Проверить, что подзадача в статусе FAILED
-        if subtask.status != SubtaskStatus.FAILED:
+        if not subtask.status.is_failed():
             raise SubtaskExecutionError(
                 f"Subtask {subtask_id} is not in FAILED status "
                 f"(current: {subtask.status.value})"
             )
         
         # Сбросить статус на PENDING
-        subtask.status = SubtaskStatus.PENDING
+        subtask.reset_to_pending()
         subtask.error = None
         subtask.started_at = None
         subtask.completed_at = None

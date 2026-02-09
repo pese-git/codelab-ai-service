@@ -11,7 +11,9 @@ from app.domain.services.subtask_executor import (
     SubtaskExecutor,
     SubtaskExecutionError
 )
-from app.domain.entities.plan import Plan, Subtask, SubtaskStatus, PlanStatus
+from app.domain.execution_context.entities.execution_plan import ExecutionPlan as Plan
+from app.domain.execution_context.entities.subtask import Subtask
+from app.domain.execution_context.value_objects import SubtaskStatus, PlanStatus
 from app.domain.entities.agent_context import AgentType
 from app.models.schemas import StreamChunk
 

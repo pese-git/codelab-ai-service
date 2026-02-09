@@ -15,7 +15,9 @@ from app.domain.services.approval_management import ApprovalManager
 from app.domain.session_context.services.conversation_management_service import ConversationManagementService
 from app.domain.services.fsm_orchestrator import FSMOrchestrator
 from app.domain.entities.fsm_state import FSMState, FSMEvent
-from app.domain.entities.plan import Plan, Subtask, PlanStatus, SubtaskStatus
+from app.domain.execution_context.entities.execution_plan import ExecutionPlan as Plan
+from app.domain.execution_context.entities.subtask import Subtask
+from app.domain.execution_context.value_objects import PlanStatus, SubtaskStatus
 from app.agents.base_agent import AgentType
 from app.domain.entities.approval import PendingApprovalState
 from app.application.coordinators.execution_coordinator import ExecutionCoordinator

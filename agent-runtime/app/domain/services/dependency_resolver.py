@@ -7,7 +7,9 @@ Dependency Resolver для управления зависимостями ме�
 import logging
 from typing import List, Set, Dict, Optional
 
-from app.domain.entities.plan import Plan, Subtask, SubtaskStatus
+from app.domain.execution_context.entities.execution_plan import ExecutionPlan
+from app.domain.execution_context.entities.subtask import Subtask
+from app.domain.execution_context.value_objects import SubtaskStatus, SubtaskId
 
 logger = logging.getLogger("agent-runtime.dependency_resolver")
 
@@ -24,7 +26,7 @@ class DependencyResolver:
     Использует DFS (Depth-First Search) для обнаружения циклов.
     """
     
-    def get_ready_subtasks(self, plan: Plan) -> List[Subtask]:
+    def get_ready_subtasks(self, plan: ExecutionPlan) -> List[Subtask]:
         """
         Получить subtasks готовые к выполнению.
         
@@ -44,28 +46,28 @@ class DependencyResolver:
             >>> for subtask in ready:
             ...     print(f"Ready: {subtask.description}")
         """
-        # Получить ID завершённых subtasks
+        # Получить ID завершённых subtasks (извлекаем значения из SubtaskId)
         completed_ids = {
-            st.id for st in plan.subtasks
-            if st.status == SubtaskStatus.DONE
+            st.id.value for st in plan.subtasks
+            if st.status.is_done()
         }
         
         # Найти готовые subtasks
         ready = []
         for subtask in plan.subtasks:
-            if subtask.status == SubtaskStatus.PENDING:
-                # Проверить, все ли зависимости выполнены
-                if all(dep_id in completed_ids for dep_id in subtask.dependencies):
+            if subtask.status.is_pending():
+                # Проверить, все ли зависимости выполнены (сравниваем значения)
+                if all(dep_id.value in completed_ids for dep_id in subtask.dependencies):
                     ready.append(subtask)
         
         logger.debug(
             f"Found {len(ready)} ready subtasks out of "
-            f"{len([st for st in plan.subtasks if st.status == SubtaskStatus.PENDING])} pending"
+            f"{len([st for st in plan.subtasks if st.status.is_pending()])} pending"
         )
         
         return ready
     
-    def has_cyclic_dependencies(self, plan: Plan) -> bool:
+    def has_cyclic_dependencies(self, plan: ExecutionPlan) -> bool:
         """
         Проверить наличие циклических зависимостей в плане.
         
@@ -92,12 +94,12 @@ class DependencyResolver:
         for subtask_id in graph.keys():
             if subtask_id not in visited:
                 if self._has_cycle_dfs(subtask_id, graph, visited, rec_stack):
-                    logger.warning(f"Cyclic dependency detected in plan {plan.id}")
+                    logger.warning(f"Cyclic dependency detected in plan {plan.id.value}")
                     return True
         
         return False
     
-    def _build_dependency_graph(self, plan: Plan) -> Dict[str, List[str]]:
+    def _build_dependency_graph(self, plan: ExecutionPlan) -> Dict[str, List[str]]:
         """
         Построить граф зависимостей.
         
@@ -109,7 +111,8 @@ class DependencyResolver:
         """
         graph = {}
         for subtask in plan.subtasks:
-            graph[subtask.id] = subtask.dependencies.copy()
+            # Извлекаем значения из Value Objects
+            graph[subtask.id.value] = [dep.value for dep in subtask.dependencies]
         
         return graph
     
@@ -151,7 +154,7 @@ class DependencyResolver:
         rec_stack.remove(node)
         return False
     
-    def get_execution_order(self, plan: Plan) -> List[List[Subtask]]:
+    def get_execution_order(self, plan: ExecutionPlan) -> List[List[Subtask]]:
         """
         Получить порядок выполнения subtasks по уровням.
         
@@ -179,21 +182,21 @@ class DependencyResolver:
         
         # Топологическая сортировка по уровням
         levels: List[List[Subtask]] = []
-        remaining = {st.id: st for st in plan.subtasks}
+        remaining = {st.id.value: st for st in plan.subtasks}
         completed: Set[str] = set()
         
         while remaining:
             # Найти subtasks без невыполненных зависимостей
             current_level = []
             for subtask_id, subtask in list(remaining.items()):
-                if all(dep_id in completed for dep_id in subtask.dependencies):
+                if all(dep_id.value in completed for dep_id in subtask.dependencies):
                     current_level.append(subtask)
                     del remaining[subtask_id]
             
             # Если не нашли ни одного → deadlock (не должно случиться после проверки циклов)
             if not current_level:
                 logger.error(
-                    f"Deadlock detected in plan {plan.id}. "
+                    f"Deadlock detected in plan {plan.id.value}. "
                     f"Remaining subtasks: {list(remaining.keys())}"
                 )
                 raise ValueError("Deadlock in dependency graph")
@@ -202,12 +205,12 @@ class DependencyResolver:
             levels.append(current_level)
             
             # Пометить как завершённые для следующей итерации
-            completed.update(st.id for st in current_level)
+            completed.update(st.id.value for st in current_level)
         
         logger.debug(f"Execution order: {len(levels)} levels")
         return levels
     
-    def validate_dependencies(self, plan: Plan) -> List[str]:
+    def validate_dependencies(self, plan: ExecutionPlan) -> List[str]:
         """
         Валидировать зависимости плана.
         
@@ -236,34 +239,34 @@ class DependencyResolver:
             errors.append("Cyclic dependencies detected")
         
         # Проверка 2: Все зависимости существуют
-        subtask_ids = {st.id for st in plan.subtasks}
+        subtask_ids = {st.id.value for st in plan.subtasks}
         for subtask in plan.subtasks:
             for dep_id in subtask.dependencies:
-                if dep_id not in subtask_ids:
+                if dep_id.value not in subtask_ids:
                     errors.append(
-                        f"Subtask {subtask.id} depends on non-existent subtask {dep_id}"
+                        f"Subtask {subtask.id.value} depends on non-existent subtask {dep_id.value}"
                     )
         
         # Проверка 3: Нет самозависимостей
         for subtask in plan.subtasks:
             if subtask.id in subtask.dependencies:
                 errors.append(
-                    f"Subtask {subtask.id} has self-dependency"
+                    f"Subtask {subtask.id.value} has self-dependency"
                 )
         
         if errors:
             logger.warning(
-                f"Dependency validation failed for plan {plan.id}: "
+                f"Dependency validation failed for plan {plan.id.value}: "
                 f"{len(errors)} errors"
             )
         else:
-            logger.debug(f"Dependency validation passed for plan {plan.id}")
+            logger.debug(f"Dependency validation passed for plan {plan.id.value}")
         
         return errors
     
     def get_dependent_subtasks(
         self,
-        plan: Plan,
+        plan: ExecutionPlan,
         subtask_id: str
     ) -> List[Subtask]:
         """
@@ -286,7 +289,8 @@ class DependencyResolver:
         """
         dependents = []
         for subtask in plan.subtasks:
-            if subtask_id in subtask.dependencies:
+            # Сравниваем значения SubtaskId
+            if any(dep.value == subtask_id for dep in subtask.dependencies):
                 dependents.append(subtask)
         
         return dependents

@@ -223,6 +223,27 @@ class Subtask(Entity):
             self.status = SubtaskStatus.pending()
             self.mark_updated()
     
+    def reset_to_pending(self) -> None:
+        """
+        Сбросить подзадачу в статус PENDING для повторного выполнения.
+        
+        Используется для retry после ошибки.
+        Очищает результат, ошибку и временные метки.
+        
+        Example:
+            >>> subtask.start()
+            >>> subtask.fail("Error")
+            >>> subtask.reset_to_pending()
+            >>> assert subtask.status.is_pending()
+            >>> assert subtask.error is None
+        """
+        self.status = SubtaskStatus.pending()
+        self.result = None
+        self.error = None
+        self.started_at = None
+        self.completed_at = None
+        self.mark_updated()
+    
     def is_ready(self, completed_subtask_ids: List[SubtaskId]) -> bool:
         """
         Проверить, готова ли подзадача к выполнению.

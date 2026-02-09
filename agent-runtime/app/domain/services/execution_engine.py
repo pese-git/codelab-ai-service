@@ -16,7 +16,9 @@ import time
 from typing import Dict, Any, List, Optional, Set, TYPE_CHECKING, AsyncGenerator
 from datetime import datetime, timezone
 
-from app.domain.entities.plan import Plan, PlanStatus, Subtask, SubtaskStatus
+from app.domain.execution_context.entities.execution_plan import ExecutionPlan as Plan
+from app.domain.execution_context.entities.subtask import Subtask
+from app.domain.execution_context.value_objects import PlanStatus, SubtaskStatus
 from app.domain.entities.execution_state import ExecutionState, ExecutionStateManager
 from app.domain.services.dependency_resolver import DependencyResolver
 from app.domain.services.subtask_executor import SubtaskExecutor, SubtaskExecutionError

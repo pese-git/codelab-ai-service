@@ -10,17 +10,17 @@ import logging
 from typing import List, Union
 from datetime import datetime, timezone
 
-from app.domain.entities.plan import Plan, Subtask, PlanStatus, SubtaskStatus
-from app.domain.agent_context.value_objects.agent_capabilities import AgentType
+from app.domain.execution_context.entities.execution_plan import ExecutionPlan
+from app.domain.execution_context.entities.subtask import Subtask
+from app.domain.execution_context.value_objects import (
+    PlanId,
+    SubtaskId,
+    PlanStatus,
+    SubtaskStatus,
+)
+from app.domain.session_context.value_objects import ConversationId
+from app.domain.agent_context.value_objects import AgentId
 from app.infrastructure.persistence.models.plan import PlanModel, SubtaskModel
-
-# Import для поддержки новых Value Objects
-try:
-    from app.domain.execution_context.value_objects import PlanId, SubtaskId
-except ImportError:
-    # Fallback если Value Objects еще не доступны
-    PlanId = None
-    SubtaskId = None
 
 logger = logging.getLogger("agent-runtime.plan_mapper")
 
@@ -81,7 +81,7 @@ class PlanMapper:
         return str(value) if value else None
     
     @staticmethod
-    def to_domain(plan_model: PlanModel) -> Plan:
+    def to_domain(plan_model: PlanModel) -> ExecutionPlan:
         """
         Преобразовать БД модель в доменную сущность.
         
@@ -89,7 +89,7 @@ class PlanMapper:
             plan_model: SQLAlchemy модель плана (с загруженными subtasks)
             
         Returns:
-            Plan: Доменная сущность
+            ExecutionPlan: Доменная сущность
         """
         # Преобразовать subtasks
         subtasks = [
@@ -108,14 +108,14 @@ class PlanMapper:
                 )
                 metadata = {}
         
-        # Создать Plan
-        plan = Plan(
-            id=plan_model.id,
-            session_id=plan_model.session_id,
+        # Создать ExecutionPlan с Value Objects
+        plan = ExecutionPlan(
+            id=PlanId(plan_model.id),
+            conversation_id=ConversationId(plan_model.session_id),
             goal=plan_model.goal,
             subtasks=subtasks,
-            status=PlanStatus(plan_model.status),
-            current_subtask_id=plan_model.current_subtask_id,
+            status=PlanStatus.from_string(plan_model.status),
+            current_subtask_id=SubtaskId(plan_model.current_subtask_id) if plan_model.current_subtask_id else None,
             metadata=metadata,
             approved_at=plan_model.approved_at,
             started_at=plan_model.started_at,
@@ -148,28 +148,13 @@ class PlanMapper:
                 )
                 dependencies = []
         
-        # Преобразовать agent string в AgentType
-        agent_mapping = {
-            "coder": AgentType.CODER,
-            "code": AgentType.CODER,
-            "architect": AgentType.ARCHITECT,
-            "plan": AgentType.ARCHITECT,
-            "debug": AgentType.DEBUG,
-            "ask": AgentType.ASK,
-            "explain": AgentType.ASK,
-        }
-        
-        agent = agent_mapping.get(
-            subtask_model.agent.lower(),
-            AgentType.CODER  # Default fallback
-        )
-        
+        # Создать Subtask с Value Objects
         subtask = Subtask(
-            id=subtask_model.id,
+            id=SubtaskId(subtask_model.id),
             description=subtask_model.description,
-            agent=agent,
-            dependencies=dependencies,
-            status=SubtaskStatus(subtask_model.status),
+            agent_id=AgentId(subtask_model.agent),
+            dependencies=[SubtaskId(dep_id) for dep_id in dependencies],
+            status=SubtaskStatus.from_string(subtask_model.status),
             estimated_time=subtask_model.estimated_time,
             result=subtask_model.result,
             error=subtask_model.error,
@@ -183,12 +168,12 @@ class PlanMapper:
         return subtask
     
     @staticmethod
-    def to_persistence(plan: Plan) -> PlanModel:
+    def to_persistence(plan: ExecutionPlan) -> PlanModel:
         """
         Преобразовать доменную сущность в БД модель.
         
         Args:
-            plan: Доменная сущность Plan
+            plan: Доменная сущность ExecutionPlan
             
         Returns:
             PlanModel: SQLAlchemy модель (с subtasks)
@@ -200,17 +185,17 @@ class PlanMapper:
                 metadata_json = json.dumps(plan.metadata)
             except (TypeError, ValueError) as e:
                 logger.warning(
-                    f"Failed to serialize metadata for plan {plan.id}: {e}"
+                    f"Failed to serialize metadata for plan {plan.id.value}: {e}"
                 )
                 metadata_json = "{}"
         
-        # Создать PlanModel
+        # Создать PlanModel, извлекая значения из Value Objects
         plan_model = PlanModel(
-            id=plan.id,
-            session_id=plan.session_id,
+            id=plan.id.value,
+            session_id=plan.conversation_id.value,
             goal=plan.goal,
             status=plan.status.value,
-            current_subtask_id=plan.current_subtask_id,
+            current_subtask_id=plan.current_subtask_id.value if plan.current_subtask_id else None,
             metadata_json=metadata_json,
             approved_at=plan.approved_at,
             started_at=plan.started_at,
@@ -221,7 +206,7 @@ class PlanMapper:
         
         # Преобразовать subtasks
         plan_model.subtasks = [
-            PlanMapper._subtask_to_persistence(st, plan.id)
+            PlanMapper._subtask_to_persistence(st, plan.id.value)
             for st in plan.subtasks
         ]
         
@@ -239,25 +224,24 @@ class PlanMapper:
         Returns:
             SubtaskModel: SQLAlchemy модель
         """
-        # Сериализация dependencies
+        # Сериализация dependencies (извлекаем значения из SubtaskId)
         dependencies_json = "[]"
         if subtask.dependencies:
             try:
-                dependencies_json = json.dumps(subtask.dependencies)
+                dep_values = [dep.value for dep in subtask.dependencies]
+                dependencies_json = json.dumps(dep_values)
             except (TypeError, ValueError) as e:
                 logger.warning(
-                    f"Failed to serialize dependencies for subtask {subtask.id}: {e}"
+                    f"Failed to serialize dependencies for subtask {subtask.id.value}: {e}"
                 )
                 dependencies_json = "[]"
         
-        # Преобразовать AgentType в string
-        agent_str = subtask.agent.value
-        
+        # Извлечь значения из Value Objects
         subtask_model = SubtaskModel(
-            id=subtask.id,
+            id=subtask.id.value,
             plan_id=plan_id,
             description=subtask.description,
-            agent=agent_str,
+            agent=subtask.agent_id.value,
             status=subtask.status.value,
             dependencies_json=dependencies_json,
             estimated_time=subtask.estimated_time,
