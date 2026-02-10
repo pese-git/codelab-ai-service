@@ -70,7 +70,7 @@ class DIContainer:
             uow: Unit of Work для доступа к session и явного commit
         """
         return ProcessToolResultUseCase(
-            tool_result_handler=self._create_tool_result_handler(uow.session),
+            tool_result_handler=self._create_tool_result_handler(uow),
             lock_manager=self._get_lock_manager(),
             uow=uow
         )
@@ -85,12 +85,30 @@ class DIContainer:
     
     # ==================== Private Helpers ====================
     
-    def _get_session_service(self, db: AsyncSession):
-        """Получить session service."""
-        return self.session_module.provide_session_service(
-            db=db,
-            event_publisher=self.infrastructure_module.provide_event_publisher()
-        )
+    def _get_session_service(self, db_or_uow):
+        """
+        Получить session service из DB session или UoW.
+        
+        Args:
+            db_or_uow: AsyncSession или SSEUnitOfWork
+        """
+        # Проверяем, что передано - uow или db
+        from sqlalchemy.ext.asyncio import AsyncSession
+        
+        if isinstance(db_or_uow, AsyncSession):
+            # Передана db session - используем старый способ
+            return self.session_module.provide_session_service(
+                db=db_or_uow,
+                event_publisher=self.infrastructure_module.provide_event_publisher(),
+                uow=None
+            )
+        else:
+            # Передан uow - используем новый способ
+            return self.session_module.provide_session_service(
+                db=None,
+                event_publisher=self.infrastructure_module.provide_event_publisher(),
+                uow=db_or_uow
+            )
     
     def _get_agent_coordination_service(self, db: AsyncSession):
         """Получить agent coordination service."""
@@ -164,20 +182,40 @@ class DIContainer:
             event_publisher=self.infrastructure_module.provide_event_publisher()
         )
     
-    def _create_tool_result_handler(self, db: AsyncSession) -> ToolResultHandler:
-        """Создать ToolResultHandler."""
-        session_service = self._get_session_service(db)
-        agent_coordination_service = self._get_agent_coordination_service(db)
-        agent_registry = self.agent_module.provide_agent_registry()
-        llm_client = self.infrastructure_module.provide_llm_client()
-        stream_handler = self._create_stream_handler(db, session_service, llm_client)
-        switch_helper = self._create_switch_helper(db)
+    def _create_tool_result_handler(self, db_or_uow) -> ToolResultHandler:
+        """
+        Создать ToolResultHandler с DB session или UoW.
         
-        # Create ApprovalManager for updating pending approval status
-        from app.domain.services.approval_management import ApprovalManager
-        from app.infrastructure.persistence.repositories.approval_repository_impl import ApprovalRepositoryImpl
-        approval_repository = ApprovalRepositoryImpl(db)
-        approval_manager = ApprovalManager(approval_repository=approval_repository)
+        Args:
+            db_or_uow: AsyncSession или SSEUnitOfWork
+        """
+        from sqlalchemy.ext.asyncio import AsyncSession
+        
+        # Определяем, что передано
+        if isinstance(db_or_uow, AsyncSession):
+            # Передана db session - используем старый способ
+            db = db_or_uow
+            session_service = self._get_session_service(db)
+            agent_coordination_service = self._get_agent_coordination_service(db)
+            stream_handler = self._create_stream_handler(db, session_service, self.infrastructure_module.provide_llm_client())
+            switch_helper = self._create_switch_helper(db)
+            
+            from app.domain.services.approval_management import ApprovalManager
+            from app.infrastructure.persistence.repositories.approval_repository_impl import ApprovalRepositoryImpl
+            approval_repository = ApprovalRepositoryImpl(db)
+            approval_manager = ApprovalManager(approval_repository=approval_repository)
+        else:
+            # Передан uow - используем новый способ с единой сессией
+            uow = db_or_uow
+            session_service = self._get_session_service(uow)
+            agent_coordination_service = self._get_agent_coordination_service(uow.session)
+            stream_handler = self._create_stream_handler(uow.session, session_service, self.infrastructure_module.provide_llm_client())
+            switch_helper = self._create_switch_helper(uow.session)
+            
+            from app.domain.services.approval_management import ApprovalManager
+            approval_manager = ApprovalManager(approval_repository=uow.approvals)
+        
+        agent_registry = self.agent_module.provide_agent_registry()
         
         return ToolResultHandler(
             session_service=session_service,

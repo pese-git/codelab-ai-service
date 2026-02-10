@@ -105,7 +105,8 @@ class SessionModule:
     def provide_session_service(
         self,
         db: AsyncSession,
-        event_publisher: Optional["EventPublisher"] = None
+        event_publisher: Optional["EventPublisher"] = None,
+        uow=None
     ) -> ConversationManagementService:
         """
         Предоставить сервис управления сессиями.
@@ -114,14 +115,26 @@ class SessionModule:
         вместо устаревшего SessionManagementService.
         
         Args:
-            db: Сессия БД
+            db: Сессия БД (deprecated, используйте uow)
             event_publisher: Event publisher (опционально, для совместимости)
+            uow: Unit of Work (рекомендуется для использования единой сессии)
             
         Returns:
             ConversationManagementService: Сервис управления conversations
         """
-        conversation_repository = self.provide_conversation_repository(db)
-        return self.provide_conversation_service(conversation_repository)
+        # ✅ Если передан uow, используем его repository напрямую
+        if uow:
+            # ИСПРАВЛЕНИЕ: НЕ передаем event_publisher, так как он не callable
+            # ConversationManagementService создаст новый экземпляр без кэширования
+            return ConversationManagementService(
+                repository=uow.conversations,
+                event_publisher=None,  # Отключаем events для UoW-based сервисов
+                uow=uow
+            )
+        else:
+            # Fallback для обратной совместимости
+            conversation_repository = self.provide_conversation_repository(db)
+            return self.provide_conversation_service(conversation_repository)
     
     def provide_conversation_management_service(
         self,
