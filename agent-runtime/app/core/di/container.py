@@ -171,7 +171,7 @@ class DIContainer:
         from app.domain.services.approval_management import ApprovalManager
         from app.infrastructure.persistence.repositories.approval_repository_impl import ApprovalRepositoryImpl
         approval_repository = ApprovalRepositoryImpl(db)
-        approval_manager = ApprovalManager(repository=approval_repository)
+        approval_manager = ApprovalManager(approval_repository=approval_repository)
         
         return ToolResultHandler(
             session_service=session_service,
