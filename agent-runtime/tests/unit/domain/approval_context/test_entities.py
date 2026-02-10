@@ -44,9 +44,9 @@ class TestPolicyRule:
     def test_create_valid_rule(self):
         """Создание валидного правила."""
         rule = PolicyRule(
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             subject_pattern="write_file",
-            action=PolicyAction(PolicyActionEnum.ASK_USER),
+            action=PolicyAction(value=PolicyActionEnum.ASK_USER),
             priority=10,
         )
         
@@ -59,17 +59,17 @@ class TestPolicyRule:
         """Невалидный regex паттерн вызывает ошибку."""
         with pytest.raises(ValueError, match="Invalid regex pattern"):
             PolicyRule(
-                approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+                approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
                 subject_pattern="[invalid",  # Невалидный regex
-                action=PolicyAction(PolicyActionEnum.ASK_USER),
+                action=PolicyAction(value=PolicyActionEnum.ASK_USER),
             )
     
     def test_rule_matches_exact_subject(self):
         """Правило совпадает с точным subject."""
         rule = PolicyRule(
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             subject_pattern="write_file",
-            action=PolicyAction(PolicyActionEnum.ASK_USER),
+            action=PolicyAction(value=PolicyActionEnum.ASK_USER),
         )
         
         assert rule.matches("write_file", {})
@@ -78,9 +78,9 @@ class TestPolicyRule:
     def test_rule_matches_regex_pattern(self):
         """Правило совпадает с regex паттерном."""
         rule = PolicyRule(
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             subject_pattern="write_.*",
-            action=PolicyAction(PolicyActionEnum.ASK_USER),
+            action=PolicyAction(value=PolicyActionEnum.ASK_USER),
         )
         
         assert rule.matches("write_file", {})
@@ -90,9 +90,9 @@ class TestPolicyRule:
     def test_rule_matches_with_conditions_gt(self):
         """Правило с условием 'больше чем'."""
         rule = PolicyRule(
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             subject_pattern="write_file",
-            action=PolicyAction(PolicyActionEnum.ASK_USER),
+            action=PolicyAction(value=PolicyActionEnum.ASK_USER),
             conditions={"size_gt": 1000},
         )
         
@@ -103,9 +103,9 @@ class TestPolicyRule:
     def test_rule_matches_with_conditions_lt(self):
         """Правило с условием 'меньше чем'."""
         rule = PolicyRule(
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             subject_pattern=".*",
-            action=PolicyAction(PolicyActionEnum.APPROVE),
+            action=PolicyAction(value=PolicyActionEnum.APPROVE),
             conditions={"size_lt": 1000},
         )
         
@@ -115,9 +115,9 @@ class TestPolicyRule:
     def test_rule_matches_with_conditions_eq(self):
         """Правило с условием 'равно'."""
         rule = PolicyRule(
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             subject_pattern=".*",
-            action=PolicyAction(PolicyActionEnum.APPROVE),
+            action=PolicyAction(value=PolicyActionEnum.APPROVE),
             conditions={"extension_eq": ".txt"},
         )
         
@@ -127,9 +127,9 @@ class TestPolicyRule:
     def test_rule_matches_with_conditions_contains(self):
         """Правило с условием 'содержит'."""
         rule = PolicyRule(
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             subject_pattern=".*",
-            action=PolicyAction(PolicyActionEnum.REJECT),
+            action=PolicyAction(value=PolicyActionEnum.REJECT),
             conditions={"path_contains": "/etc/"},
         )
         
@@ -139,9 +139,9 @@ class TestPolicyRule:
     def test_rule_matches_multiple_conditions(self):
         """Правило с несколькими условиями (все должны выполняться)."""
         rule = PolicyRule(
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             subject_pattern="write_file",
-            action=PolicyAction(PolicyActionEnum.ASK_USER),
+            action=PolicyAction(value=PolicyActionEnum.ASK_USER),
             conditions={
                 "size_gt": 1000,
                 "extension_eq": ".py",
@@ -158,21 +158,21 @@ class TestPolicyRule:
     def test_rule_equality(self):
         """Сравнение правил по значению."""
         rule1 = PolicyRule(
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             subject_pattern="write_file",
-            action=PolicyAction(PolicyActionEnum.ASK_USER),
+            action=PolicyAction(value=PolicyActionEnum.ASK_USER),
             priority=10,
         )
         rule2 = PolicyRule(
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             subject_pattern="write_file",
-            action=PolicyAction(PolicyActionEnum.ASK_USER),
+            action=PolicyAction(value=PolicyActionEnum.ASK_USER),
             priority=10,
         )
         rule3 = PolicyRule(
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             subject_pattern="read_file",
-            action=PolicyAction(PolicyActionEnum.APPROVE),
+            action=PolicyAction(value=PolicyActionEnum.APPROVE),
             priority=5,
         )
         
@@ -182,14 +182,14 @@ class TestPolicyRule:
     def test_rule_hash(self):
         """Правила можно использовать в множествах."""
         rule1 = PolicyRule(
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             subject_pattern="write_file",
-            action=PolicyAction(PolicyActionEnum.ASK_USER),
+            action=PolicyAction(value=PolicyActionEnum.ASK_USER),
         )
         rule2 = PolicyRule(
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             subject_pattern="write_file",
-            action=PolicyAction(PolicyActionEnum.ASK_USER),
+            action=PolicyAction(value=PolicyActionEnum.ASK_USER),
         )
         
         rule_set = {rule1, rule2}
@@ -206,15 +206,15 @@ class TestApprovalRequest:
     def test_create_approval_request(self):
         """Создание запроса на утверждение."""
         request = ApprovalRequest.create(
-            approval_id=ApprovalId("req-tool-123"),
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_id=ApprovalId(value="req-tool-123"),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             session_id="session-abc",
             subject="write_file",
             request_data={"path": "test.py", "content": "..."},
             reason="File modification requires approval",
         )
         
-        assert request.approval_id == ApprovalId("req-tool-123")
+        assert request.approval_id == ApprovalId(value="req-tool-123")
         assert request.approval_type.is_tool_call()
         assert request.status.is_pending()
         assert request.session_id == "session-abc"
@@ -224,8 +224,8 @@ class TestApprovalRequest:
     def test_create_generates_approval_requested_event(self):
         """Создание генерирует событие ApprovalRequested."""
         request = ApprovalRequest.create(
-            approval_id=ApprovalId("req-123"),
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_id=ApprovalId(value="req-123"),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             session_id="session-abc",
             subject="write_file",
             request_data={},
@@ -234,13 +234,13 @@ class TestApprovalRequest:
         events = request.domain_events
         assert len(events) == 1
         assert isinstance(events[0], ApprovalRequested)
-        assert events[0].approval_id == ApprovalId("req-123")
+        assert events[0].approval_id == ApprovalId(value="req-123")
     
     def test_approve_request(self):
         """Одобрение запроса."""
         request = ApprovalRequest.create(
-            approval_id=ApprovalId("req-123"),
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_id=ApprovalId(value="req-123"),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             session_id="session-abc",
             subject="write_file",
             request_data={},
@@ -255,8 +255,8 @@ class TestApprovalRequest:
     def test_approve_generates_approval_granted_event(self):
         """Одобрение генерирует событие ApprovalGranted."""
         request = ApprovalRequest.create(
-            approval_id=ApprovalId("req-123"),
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_id=ApprovalId(value="req-123"),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             session_id="session-abc",
             subject="write_file",
             request_data={},
@@ -273,8 +273,8 @@ class TestApprovalRequest:
     def test_reject_request(self):
         """Отклонение запроса."""
         request = ApprovalRequest.create(
-            approval_id=ApprovalId("req-123"),
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_id=ApprovalId(value="req-123"),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             session_id="session-abc",
             subject="write_file",
             request_data={},
@@ -289,8 +289,8 @@ class TestApprovalRequest:
     def test_reject_generates_approval_rejected_event(self):
         """Отклонение генерирует событие ApprovalRejected."""
         request = ApprovalRequest.create(
-            approval_id=ApprovalId("req-123"),
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_id=ApprovalId(value="req-123"),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             session_id="session-abc",
             subject="write_file",
             request_data={},
@@ -307,8 +307,8 @@ class TestApprovalRequest:
     def test_expire_request(self):
         """Истечение запроса."""
         request = ApprovalRequest.create(
-            approval_id=ApprovalId("req-123"),
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_id=ApprovalId(value="req-123"),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             session_id="session-abc",
             subject="write_file",
             request_data={},
@@ -322,8 +322,8 @@ class TestApprovalRequest:
     def test_expire_generates_approval_expired_event(self):
         """Истечение генерирует событие ApprovalExpired."""
         request = ApprovalRequest.create(
-            approval_id=ApprovalId("req-123"),
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_id=ApprovalId(value="req-123"),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             session_id="session-abc",
             subject="write_file",
             request_data={},
@@ -339,8 +339,8 @@ class TestApprovalRequest:
     def test_cannot_approve_already_approved(self):
         """Нельзя одобрить уже одобренный запрос."""
         request = ApprovalRequest.create(
-            approval_id=ApprovalId("req-123"),
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_id=ApprovalId(value="req-123"),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             session_id="session-abc",
             subject="write_file",
             request_data={},
@@ -354,8 +354,8 @@ class TestApprovalRequest:
     def test_cannot_reject_already_rejected(self):
         """Нельзя отклонить уже отклоненный запрос."""
         request = ApprovalRequest.create(
-            approval_id=ApprovalId("req-123"),
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_id=ApprovalId(value="req-123"),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             session_id="session-abc",
             subject="write_file",
             request_data={},
@@ -373,9 +373,9 @@ class TestApprovalRequest:
         
         # Создаем запрос напрямую с прошлым временем
         request = ApprovalRequest(
-            id=ApprovalId("req-123"),
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
-            status=ApprovalStatus(ApprovalStatusEnum.PENDING),
+            id=ApprovalId(value="req-123"),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
+            status=ApprovalStatus(value=ApprovalStatusEnum.PENDING),
             session_id="session-abc",
             subject="write_file",
             request_data={},
@@ -389,8 +389,8 @@ class TestApprovalRequest:
     def test_approved_request_not_expired(self):
         """Одобренный запрос не считается истекшим."""
         request = ApprovalRequest.create(
-            approval_id=ApprovalId("req-123"),
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_id=ApprovalId(value="req-123"),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             session_id="session-abc",
             subject="write_file",
             request_data={},
@@ -416,7 +416,7 @@ class TestHITLPolicy:
         policy = HITLPolicy.create(
             policy_id="policy-1",
             name="Test Policy",
-            default_action=PolicyAction(PolicyActionEnum.ASK_USER),
+            default_action=PolicyAction(value=PolicyActionEnum.ASK_USER),
         )
         
         assert policy.id == "policy-1"
@@ -433,9 +433,9 @@ class TestHITLPolicy:
         )
         
         rule = PolicyRule(
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             subject_pattern="write_file",
-            action=PolicyAction(PolicyActionEnum.ASK_USER),
+            action=PolicyAction(value=PolicyActionEnum.ASK_USER),
             priority=10,
         )
         
@@ -452,21 +452,21 @@ class TestHITLPolicy:
         )
         
         rule1 = PolicyRule(
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             subject_pattern="write_file",
-            action=PolicyAction(PolicyActionEnum.ASK_USER),
+            action=PolicyAction(value=PolicyActionEnum.ASK_USER),
             priority=5,
         )
         rule2 = PolicyRule(
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             subject_pattern="read_file",
-            action=PolicyAction(PolicyActionEnum.APPROVE),
+            action=PolicyAction(value=PolicyActionEnum.APPROVE),
             priority=10,
         )
         rule3 = PolicyRule(
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             subject_pattern="delete_file",
-            action=PolicyAction(PolicyActionEnum.REJECT),
+            action=PolicyAction(value=PolicyActionEnum.REJECT),
             priority=15,
         )
         
@@ -487,9 +487,9 @@ class TestHITLPolicy:
         )
         
         rule = PolicyRule(
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             subject_pattern="write_file",
-            action=PolicyAction(PolicyActionEnum.ASK_USER),
+            action=PolicyAction(value=PolicyActionEnum.ASK_USER),
         )
         
         policy.add_rule(rule)
@@ -507,9 +507,9 @@ class TestHITLPolicy:
         )
         
         rule = PolicyRule(
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             subject_pattern="write_file",
-            action=PolicyAction(PolicyActionEnum.ASK_USER),
+            action=PolicyAction(value=PolicyActionEnum.ASK_USER),
         )
         
         removed = policy.remove_rule(rule)
@@ -520,20 +520,20 @@ class TestHITLPolicy:
         policy = HITLPolicy.create(
             policy_id="policy-1",
             name="Test Policy",
-            default_action=PolicyAction(PolicyActionEnum.APPROVE),
+            default_action=PolicyAction(value=PolicyActionEnum.APPROVE),
         )
         
         rule = PolicyRule(
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             subject_pattern="write_file",
-            action=PolicyAction(PolicyActionEnum.ASK_USER),
+            action=PolicyAction(value=PolicyActionEnum.ASK_USER),
             priority=10,
         )
         policy.add_rule(rule)
         
         action = policy.evaluate(
-            approval_id=ApprovalId("req-123"),
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_id=ApprovalId(value="req-123"),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             subject="write_file",
             request_data={},
         )
@@ -545,20 +545,20 @@ class TestHITLPolicy:
         policy = HITLPolicy.create(
             policy_id="policy-1",
             name="Test Policy",
-            default_action=PolicyAction(PolicyActionEnum.APPROVE),
+            default_action=PolicyAction(value=PolicyActionEnum.APPROVE),
         )
         
         rule = PolicyRule(
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             subject_pattern="write_file",
-            action=PolicyAction(PolicyActionEnum.ASK_USER),
+            action=PolicyAction(value=PolicyActionEnum.ASK_USER),
         )
         policy.add_rule(rule)
         
         # Запрос не совпадает с правилом
         action = policy.evaluate(
-            approval_id=ApprovalId("req-123"),
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_id=ApprovalId(value="req-123"),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             subject="read_file",  # Не совпадает с "write_file"
             request_data={},
         )
@@ -573,15 +573,15 @@ class TestHITLPolicy:
         )
         
         rule = PolicyRule(
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             subject_pattern="write_file",
-            action=PolicyAction(PolicyActionEnum.ASK_USER),
+            action=PolicyAction(value=PolicyActionEnum.ASK_USER),
         )
         policy.add_rule(rule)
         
         policy.evaluate(
-            approval_id=ApprovalId("req-123"),
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_id=ApprovalId(value="req-123"),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             subject="write_file",
             request_data={},
         )
@@ -597,14 +597,14 @@ class TestHITLPolicy:
         policy = HITLPolicy.create(
             policy_id="policy-1",
             name="Test Policy",
-            default_action=PolicyAction(PolicyActionEnum.REJECT),
+            default_action=PolicyAction(value=PolicyActionEnum.REJECT),
         )
         
         policy.deactivate()
         
         action = policy.evaluate(
-            approval_id=ApprovalId("req-123"),
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_id=ApprovalId(value="req-123"),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             subject="write_file",
             request_data={},
         )
@@ -635,17 +635,17 @@ class TestHITLPolicy:
         
         # Низкий приоритет - одобрить
         rule1 = PolicyRule(
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             subject_pattern=".*",  # Совпадает со всем
-            action=PolicyAction(PolicyActionEnum.APPROVE),
+            action=PolicyAction(value=PolicyActionEnum.APPROVE),
             priority=5,
         )
         
         # Высокий приоритет - запросить пользователя
         rule2 = PolicyRule(
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             subject_pattern="write_file",
-            action=PolicyAction(PolicyActionEnum.ASK_USER),
+            action=PolicyAction(value=PolicyActionEnum.ASK_USER),
             priority=10,
         )
         
@@ -654,8 +654,8 @@ class TestHITLPolicy:
         
         # Должно сработать правило с высшим приоритетом
         action = policy.evaluate(
-            approval_id=ApprovalId("req-123"),
-            approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+            approval_id=ApprovalId(value="req-123"),
+            approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
             subject="write_file",
             request_data={},
         )

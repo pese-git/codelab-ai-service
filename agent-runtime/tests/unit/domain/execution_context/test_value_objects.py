@@ -10,6 +10,7 @@ Unit тесты для Value Objects в Execution Context.
 
 import pytest
 from datetime import datetime, timezone
+from pydantic import ValidationError
 
 from app.domain.execution_context.value_objects import (
     PlanId,
@@ -31,12 +32,12 @@ class TestPlanId:
     
     def test_create_plan_id_with_empty_string_raises_error(self):
         """Создание PlanId с пустой строкой вызывает ошибку."""
-        with pytest.raises(ValueError, match="Plan ID cannot be empty"):
+        with pytest.raises(ValidationError, match="PlanId value cannot be empty"):
             PlanId(value="")
     
     def test_create_plan_id_with_whitespace_raises_error(self):
         """Создание PlanId с пробелами вызывает ошибку."""
-        with pytest.raises(ValueError, match="Plan ID cannot be empty"):
+        with pytest.raises(ValidationError, match="PlanId value cannot be empty"):
             PlanId(value="   ")
     
     def test_plan_id_equality(self):
@@ -81,7 +82,7 @@ class TestSubtaskId:
     
     def test_create_subtask_id_with_empty_string_raises_error(self):
         """Создание SubtaskId с пустой строкой вызывает ошибку."""
-        with pytest.raises(ValueError, match="Subtask ID cannot be empty"):
+        with pytest.raises(ValidationError, match="SubtaskId value cannot be empty"):
             SubtaskId(value="")
     
     def test_subtask_id_equality(self):
@@ -176,7 +177,8 @@ class TestSubtaskStatus:
     def test_all_subtask_statuses_exist(self):
         """Все статусы подзадачи определены."""
         assert SubtaskStatus.PENDING.value == "pending"
-        assert SubtaskStatus.RUNNING.value == "in_progress"
+        assert SubtaskStatus.IN_PROGRESS.value == "in_progress"
+        assert SubtaskStatus.RUNNING.value == "running"  # Alias
         assert SubtaskStatus.DONE.value == "done"
         assert SubtaskStatus.FAILED.value == "failed"
     

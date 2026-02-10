@@ -24,6 +24,8 @@ class SubtaskStatusEnum(str, Enum):
 
 class SubtaskStatus(ValueObject):
     """
+    
+    value: SubtaskStatusEnum
     Статус подзадачи с валидацией переходов.
     
     Бизнес-правила переходов:
@@ -60,6 +62,8 @@ class SubtaskStatus(ValueObject):
         SubtaskStatusEnum.FAILED: {SubtaskStatusEnum.PENDING},  # Можно retry
     }
     
+    value: SubtaskStatusEnum
+    
     # Константы для удобного использования
     PENDING: 'SubtaskStatus | None' = None  # Будет инициализировано после определения класса
     IN_PROGRESS: 'SubtaskStatus | None' = None
@@ -67,57 +71,35 @@ class SubtaskStatus(ValueObject):
     DONE: 'SubtaskStatus | None' = None
     FAILED: 'SubtaskStatus | None' = None
     
-    def __init__(self, value: SubtaskStatusEnum):
-        """
-        Создать статус подзадачи.
-        
-        Args:
-            value: Значение статуса
-            
-        Raises:
-            ValueError: Если статус невалиден
-        """
-        if not isinstance(value, SubtaskStatusEnum):
-            raise ValueError(
-                f"Status must be SubtaskStatusEnum, got {type(value).__name__}"
-            )
-        
-        self._value = value
-    
-    @property
-    def value(self) -> SubtaskStatusEnum:
-        """Получить значение статуса."""
-        return self._value
-    
     @classmethod
     def pending(cls) -> "SubtaskStatus":
         """Создать статус PENDING."""
-        return cls(SubtaskStatusEnum.PENDING)
+        return cls(value=SubtaskStatusEnum.PENDING)
     
     @classmethod
     def in_progress(cls) -> "SubtaskStatus":
         """Создать статус IN_PROGRESS."""
-        return cls(SubtaskStatusEnum.IN_PROGRESS)
+        return cls(value=SubtaskStatusEnum.IN_PROGRESS)
     
     @classmethod
     def running(cls) -> "SubtaskStatus":
         """Создать статус RUNNING."""
-        return cls(SubtaskStatusEnum.RUNNING)
+        return cls(value=SubtaskStatusEnum.RUNNING)
     
     @classmethod
     def done(cls) -> "SubtaskStatus":
         """Создать статус DONE."""
-        return cls(SubtaskStatusEnum.DONE)
+        return cls(value=SubtaskStatusEnum.DONE)
     
     @classmethod
     def failed(cls) -> "SubtaskStatus":
         """Создать статус FAILED."""
-        return cls(SubtaskStatusEnum.FAILED)
+        return cls(value=SubtaskStatusEnum.FAILED)
     
     @classmethod
     def blocked(cls) -> "SubtaskStatus":
         """Создать статус BLOCKED."""
-        return cls(SubtaskStatusEnum.BLOCKED)
+        return cls(value=SubtaskStatusEnum.BLOCKED)
     
     @classmethod
     def from_string(cls, value: str) -> "SubtaskStatus":
@@ -135,7 +117,7 @@ class SubtaskStatus(ValueObject):
         """
         try:
             enum_value = SubtaskStatusEnum(value)
-            return cls(enum_value)
+            return cls(value=enum_value)
         except ValueError:
             valid_values = [s.value for s in SubtaskStatusEnum]
             raise ValueError(
@@ -159,8 +141,8 @@ class SubtaskStatus(ValueObject):
             >>> pending.can_transition_to(running)
             True
         """
-        valid_targets = self._VALID_TRANSITIONS.get(self._value, set())
-        return target._value in valid_targets
+        valid_targets = self._VALID_TRANSITIONS.get(self.value, set())
+        return target.value in valid_targets
     
     def is_terminal(self) -> bool:
         """
@@ -178,45 +160,45 @@ class SubtaskStatus(ValueObject):
             >>> failed.is_terminal()
             False  # FAILED можно retry
         """
-        return self._value == SubtaskStatusEnum.DONE
+        return self.value == SubtaskStatusEnum.DONE
     
     def is_pending(self) -> bool:
         """Проверить, является ли статус PENDING."""
-        return self._value == SubtaskStatusEnum.PENDING
+        return self.value == SubtaskStatusEnum.PENDING
     
     def is_running(self) -> bool:
         """Проверить, является ли статус RUNNING."""
-        return self._value == SubtaskStatusEnum.RUNNING
+        return self.value == SubtaskStatusEnum.RUNNING
     
     def is_done(self) -> bool:
         """Проверить, является ли статус DONE."""
-        return self._value == SubtaskStatusEnum.DONE
+        return self.value == SubtaskStatusEnum.DONE
     
     def is_failed(self) -> bool:
         """Проверить, является ли статус FAILED."""
-        return self._value == SubtaskStatusEnum.FAILED
+        return self.value == SubtaskStatusEnum.FAILED
     
     def is_blocked(self) -> bool:
         """Проверить, является ли статус BLOCKED."""
-        return self._value == SubtaskStatusEnum.BLOCKED
+        return self.value == SubtaskStatusEnum.BLOCKED
     
     def __str__(self) -> str:
         """Строковое представление."""
-        return self._value.value
+        return self.value.value
     
     def __repr__(self) -> str:
         """Отладочное представление."""
-        return f"SubtaskStatus({self._value.value})"
+        return f"SubtaskStatus({self.value.value})"
     
     def __eq__(self, other: object) -> bool:
         """Сравнение на равенство."""
         if not isinstance(other, SubtaskStatus):
             return False
-        return self._value == other._value
+        return self.value == other.value
     
     def __hash__(self) -> int:
         """Хеш для использования в множествах и словарях."""
-        return hash(self._value)
+        return hash(self.value)
 
 
 # Инициализация констант

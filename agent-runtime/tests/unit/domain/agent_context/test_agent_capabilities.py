@@ -25,7 +25,7 @@ class TestAgentCapabilitiesCreation:
     
     def test_create_with_invalid_agent_type_raises_error(self):
         """Тест что невалидный тип агента вызывает ошибку."""
-        with pytest.raises(ValueError, match="agent_type должен быть AgentType"):
+        with pytest.raises(ValueError, match="Невалидный тип агента"):
             AgentCapabilities(
                 agent_type="invalid",
                 supported_tools=set()

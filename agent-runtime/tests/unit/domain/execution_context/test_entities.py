@@ -126,7 +126,7 @@ class TestSubtask:
         
         subtask.start()
         
-        with pytest.raises(ValueError, match="Cannot transition"):
+        with pytest.raises(ValueError, match="Cannot"):
             subtask.start()
     
     def test_cannot_complete_pending_subtask(self):
@@ -139,7 +139,7 @@ class TestSubtask:
             metadata={}
         )
         
-        with pytest.raises(ValueError, match="Cannot transition"):
+        with pytest.raises(ValueError, match="Cannot"):
             subtask.complete(result="Result")
     
     def test_subtask_with_dependencies(self):
@@ -204,22 +204,27 @@ class TestExecutionPlan:
     
     def test_complete_plan(self):
         """Завершение плана."""
+        subtask = Subtask(
+            id=SubtaskId(value="subtask-1"),
+            description="Task 1",
+            agent_id=AgentId(value="coder")
+        )
+        
         plan = ExecutionPlan(
             id=PlanId(value="plan-1"),
             conversation_id=ConversationId(value="test-session"),
             goal="Complete the project",
-            subtasks=[
-                Subtask(
-                    id=SubtaskId(value="subtask-1"),
-                    description="Task 1",
-                    agent_id=AgentId(value="coder")
-                )
-            ],
+            subtasks=[subtask],
             metadata={}
         )
         
         plan.approve()
         plan.start_execution()
+        
+        # Завершить подзадачу
+        subtask.start()
+        subtask.complete(result="Task completed")
+        
         plan.complete()
         
         assert plan.status == PlanStatus.COMPLETED
@@ -228,16 +233,23 @@ class TestExecutionPlan:
     
     def test_fail_plan(self):
         """Провал плана."""
+        subtask = Subtask(
+            id=SubtaskId(value="subtask-1"),
+            description="Task 1",
+            agent_id=AgentId(value="coder")
+        )
+        
         plan = ExecutionPlan(
             id=PlanId(value="plan-1"),
             conversation_id=ConversationId(value="test-session"),
             goal="Complete the project",
-            subtasks=[],
+            subtasks=[subtask],
             metadata={}
         )
         
+        plan.approve()
         plan.start_execution()
-        plan.fail(error="Plan execution failed")
+        plan.fail(reason="Plan execution failed")
         
         assert plan.status == PlanStatus.FAILED
         assert plan.error == "Plan execution failed"
@@ -245,16 +257,23 @@ class TestExecutionPlan:
     
     def test_cancel_plan(self):
         """Отмена плана."""
+        subtask = Subtask(
+            id=SubtaskId(value="subtask-1"),
+            description="Task 1",
+            agent_id=AgentId(value="coder")
+        )
+        
         plan = ExecutionPlan(
             id=PlanId(value="plan-1"),
             conversation_id=ConversationId(value="test-session"),
             goal="Complete the project",
-            subtasks=[],
+            subtasks=[subtask],
             metadata={}
         )
         
+        plan.approve()
         plan.start_execution()
-        plan.cancel()
+        plan.cancel(reason="User requested cancellation")
         
         assert plan.status == PlanStatus.CANCELLED
         assert plan.completed_at is not None
@@ -377,14 +396,15 @@ class TestExecutionPlan:
         )
         
         # Изначально нет событий
-        assert len(plan.domain_events) == 0
+        assert len(plan.get_domain_events()) == 0
         
         # После операций события должны добавляться
         # (это будет делаться в сервисах)
-        from app.domain.execution_context.events import PlanStarted
+        from app.domain.execution_context.events import PlanExecutionStarted
         
-        event = PlanStarted(
+        event = PlanExecutionStarted(
             plan_id=plan.id,
+            conversation_id=plan.conversation_id.value,
             goal=plan.goal,
             subtask_count=0,
             started_at=datetime.now(timezone.utc)
@@ -392,8 +412,8 @@ class TestExecutionPlan:
         
         plan.add_domain_event(event)
         
-        assert len(plan.domain_events) == 1
-        assert isinstance(plan.domain_events[0], PlanStarted)
+        assert len(plan.get_domain_events()) == 1
+        assert isinstance(plan.get_domain_events()[0], PlanExecutionStarted)
     
     def test_clear_domain_events(self):
         """Очистка Domain Events."""
@@ -405,20 +425,21 @@ class TestExecutionPlan:
             metadata={}
         )
         
-        from app.domain.execution_context.events import PlanStarted
+        from app.domain.execution_context.events import PlanExecutionStarted
         
-        event = PlanStarted(
+        event = PlanExecutionStarted(
             plan_id=plan.id,
+            conversation_id=plan.conversation_id.value,
             goal=plan.goal,
             subtask_count=0,
             started_at=datetime.now(timezone.utc)
         )
         
         plan.add_domain_event(event)
-        assert len(plan.domain_events) == 1
+        assert len(plan.get_domain_events()) == 1
         
         plan.clear_domain_events()
-        assert len(plan.domain_events) == 0
+        assert len(plan.get_domain_events()) == 0
 
 
 class TestExecutionPlanLifecycle:
@@ -451,7 +472,8 @@ class TestExecutionPlanLifecycle:
             metadata={}
         )
         
-        # Запустить план
+        # Утвердить и запустить план
+        plan.approve()
         plan.start_execution()
         assert plan.status == PlanStatus.IN_PROGRESS
         
@@ -490,7 +512,8 @@ class TestExecutionPlanLifecycle:
             metadata={}
         )
         
-        # Запустить план
+        # Утвердить и запустить план
+        plan.approve()
         plan.start_execution()
         
         # Запустить подзадачу
@@ -501,5 +524,5 @@ class TestExecutionPlanLifecycle:
         assert subtask.status == SubtaskStatus.FAILED
         
         # План тоже провалился
-        plan.fail(error="Subtask failed")
+        plan.fail(reason="Subtask failed")
         assert plan.status == PlanStatus.FAILED

@@ -6,6 +6,7 @@ ApprovalId Value Object.
 
 from typing import Any
 
+from pydantic import field_validator
 from app.domain.shared.value_object import ValueObject
 
 
@@ -27,44 +28,32 @@ class ApprovalId(ValueObject):
         >>> ApprovalId("")  # Raises ValueError
         >>> ApprovalId("req 123")  # Raises ValueError (пробелы)
     """
+    value: str
     
-    def __init__(self, value: str):
-        """
-        Создать ApprovalId.
-        
-        Args:
-            value: Строковый идентификатор
-            
-        Raises:
-            ValueError: Если value пустой или содержит пробелы
-        """
-        if not value or not value.strip():
-            raise ValueError("Approval ID cannot be empty or whitespace")
-        
-        if " " in value:
-            raise ValueError("Approval ID cannot contain spaces")
-        
-        self._value = value
-    
-    @property
-    def value(self) -> str:
-        """Получить строковое значение ID."""
-        return self._value
+    @field_validator('value')
+    @classmethod
+    def validate_value(cls, v: str) -> str:
+        """Валидация значения ApprovalId."""
+        if not v or not v.strip():
+            raise ValueError("ApprovalId value cannot be empty")
+        if ' ' in v:
+            raise ValueError("ApprovalId value cannot contain spaces")
+        return v
     
     def __str__(self) -> str:
         """Строковое представление."""
-        return self._value
+        return self.value
     
     def __repr__(self) -> str:
         """Отладочное представление."""
-        return f"ApprovalId('{self._value}')"
+        return f"ApprovalId(value='{self.value}')"
     
     def __eq__(self, other: Any) -> bool:
         """Сравнение по значению."""
         if not isinstance(other, ApprovalId):
             return False
-        return self._value == other._value
+        return self.value == other.value
     
     def __hash__(self) -> int:
         """Хеш для использования в множествах и словарях."""
-        return hash(self._value)
+        return hash(self.value)

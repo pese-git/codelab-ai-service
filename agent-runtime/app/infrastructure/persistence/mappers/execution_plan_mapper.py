@@ -92,12 +92,12 @@ class ExecutionPlanMapper:
         
         # Создать ExecutionPlan
         execution_plan = ExecutionPlan(
-            id=PlanId(model.id),
-            conversation_id=ConversationId(model.session_id),
+            id=PlanId(value=model.id),
+            conversation_id=ConversationId(value=model.session_id),
             goal=model.goal,
             subtasks=subtasks,
             status=PlanStatus.from_string(model.status),
-            current_subtask_id=SubtaskId(model.current_subtask_id) if model.current_subtask_id else None,
+            current_subtask_id=SubtaskId(value=model.current_subtask_id) if model.current_subtask_id else None,
             metadata=metadata,
             approved_at=model.approved_at,
             started_at=model.started_at,
@@ -123,14 +123,14 @@ class ExecutionPlanMapper:
         if model.dependencies_json:
             try:
                 deps = json.loads(model.dependencies_json)
-                dependencies = [SubtaskId(d) for d in deps]
+                dependencies = [SubtaskId(value=d) for d in deps]
             except json.JSONDecodeError:
                 logger.warning(
                     f"Failed to parse dependencies for subtask {model.id}"
                 )
         
         return Subtask(
-            id=SubtaskId(model.id),
+            id=SubtaskId(value=model.id),
             description=model.description,
             agent_id=AgentId(value=model.agent),
             dependencies=dependencies,

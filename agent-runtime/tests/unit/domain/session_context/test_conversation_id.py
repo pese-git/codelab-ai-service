@@ -40,7 +40,7 @@ class TestConversationId:
         """Слишком длинный ID вызывает ошибку"""
         long_id = "a" * 256
         with pytest.raises(ValueError, match="не может превышать 255 символов"):
-            ConversationId(long_id)
+            ConversationId(value=long_id)
     
     def test_invalid_characters_raise_error(self):
         """Недопустимые символы вызывают ошибку"""

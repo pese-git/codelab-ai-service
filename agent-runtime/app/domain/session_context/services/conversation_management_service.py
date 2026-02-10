@@ -120,7 +120,7 @@ class ConversationManagementService:
         if not conversation_id:
             conv_id = ConversationId.generate()
         else:
-            conv_id = ConversationId(conversation_id)
+            conv_id = ConversationId(value=conversation_id)
         
         # Проверить, что conversation не существует
         existing = await repo.find_by_id(conv_id)
@@ -167,7 +167,7 @@ class ConversationManagementService:
         Пример:
             >>> conversation = await service.get_conversation("conv-123")
         """
-        conv_id = ConversationId(conversation_id)
+        conv_id = ConversationId(value=conversation_id)
         conversation = await self._get_repository().find_by_id(conv_id)
         
         if not conversation:
@@ -214,7 +214,7 @@ class ConversationManagementService:
         repo = uow.conversations if uow else self._get_repository()
         
         # Попытаться найти существующую
-        conv_id = ConversationId(conversation_id)
+        conv_id = ConversationId(value=conversation_id)
         existing = await repo.find_by_id(conv_id)
         
         if existing:
@@ -270,7 +270,7 @@ class ConversationManagementService:
         repo = uow.conversations if uow else self._get_repository()
         
         # Получить conversation
-        conversation = await repo.find_by_id(ConversationId(conversation_id))
+        conversation = await repo.find_by_id(ConversationId(value=conversation_id))
         if not conversation:
             raise SessionNotFoundError(f"Conversation {conversation_id} not found")
         

@@ -47,8 +47,8 @@ class ApprovalRequest(Entity):
     Примеры:
         >>> # Создание запроса
         >>> request = ApprovalRequest.create(
-        ...     approval_id=ApprovalId("req-tool-123"),
-        ...     approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+        ...     approval_id=ApprovalId(value="req-tool-123"),
+        ...     approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
         ...     session_id="session-abc",
         ...     subject="write_file",
         ...     request_data={"path": "test.py", "content": "..."},
@@ -103,7 +103,7 @@ class ApprovalRequest(Entity):
         request = cls(
             id=approval_id,
             approval_type=approval_type,
-            status=ApprovalStatus(ApprovalStatusEnum.PENDING),
+            status=ApprovalStatus(value=ApprovalStatusEnum.PENDING),
             session_id=session_id,
             subject=subject,
             request_data=request_data,
@@ -139,7 +139,7 @@ class ApprovalRequest(Entity):
         Raises:
             ValueError: Если переход в APPROVED невозможен
         """
-        target_status = ApprovalStatus(ApprovalStatusEnum.APPROVED)
+        target_status = ApprovalStatus(value=ApprovalStatusEnum.APPROVED)
         
         if not self.status.can_transition_to(target_status):
             raise ValueError(
@@ -170,7 +170,7 @@ class ApprovalRequest(Entity):
         Raises:
             ValueError: Если переход в REJECTED невозможен
         """
-        target_status = ApprovalStatus(ApprovalStatusEnum.REJECTED)
+        target_status = ApprovalStatus(value=ApprovalStatusEnum.REJECTED)
         
         if not self.status.can_transition_to(target_status):
             raise ValueError(
@@ -200,7 +200,7 @@ class ApprovalRequest(Entity):
         Raises:
             ValueError: Если переход в EXPIRED невозможен
         """
-        target_status = ApprovalStatus(ApprovalStatusEnum.EXPIRED)
+        target_status = ApprovalStatus(value=ApprovalStatusEnum.EXPIRED)
         
         if not self.status.can_transition_to(target_status):
             raise ValueError(

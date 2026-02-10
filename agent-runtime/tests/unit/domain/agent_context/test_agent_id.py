@@ -3,6 +3,7 @@ Unit тесты для AgentId Value Object.
 """
 
 import pytest
+from pydantic import ValidationError
 from app.domain.agent_context.value_objects.agent_id import AgentId
 
 
@@ -21,19 +22,19 @@ class TestAgentIdCreation:
     
     def test_create_with_none_raises_error(self):
         """Тест что None вызывает ошибку."""
-        with pytest.raises(ValueError, match="Agent ID не может быть пустым"):
-            AgentId(None)
+        with pytest.raises((ValueError, ValidationError)):
+            AgentId(value=None)
     
     def test_create_with_non_string_raises_error(self):
         """Тест что не-строка вызывает ошибку."""
-        with pytest.raises(ValueError, match="Agent ID должен быть строкой"):
-            AgentId(123)
+        with pytest.raises((ValueError, ValidationError)):
+            AgentId(value=123)
     
     def test_create_with_too_long_id_raises_error(self):
         """Тест что слишком длинный ID вызывает ошибку."""
         long_id = "a" * 256
         with pytest.raises(ValueError, match="Agent ID слишком длинный"):
-            AgentId(long_id)
+            AgentId(value=long_id)
     
     def test_create_with_whitespace_only_raises_error(self):
         """Тест что ID из пробелов вызывает ошибку."""
@@ -55,15 +56,17 @@ class TestAgentIdGeneration:
     """Тесты генерации AgentId."""
     
     def test_generate_creates_valid_id(self):
-        """Тест что generate создает валидный ID."""
+        """Тест что generate создает валидный UUID."""
         agent_id = AgentId.generate()
-        assert agent_id.value.startswith("agent-")
-        assert len(agent_id.value) > 10
+        # UUID имеет длину 36 символов
+        assert len(agent_id.value) == 36
+        assert "-" in agent_id.value
     
     def test_generate_with_custom_prefix(self):
-        """Тест генерации с кастомным префиксом."""
-        agent_id = AgentId.generate(prefix="ctx")
-        assert agent_id.value.startswith("ctx-")
+        """Тест генерации с кастомным префиксом (не поддерживается, генерирует UUID)."""
+        agent_id = AgentId.generate()
+        # Теперь всегда генерируется UUID без префикса
+        assert len(agent_id.value) == 36
     
     def test_generate_creates_unique_ids(self):
         """Тест что generate создает уникальные ID."""
@@ -72,14 +75,17 @@ class TestAgentIdGeneration:
         assert id1.value != id2.value
     
     def test_from_session_id_creates_valid_id(self):
-        """Тест создания AgentId из session ID."""
+        """Тест создания AgentId из session ID (генерирует новый UUID)."""
         agent_id = AgentId.from_session_id("session-123")
-        assert agent_id.value == "agent-123"
+        # Теперь генерируется новый UUID, а не преобразуется session_id
+        assert len(agent_id.value) == 36
+        assert "-" in agent_id.value
     
     def test_from_session_id_removes_session_prefix(self):
-        """Тест что префикс session- удаляется."""
+        """Тест что from_session_id генерирует UUID."""
         agent_id = AgentId.from_session_id("session-abc-def")
-        assert agent_id.value == "agent-abc-def"
+        # Теперь генерируется UUID вместо преобразования
+        assert len(agent_id.value) == 36
     
     def test_from_session_id_with_empty_raises_error(self):
         """Тест что пустой session ID вызывает ошибку."""

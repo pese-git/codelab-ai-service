@@ -419,7 +419,7 @@ class TestExecutionPlanMapper:
         for status_str, status_obj in statuses:
             # Arrange
             plan = ExecutionPlan(
-                id=PlanId(f"plan-{status_str}"),
+                id=PlanId(value=f"plan-{status_str}"),
                 conversation_id=ConversationId(value="conv-1"),
                 goal="Test goal",
                 status=status_obj

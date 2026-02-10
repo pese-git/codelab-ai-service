@@ -129,4 +129,4 @@ class ToolName(ValueObject):
     
     def __repr__(self) -> str:
         """Отладочное представление."""
-        return f"ToolName('{self.value}')"
+        return f"ToolName(value='{self.value}')"

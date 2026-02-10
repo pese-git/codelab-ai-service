@@ -33,8 +33,8 @@ class ApprovalService:
         >>> 
         >>> # Создание запроса
         >>> request = await service.request_approval(
-        ...     approval_id=ApprovalId("req-tool-123"),
-        ...     approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+        ...     approval_id=ApprovalId(value="req-tool-123"),
+        ...     approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
         ...     session_id="session-abc",
         ...     subject="write_file",
         ...     request_data={"path": "test.py"},
@@ -43,7 +43,7 @@ class ApprovalService:
         >>> 
         >>> # Одобрение
         >>> await service.grant_approval(
-        ...     approval_id=ApprovalId("req-tool-123"),
+        ...     approval_id=ApprovalId(value="req-tool-123"),
         ...     decision="User confirmed"
         ... )
     """

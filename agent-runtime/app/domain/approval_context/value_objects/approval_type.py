@@ -7,6 +7,7 @@ ApprovalType Value Object.
 from enum import Enum
 from typing import Any, ClassVar
 
+from pydantic import field_validator
 from app.domain.shared.value_object import ValueObject
 
 
@@ -27,6 +28,8 @@ class ApprovalTypeEnum(str, Enum):
 
 class ApprovalType(ValueObject):
     """
+    
+    value: ApprovalTypeEnum
     Типобезопасный тип запроса на утверждение.
     
     Обеспечивает:
@@ -42,58 +45,46 @@ class ApprovalType(ValueObject):
         >>> approval_type.is_tool_call()
         True
     """
+    value: ApprovalTypeEnum
     
-    def __init__(self, value: ApprovalTypeEnum):
-        """
-        Создать ApprovalType.
-        
-        Args:
-            value: Значение типа из ApprovalTypeEnum
-            
-        Raises:
-            ValueError: Если value не является ApprovalTypeEnum
-        """
-        if not isinstance(value, ApprovalTypeEnum):
-            raise ValueError(
-                f"Type must be ApprovalTypeEnum, got {type(value).__name__}"
-            )
-        self._value = value
-    
-    @property
-    def value(self) -> ApprovalTypeEnum:
-        """Получить значение типа."""
-        return self._value
+    @field_validator('value', mode='before')
+    @classmethod
+    def validate_value(cls, v: Any) -> ApprovalTypeEnum:
+        """Валидация что value является ApprovalTypeEnum."""
+        if not isinstance(v, ApprovalTypeEnum):
+            raise ValueError(f"value must be ApprovalTypeEnum, got {type(v).__name__}")
+        return v
     
     def is_tool_call(self) -> bool:
         """Проверить, является ли тип вызовом инструмента."""
-        return self._value == ApprovalTypeEnum.TOOL_CALL
+        return self.value == ApprovalTypeEnum.TOOL_CALL
     
     def is_plan_execution(self) -> bool:
         """Проверить, является ли тип выполнением плана."""
-        return self._value == ApprovalTypeEnum.PLAN_EXECUTION
+        return self.value == ApprovalTypeEnum.PLAN_EXECUTION
     
     def is_agent_switch(self) -> bool:
         """Проверить, является ли тип переключением агента."""
-        return self._value == ApprovalTypeEnum.AGENT_SWITCH
+        return self.value == ApprovalTypeEnum.AGENT_SWITCH
     
     def is_file_operation(self) -> bool:
         """Проверить, является ли тип операцией с файлом."""
-        return self._value == ApprovalTypeEnum.FILE_OPERATION
+        return self.value == ApprovalTypeEnum.FILE_OPERATION
     
     def __str__(self) -> str:
         """Строковое представление."""
-        return self._value.value
+        return self.value.value
     
     def __repr__(self) -> str:
         """Отладочное представление."""
-        return f"ApprovalType({self._value.name})"
+        return f"ApprovalType({self.value.name})"
     
     def __eq__(self, other: Any) -> bool:
         """Сравнение по значению."""
         if not isinstance(other, ApprovalType):
             return False
-        return self._value == other._value
+        return self.value == other.value
     
     def __hash__(self) -> int:
         """Хеш для использования в множествах и словарях."""
-        return hash(self._value)
+        return hash(self.value)

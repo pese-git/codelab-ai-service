@@ -44,6 +44,7 @@ class ExecutionPlan(Entity):
         approved_at: Время утверждения плана
         started_at: Время начала выполнения
         completed_at: Время завершения
+        error: Информация об ошибке (если failed)
     
     Example:
         >>> plan = ExecutionPlan(
@@ -107,6 +108,11 @@ class ExecutionPlan(Entity):
     completed_at: Optional[datetime] = Field(
         default=None,
         description="Время завершения"
+    )
+    
+    error: Optional[str] = Field(
+        default=None,
+        description="Информация об ошибке"
     )
     
     def add_subtask(self, subtask: Subtask) -> None:
@@ -294,6 +300,7 @@ class ExecutionPlan(Entity):
         
         self.status = PlanStatus.failed()
         self.completed_at = datetime.now(timezone.utc)
+        self.error = reason
         self.metadata["failure_reason"] = reason
         self.mark_updated()
     

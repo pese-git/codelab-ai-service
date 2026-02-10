@@ -94,11 +94,8 @@ class AgentId(ValueObject):
         """
         Создать AgentId из session ID (генерирует новый UUID).
         
-        ВАЖНО: Теперь генерирует новый UUID вместо использования session_id,
-        чтобы соответствовать ограничению БД VARCHAR(36).
-        
         Args:
-            session_id: ID сессии (используется только для валидации)
+            session_id: ID сессии (используется для валидации)
             
         Returns:
             AgentId с новым UUID
@@ -111,16 +108,16 @@ class AgentId(ValueObject):
         if not session_id:
             raise ValueError("Session ID не может быть пустым")
         
-        # Генерируем новый UUID вместо использования session_id
+        # Генерируем новый UUID
         return AgentId.generate()
     
     def __str__(self) -> str:
         """Строковое представление."""
-        return self._value
+        return self.value
     
     def __repr__(self) -> str:
         """Отладочное представление."""
-        return f"AgentId('{self._value}')"
+        return f"AgentId(value='{self.value}')"
     
     def __eq__(self, other: object) -> bool:
         """
@@ -134,7 +131,7 @@ class AgentId(ValueObject):
         """
         if not isinstance(other, AgentId):
             return False
-        return self._value == other._value
+        return self.value == other.value
     
     def __hash__(self) -> int:
         """
@@ -143,7 +140,7 @@ class AgentId(ValueObject):
         Returns:
             Хеш значения ID
         """
-        return hash(self._value)
+        return hash(self.value)
     
     def __lt__(self, other: "AgentId") -> bool:
         """
@@ -157,4 +154,4 @@ class AgentId(ValueObject):
         """
         if not isinstance(other, AgentId):
             return NotImplemented
-        return self._value < other._value
+        return self.value < other.value

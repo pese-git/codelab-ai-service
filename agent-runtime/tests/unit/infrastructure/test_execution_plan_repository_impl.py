@@ -301,7 +301,7 @@ class TestExecutionPlanRepositoryImpl:
         
         for i in range(3):
             plan = ExecutionPlan(
-                id=PlanId(f"plan-{i}"),
+                id=PlanId(value=f"plan-{i}"),
                 conversation_id=conv_id,
                 goal=f"Goal {i}"
             )

@@ -7,6 +7,7 @@ PolicyAction Value Object.
 from enum import Enum
 from typing import Any, ClassVar
 
+from pydantic import field_validator
 from app.domain.shared.value_object import ValueObject
 
 
@@ -25,6 +26,8 @@ class PolicyActionEnum(str, Enum):
 
 class PolicyAction(ValueObject):
     """
+    
+    value: PolicyActionEnum
     Типобезопасное действие политики HITL.
     
     Обеспечивает:
@@ -40,39 +43,27 @@ class PolicyAction(ValueObject):
         >>> action.requires_user_decision()
         True
     """
+    value: PolicyActionEnum
     
-    def __init__(self, value: PolicyActionEnum):
-        """
-        Создать PolicyAction.
-        
-        Args:
-            value: Значение действия из PolicyActionEnum
-            
-        Raises:
-            ValueError: Если value не является PolicyActionEnum
-        """
-        if not isinstance(value, PolicyActionEnum):
-            raise ValueError(
-                f"Action must be PolicyActionEnum, got {type(value).__name__}"
-            )
-        self._value = value
-    
-    @property
-    def value(self) -> PolicyActionEnum:
-        """Получить значение действия."""
-        return self._value
+    @field_validator('value', mode='before')
+    @classmethod
+    def validate_value(cls, v: Any) -> PolicyActionEnum:
+        """Валидация что value является PolicyActionEnum."""
+        if not isinstance(v, PolicyActionEnum):
+            raise ValueError(f"value must be PolicyActionEnum, got {type(v).__name__}")
+        return v
     
     def is_approve(self) -> bool:
         """Проверить, является ли действие автоматическим одобрением."""
-        return self._value == PolicyActionEnum.APPROVE
+        return self.value == PolicyActionEnum.APPROVE
     
     def is_reject(self) -> bool:
         """Проверить, является ли действие автоматическим отклонением."""
-        return self._value == PolicyActionEnum.REJECT
+        return self.value == PolicyActionEnum.REJECT
     
     def is_ask_user(self) -> bool:
         """Проверить, требуется ли запрос решения у пользователя."""
-        return self._value == PolicyActionEnum.ASK_USER
+        return self.value == PolicyActionEnum.ASK_USER
     
     def requires_user_decision(self) -> bool:
         """
@@ -81,7 +72,7 @@ class PolicyAction(ValueObject):
         Returns:
             True если действие ASK_USER, False для автоматических действий
         """
-        return self._value == PolicyActionEnum.ASK_USER
+        return self.value == PolicyActionEnum.ASK_USER
     
     def is_automatic(self) -> bool:
         """
@@ -90,22 +81,22 @@ class PolicyAction(ValueObject):
         Returns:
             True если действие APPROVE или REJECT
         """
-        return self._value in (PolicyActionEnum.APPROVE, PolicyActionEnum.REJECT)
+        return self.value in (PolicyActionEnum.APPROVE, PolicyActionEnum.REJECT)
     
     def __str__(self) -> str:
         """Строковое представление."""
-        return self._value.value
+        return self.value.value
     
     def __repr__(self) -> str:
         """Отладочное представление."""
-        return f"PolicyAction({self._value.name})"
+        return f"PolicyAction({self.value.name})"
     
     def __eq__(self, other: Any) -> bool:
         """Сравнение по значению."""
         if not isinstance(other, PolicyAction):
             return False
-        return self._value == other._value
+        return self.value == other.value
     
     def __hash__(self) -> int:
         """Хеш для использования в множествах и словарях."""
-        return hash(self._value)
+        return hash(self.value)

@@ -6,6 +6,7 @@ Represents a unique identifier for a conversation with validation.
 
 import re
 from typing import Optional, ClassVar
+from pydantic import field_validator
 
 from app.domain.shared.value_object import ValueObject
 
@@ -25,61 +26,47 @@ class ConversationId(ValueObject):
     - Type-safe: Prevents invalid IDs from being created
     
     Usage:
-        >>> conv_id = ConversationId("session-123")
+        >>> conv_id = ConversationId(value="session-123")
         >>> str(conv_id)
         'session-123'
         
-        >>> invalid_id = ConversationId("")  # Raises ValueError
+        >>> invalid_id = ConversationId(value="")  # Raises ValueError
     """
+    
+    value: str
     
     # Validation constants
     MIN_LENGTH: ClassVar[int] = 1
     MAX_LENGTH: ClassVar[int] = 255
     VALID_PATTERN: ClassVar[re.Pattern] = re.compile(r'^[a-zA-Z0-9_-]+$')
     
-    def __init__(self, value: str):
-        """
-        Initialize conversation ID with validation.
+    @field_validator('value')
+    @classmethod
+    def validate_value(cls, v: str) -> str:
+        """Validate conversation ID format and constraints."""
+        if not v:
+            raise ValueError("Conversation ID не может быть пустым")
         
-        Args:
-            value: String identifier for the conversation
-            
-        Raises:
-            ValueError: If value is invalid (empty, too long, invalid format)
-        """
-        if not value:
-            raise ValueError("Conversation ID cannot be empty")
+        if len(v) < cls.MIN_LENGTH:
+            raise ValueError(f"Conversation ID не может быть короче {cls.MIN_LENGTH} символов")
         
-        if len(value) < self.MIN_LENGTH:
+        if len(v) > cls.MAX_LENGTH:
+            raise ValueError(f"Conversation ID не может превышать {cls.MAX_LENGTH} символов")
+        
+        if not cls.VALID_PATTERN.match(v):
             raise ValueError(
-                f"Conversation ID must be at least {self.MIN_LENGTH} character(s)"
+                "Conversation ID может содержать только буквы, цифры, дефисы и подчеркивания"
             )
         
-        if len(value) > self.MAX_LENGTH:
-            raise ValueError(
-                f"Conversation ID cannot exceed {self.MAX_LENGTH} characters, got {len(value)}"
-            )
-        
-        if not self.VALID_PATTERN.match(value):
-            raise ValueError(
-                f"Conversation ID must contain only alphanumeric characters, "
-                f"hyphens, and underscores. Got: {value}"
-            )
-        
-        self._value = value
-    
-    @property
-    def value(self) -> str:
-        """Get the string value of the conversation ID."""
-        return self._value
+        return v
     
     def __str__(self) -> str:
         """String representation returns the ID value."""
-        return self._value
+        return self.value
     
     def __repr__(self) -> str:
         """Developer-friendly representation."""
-        return f"ConversationId('{self._value}')"
+        return f"ConversationId('{self.value}')"
     
     @classmethod
     def generate(cls) -> 'ConversationId':
@@ -95,4 +82,4 @@ class ConversationId(ValueObject):
             True
         """
         import uuid
-        return cls(str(uuid.uuid4()))
+        return cls(value=str(uuid.uuid4()))

@@ -6,7 +6,7 @@ Agent Entity.
 
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_serializer
 
 from ...shared.base_entity import Entity
 from ..value_objects.agent_id import AgentId
@@ -129,7 +129,6 @@ class Agent(Entity):
         if not v:
             raise ValueError("session_id не может быть пустым")
         return v
-    
     @field_validator('capabilities')
     @classmethod
     def validate_capabilities(cls, v: Any) -> AgentCapabilities:
@@ -137,6 +136,30 @@ class Agent(Entity):
         if not isinstance(v, AgentCapabilities):
             raise ValueError("capabilities должен быть AgentCapabilities")
         return v
+    
+    def _get_switch_history_internal(self) -> List[AgentSwitchRecord]:
+        """Получить внутреннюю ссылку на switch_history (для модификации)."""
+        return object.__getattribute__(self, 'switch_history')
+    
+    def _get_metadata_internal(self) -> Dict[str, Any]:
+        """Получить внутреннюю ссылку на metadata (для модификации)."""
+        return object.__getattribute__(self, 'metadata')
+    
+    def __getattribute__(self, name: str) -> Any:
+        """Переопределение доступа к атрибутам для immutability."""
+        # Для внутренних методов возвращаем оригинал
+        if name.startswith('_get_') or name.startswith('_'):
+            return object.__getattribute__(self, name)
+        
+        value = object.__getattribute__(self, name)
+        
+        # Возвращаем копии для switch_history и metadata
+        if name == 'switch_history' and isinstance(value, list):
+            return value.copy()
+        elif name == 'metadata' and isinstance(value, dict):
+            return value.copy()
+        
+        return value
     
     @property
     def current_type(self) -> AgentType:
@@ -249,8 +272,8 @@ class Agent(Entity):
             confidence=confidence
         )
         
-        # Добавить в историю
-        self.switch_history.append(record)
+        # Добавить в историю (используем внутренний метод)
+        self._get_switch_history_internal().append(record)
         
         # Обновить состояние
         new_capabilities = AgentCapabilities.for_agent_type(target_type)
@@ -273,7 +296,8 @@ class Agent(Entity):
             >>> if last:
             ...     print(f"Last switch to: {last.to_agent.value}")
         """
-        return self.switch_history[-1] if self.switch_history else None
+        history = self._get_switch_history_internal()
+        return history[-1] if history else None
     
     def get_switch_history_dict(self) -> List[Dict[str, Any]]:
         """
@@ -287,7 +311,7 @@ class Agent(Entity):
             >>> history[0]['to']
             'coder'
         """
-        return [record.to_dict() for record in self.switch_history]
+        return [record.to_dict() for record in self._get_switch_history_internal()]
     
     def reset_to_orchestrator(self, reason: str = "Session reset") -> None:
         """
@@ -316,7 +340,7 @@ class Agent(Entity):
         Пример:
             >>> agent.add_metadata("user_preference", "verbose")
         """
-        self.metadata[key] = value
+        self._get_metadata_internal()[key] = value
         self.mark_updated()
     
     def get_metadata(self, key: str, default: Any = None) -> Any:
@@ -333,7 +357,7 @@ class Agent(Entity):
         Пример:
             >>> pref = agent.get_metadata("user_preference", "normal")
         """
-        return self.metadata.get(key, default)
+        return self._get_metadata_internal().get(key, default)
     
     def supports_tool(self, tool_name: str) -> bool:
         """

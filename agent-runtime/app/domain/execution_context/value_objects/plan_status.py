@@ -48,6 +48,8 @@ class PlanStatus(ValueObject):
         True
     """
     
+    value: PlanStatusEnum
+    
     # Допустимые переходы между статусами
     _VALID_TRANSITIONS: ClassVar[Dict[PlanStatusEnum, Set[PlanStatusEnum]]] = {
         PlanStatusEnum.PENDING: {PlanStatusEnum.IN_PROGRESS, PlanStatusEnum.CANCELLED},
@@ -76,62 +78,40 @@ class PlanStatus(ValueObject):
     FAILED: 'PlanStatus | None' = None
     CANCELLED: 'PlanStatus | None' = None
     
-    def __init__(self, value: PlanStatusEnum):
-        """
-        Создать статус плана.
-        
-        Args:
-            value: Значение статуса
-            
-        Raises:
-            ValueError: Если статус невалиден
-        """
-        if not isinstance(value, PlanStatusEnum):
-            raise ValueError(
-                f"Status must be PlanStatusEnum, got {type(value).__name__}"
-            )
-        
-        self._value = value
-    
-    @property
-    def value(self) -> PlanStatusEnum:
-        """Получить значение статуса."""
-        return self._value
-    
     @classmethod
     def pending(cls) -> "PlanStatus":
         """Создать статус PENDING."""
-        return cls(PlanStatusEnum.PENDING)
+        return cls(value=PlanStatusEnum.PENDING)
     
     @classmethod
     def draft(cls) -> "PlanStatus":
         """Создать статус DRAFT."""
-        return cls(PlanStatusEnum.DRAFT)
+        return cls(value=PlanStatusEnum.DRAFT)
     
     @classmethod
     def approved(cls) -> "PlanStatus":
         """Создать статус APPROVED."""
-        return cls(PlanStatusEnum.APPROVED)
+        return cls(value=PlanStatusEnum.APPROVED)
     
     @classmethod
     def in_progress(cls) -> "PlanStatus":
         """Создать статус IN_PROGRESS."""
-        return cls(PlanStatusEnum.IN_PROGRESS)
+        return cls(value=PlanStatusEnum.IN_PROGRESS)
     
     @classmethod
     def completed(cls) -> "PlanStatus":
         """Создать статус COMPLETED."""
-        return cls(PlanStatusEnum.COMPLETED)
+        return cls(value=PlanStatusEnum.COMPLETED)
     
     @classmethod
     def failed(cls) -> "PlanStatus":
         """Создать статус FAILED."""
-        return cls(PlanStatusEnum.FAILED)
+        return cls(value=PlanStatusEnum.FAILED)
     
     @classmethod
     def cancelled(cls) -> "PlanStatus":
         """Создать статус CANCELLED."""
-        return cls(PlanStatusEnum.CANCELLED)
+        return cls(value=PlanStatusEnum.CANCELLED)
     
     @classmethod
     def from_string(cls, value: str) -> "PlanStatus":
@@ -149,7 +129,7 @@ class PlanStatus(ValueObject):
         """
         try:
             enum_value = PlanStatusEnum(value)
-            return cls(enum_value)
+            return cls(value=enum_value)
         except ValueError:
             valid_values = [s.value for s in PlanStatusEnum]
             raise ValueError(
@@ -173,8 +153,8 @@ class PlanStatus(ValueObject):
             >>> draft.can_transition_to(approved)
             True
         """
-        valid_targets = self._VALID_TRANSITIONS.get(self._value, set())
-        return target._value in valid_targets
+        valid_targets = self._VALID_TRANSITIONS.get(self.value, set())
+        return target.value in valid_targets
     
     def is_terminal(self) -> bool:
         """
@@ -188,7 +168,7 @@ class PlanStatus(ValueObject):
             >>> completed.is_terminal()
             True
         """
-        return self._value in {
+        return self.value in {
             PlanStatusEnum.COMPLETED,
             PlanStatusEnum.FAILED,
             PlanStatusEnum.CANCELLED
@@ -196,45 +176,45 @@ class PlanStatus(ValueObject):
     
     def is_draft(self) -> bool:
         """Проверить, является ли статус DRAFT."""
-        return self._value == PlanStatusEnum.DRAFT
+        return self.value == PlanStatusEnum.DRAFT
     
     def is_approved(self) -> bool:
         """Проверить, является ли статус APPROVED."""
-        return self._value == PlanStatusEnum.APPROVED
+        return self.value == PlanStatusEnum.APPROVED
     
     def is_in_progress(self) -> bool:
         """Проверить, является ли статус IN_PROGRESS."""
-        return self._value == PlanStatusEnum.IN_PROGRESS
+        return self.value == PlanStatusEnum.IN_PROGRESS
     
     def is_completed(self) -> bool:
         """Проверить, является ли статус COMPLETED."""
-        return self._value == PlanStatusEnum.COMPLETED
+        return self.value == PlanStatusEnum.COMPLETED
     
     def is_failed(self) -> bool:
         """Проверить, является ли статус FAILED."""
-        return self._value == PlanStatusEnum.FAILED
+        return self.value == PlanStatusEnum.FAILED
     
     def is_cancelled(self) -> bool:
         """Проверить, является ли статус CANCELLED."""
-        return self._value == PlanStatusEnum.CANCELLED
+        return self.value == PlanStatusEnum.CANCELLED
     
     def __str__(self) -> str:
         """Строковое представление."""
-        return self._value.value
+        return self.value.value
     
     def __repr__(self) -> str:
         """Отладочное представление."""
-        return f"PlanStatus({self._value.value})"
+        return f"PlanStatus({self.value.value})"
     
     def __eq__(self, other: object) -> bool:
         """Сравнение на равенство."""
         if not isinstance(other, PlanStatus):
             return False
-        return self._value == other._value
+        return self.value == other.value
     
     def __hash__(self) -> int:
         """Хеш для использования в множествах и словарях."""
-        return hash(self._value)
+        return hash(self.value)
 
 
 # Инициализация констант

@@ -76,7 +76,7 @@ class TestAgentRepositoryImpl:
     ):
         """Тест сохранения и поиска агента по ID."""
         # Arrange
-        agent_id = AgentId(sample_agent.id)
+        agent_id = AgentId(value=sample_agent.id)
         
         # Act - Save
         await agent_repository.save(sample_agent)
@@ -138,7 +138,7 @@ class TestAgentRepositoryImpl:
         await db_session.commit()
         
         # Act - Find
-        agent_id = AgentId(sample_agent.id)
+        agent_id = AgentId(value=sample_agent.id)
         found = await agent_repository.find_by_id(agent_id)
         
         # Assert
@@ -162,7 +162,7 @@ class TestAgentRepositoryImpl:
         await db_session.commit()
         
         # Act - Update
-        agent_id = AgentId(sample_agent.id)
+        agent_id = AgentId(value=sample_agent.id)
         found = await agent_repository.find_by_id(agent_id)
         found.switch_to(AgentType.ARCHITECT, "Need architecture")
         found.add_metadata("test_key", "test_value")
@@ -185,7 +185,7 @@ class TestAgentRepositoryImpl:
     ):
         """Тест удаления агента по ID."""
         # Arrange
-        agent_id = AgentId(sample_agent.id)
+        agent_id = AgentId(value=sample_agent.id)
         await agent_repository.save(sample_agent)
         await db_session.commit()
         
@@ -228,7 +228,7 @@ class TestAgentRepositoryImpl:
     ):
         """Тест проверки существования агента."""
         # Arrange
-        agent_id = AgentId(sample_agent.id)
+        agent_id = AgentId(value=sample_agent.id)
         
         # Act - Before save
         exists_before = await agent_repository.exists(agent_id)

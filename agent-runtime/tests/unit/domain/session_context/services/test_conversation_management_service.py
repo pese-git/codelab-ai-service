@@ -78,7 +78,7 @@ class TestConversationManagementService:
         """Тест: ошибка при создании существующей conversation."""
         # Arrange
         conv_id = "existing-conv"
-        existing = Conversation.create(ConversationId(conv_id))
+        existing = Conversation.create(ConversationId(value=conv_id))
         mock_repository.find_by_id.return_value = existing
         
         # Act & Assert
@@ -93,7 +93,7 @@ class TestConversationManagementService:
         """Тест: получение существующей conversation."""
         # Arrange
         conv_id = "test-conv"
-        expected = Conversation.create(ConversationId(conv_id))
+        expected = Conversation.create(ConversationId(value=conv_id))
         mock_repository.find_by_id.return_value = expected
         
         # Act
@@ -124,7 +124,7 @@ class TestConversationManagementService:
         """Тест: get_or_create возвращает существующую conversation."""
         # Arrange
         conv_id = "test-conv"
-        existing = Conversation.create(ConversationId(conv_id))
+        existing = Conversation.create(ConversationId(value=conv_id))
         mock_repository.find_by_id.return_value = existing
         
         # Act
@@ -159,7 +159,7 @@ class TestConversationManagementService:
         """Тест: добавление сообщения в conversation."""
         # Arrange
         conv_id = "test-conv"
-        conversation = Conversation.create(ConversationId(conv_id))
+        conversation = Conversation.create(ConversationId(value=conv_id))
         mock_repository.find_by_id.return_value = conversation
         
         # Act
@@ -183,7 +183,7 @@ class TestConversationManagementService:
         """Тест: добавление успешного результата инструмента."""
         # Arrange
         conv_id = "test-conv"
-        conversation = Conversation.create(ConversationId(conv_id))
+        conversation = Conversation.create(ConversationId(value=conv_id))
         mock_repository.find_by_id.return_value = conversation
         
         # Act
@@ -206,7 +206,7 @@ class TestConversationManagementService:
         """Тест: добавление результата инструмента с ошибкой."""
         # Arrange
         conv_id = "test-conv"
-        conversation = Conversation.create(ConversationId(conv_id))
+        conversation = Conversation.create(ConversationId(value=conv_id))
         mock_repository.find_by_id.return_value = conversation
         
         # Act
@@ -228,7 +228,7 @@ class TestConversationManagementService:
         """Тест: деактивация conversation."""
         # Arrange
         conv_id = "test-conv"
-        conversation = Conversation.create(ConversationId(conv_id))
+        conversation = Conversation.create(ConversationId(value=conv_id))
         mock_repository.find_by_id.return_value = conversation
         
         # Act
@@ -285,7 +285,7 @@ class TestConversationManagementService:
         """Тест: создание контекста для subtask."""
         # Arrange
         conv_id = "test-conv"
-        conversation = Conversation.create(ConversationId(conv_id))
+        conversation = Conversation.create(ConversationId(value=conv_id))
         # Добавить несколько сообщений
         conversation.add_message(Message(id="1", role="user", content="Test"))
         conversation.add_message(Message(id="2", role="assistant", content="Response"))
@@ -311,7 +311,7 @@ class TestConversationManagementService:
         """Тест: восстановление из snapshot."""
         # Arrange
         conv_id = "test-conv"
-        conversation = Conversation.create(ConversationId(conv_id))
+        conversation = Conversation.create(ConversationId(value=conv_id))
         conversation.add_message(Message(id="1", role="user", content="Test"))
         mock_repository.find_by_id.return_value = conversation
         
@@ -343,7 +343,7 @@ class TestConversationManagementService:
         """Тест: подготовка контекста для переключения агента."""
         # Arrange
         conv_id = "test-conv"
-        conversation = Conversation.create(ConversationId(conv_id))
+        conversation = Conversation.create(ConversationId(value=conv_id))
         conversation.add_message(Message(id="1", role="user", content="Test"))
         mock_repository.find_by_id.return_value = conversation
         

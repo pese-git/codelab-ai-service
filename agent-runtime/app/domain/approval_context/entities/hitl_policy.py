@@ -39,22 +39,22 @@ class HITLPolicy(Entity):
         >>> policy = HITLPolicy.create(
         ...     policy_id="policy-default",
         ...     name="Default HITL Policy",
-        ...     default_action=PolicyAction(PolicyActionEnum.ASK_USER)
+        ...     default_action=PolicyAction(value=PolicyActionEnum.ASK_USER)
         ... )
         >>> 
         >>> # Добавление правила
         >>> rule = PolicyRule(
-        ...     approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+        ...     approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
         ...     subject_pattern="write_file",
-        ...     action=PolicyAction(PolicyActionEnum.ASK_USER),
+        ...     action=PolicyAction(value=PolicyActionEnum.ASK_USER),
         ...     priority=10
         ... )
         >>> policy.add_rule(rule)
         >>> 
         >>> # Оценка запроса
         >>> action = policy.evaluate(
-        ...     approval_id=ApprovalId("req-123"),
-        ...     approval_type=ApprovalType(ApprovalTypeEnum.TOOL_CALL),
+        ...     approval_id=ApprovalId(value="req-123"),
+        ...     approval_type=ApprovalType(value=ApprovalTypeEnum.TOOL_CALL),
         ...     subject="write_file",
         ...     request_data={}
         ... )
@@ -65,7 +65,7 @@ class HITLPolicy(Entity):
     rules: List[PolicyRule] = Field(default_factory=list, description="Список правил")
     is_active: bool = Field(True, description="Активна ли политика")
     default_action: PolicyAction = Field(
-        default_factory=lambda: PolicyAction(PolicyActionEnum.ASK_USER),
+        default_factory=lambda: PolicyAction(value=PolicyActionEnum.ASK_USER),
         description="Действие по умолчанию"
     )
     
@@ -94,7 +94,7 @@ class HITLPolicy(Entity):
             name=name,
             rules=[],
             is_active=True,
-            default_action=default_action or PolicyAction(PolicyActionEnum.ASK_USER),
+            default_action=default_action or PolicyAction(value=PolicyActionEnum.ASK_USER),
         )
     
     def evaluate(
@@ -121,7 +121,7 @@ class HITLPolicy(Entity):
         """
         # Если политика неактивна, автоматически одобряем
         if not self.is_active:
-            return PolicyAction(PolicyActionEnum.APPROVE)
+            return PolicyAction(value=PolicyActionEnum.APPROVE)
         
         # Проверка правил по приоритету
         for rule in self.rules:

@@ -69,12 +69,21 @@ class Entity(BaseModel):
         """Clear all domain events."""
         self._domain_events = []
     
-    @property
-    def domain_events(self) -> List[Any]:
-        """Get list of domain events."""
+    def get_domain_events(self) -> List[Any]:
+        """
+        Get list of domain events.
+        
+        Returns:
+            Copy of domain events list
+        """
         if not hasattr(self, '_domain_events'):
             self._domain_events = []
         return self._domain_events.copy()
+    
+    @property
+    def domain_events(self) -> List[Any]:
+        """Get list of domain events (property accessor)."""
+        return self.get_domain_events()
     
     def __eq__(self, other: Any) -> bool:
         """

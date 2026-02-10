@@ -5,6 +5,7 @@ Value Object для идентификатора плана выполнения
 """
 
 import uuid
+from pydantic import field_validator
 from app.domain.shared.value_object import ValueObject
 
 
@@ -27,52 +28,33 @@ class PlanId(ValueObject):
         
         >>> invalid_id = PlanId("")  # Raises ValueError
     """
-    
-    def __init__(self, value: str):
-        """
-        Создать идентификатор плана.
-        
-        Args:
-            value: Строковое значение ID
-            
-        Raises:
-            ValueError: Если ID невалиден
-        """
-        if not value or not value.strip():
-            raise ValueError("Plan ID cannot be empty")
-        
-        if not isinstance(value, str):
-            raise ValueError(f"Plan ID must be a string, got {type(value).__name__}")
-        
-        if len(value) > 255:
-            raise ValueError(
-                f"Plan ID too long: {len(value)} characters (max 255)"
-            )
-        
-        self._value = value
-    
-    @property
-    def value(self) -> str:
-        """Получить строковое значение ID."""
-        return self._value
-    
+    value: str
+
+    @field_validator('value')
+    @classmethod
+    def validate_value(cls, v: str) -> str:
+        """Валидация значения PlanId."""
+        if not v or not v.strip():
+            raise ValueError("PlanId value cannot be empty")
+        return v
+
     def __str__(self) -> str:
         """Строковое представление."""
-        return self._value
+        return self.value
     
     def __repr__(self) -> str:
         """Отладочное представление."""
-        return f"PlanId(value='{self._value}')"
+        return f"PlanId(value='{self.value}')"
     
     def __eq__(self, other: object) -> bool:
         """Сравнение на равенство."""
         if not isinstance(other, PlanId):
             return False
-        return self._value == other._value
+        return self.value == other.value
     
     def __hash__(self) -> int:
         """Хеш для использования в множествах и словарях."""
-        return hash(self._value)
+        return hash(self.value)
     
     @staticmethod
     def generate() -> "PlanId":
@@ -88,4 +70,4 @@ class PlanId(ValueObject):
             36
         """
         unique_id = str(uuid.uuid4())
-        return PlanId(unique_id)
+        return PlanId(value=unique_id)
