@@ -44,10 +44,10 @@ class AskAgent(BaseAgent):
                 "read_file",
                 "search_in_code",
                 "list_files",
-                "ask_followup_question",
-                "attempt_completion"
+                "ask_followup_question"
             ]
             # Minimal tools - only for reading and context
+            # Note: attempt_completion removed - ask agent just answers, doesn't complete tasks
         )
         logger.info("Ask agent initialized (read-only mode)")
     
