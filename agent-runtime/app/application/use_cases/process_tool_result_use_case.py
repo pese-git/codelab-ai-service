@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 from .base_use_case import StreamingUseCase
 from ...models.schemas import StreamChunk
+from ...infrastructure.concurrency.request_deduplicator import get_request_deduplicator
 
 logger = logging.getLogger("agent-runtime.use_cases.process_tool_result")
 
@@ -130,7 +131,20 @@ class ProcessToolResultUseCase(StreamingUseCase[ProcessToolResultRequest, Stream
             f"call_id={request.call_id}, has_error={request.error is not None}"
         )
         
+        # ✅ ДЕДУПЛИКАЦИЯ: Проверить, не был ли уже обработан этот tool_result
+        deduplicator = get_request_deduplicator()
+        if deduplicator.is_duplicate(request.session_id, request.call_id):
+            logger.warning(
+                f"🔄 Tool result {request.call_id} already processed for session {request.session_id}, "
+                f"skipping duplicate request"
+            )
+            # Возвращаем пустой генератор - запрос уже обработан
+            return
+        
         try:
+            # Отметить запрос как обрабатываемый
+            deduplicator.mark_processed(request.session_id, request.call_id)
+            
             # Блокировка сессии для предотвращения конкурентных запросов
             async with self._lock_manager.lock(request.session_id):
                 # Делегировать обработку в ToolResultHandler (Domain Layer)
