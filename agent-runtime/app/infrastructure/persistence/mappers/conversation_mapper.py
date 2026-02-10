@@ -99,7 +99,7 @@ class ConversationMapper:
                 messages.append(message)
         
         # Создать ConversationId
-        conversation_id = ConversationId(model.id)
+        conversation_id = ConversationId(value=model.id)
         
         # Создать MessageCollection
         message_collection = MessageCollection(messages=messages)

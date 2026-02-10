@@ -110,12 +110,12 @@ class PlanMapper:
         
         # Создать ExecutionPlan с Value Objects
         plan = ExecutionPlan(
-            id=PlanId(plan_model.id),
-            conversation_id=ConversationId(plan_model.session_id),
+            id=PlanId(value=plan_model.id),
+            conversation_id=ConversationId(value=plan_model.session_id),
             goal=plan_model.goal,
             subtasks=subtasks,
             status=PlanStatus.from_string(plan_model.status),
-            current_subtask_id=SubtaskId(plan_model.current_subtask_id) if plan_model.current_subtask_id else None,
+            current_subtask_id=SubtaskId(value=plan_model.current_subtask_id) if plan_model.current_subtask_id else None,
             metadata=metadata,
             approved_at=plan_model.approved_at,
             started_at=plan_model.started_at,
@@ -150,10 +150,10 @@ class PlanMapper:
         
         # Создать Subtask с Value Objects
         subtask = Subtask(
-            id=SubtaskId(subtask_model.id),
+            id=SubtaskId(value=subtask_model.id),
             description=subtask_model.description,
-            agent_id=AgentId(subtask_model.agent),
-            dependencies=[SubtaskId(dep_id) for dep_id in dependencies],
+            agent_id=AgentId(value=subtask_model.agent),
+            dependencies=[SubtaskId(value=dep_id) for dep_id in dependencies],
             status=SubtaskStatus.from_string(subtask_model.status),
             estimated_time=subtask_model.estimated_time,
             result=subtask_model.result,

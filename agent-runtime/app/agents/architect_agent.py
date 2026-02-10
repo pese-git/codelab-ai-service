@@ -195,8 +195,8 @@ class ArchitectAgent(BaseAgent):
             
             # 3. Create ExecutionPlan entity with generated ID
             plan = ExecutionPlan(
-                id=PlanId(str(uuid.uuid4())),
-                conversation_id=ConversationId(session_id),
+                id=PlanId(value=str(uuid.uuid4())),
+                conversation_id=ConversationId(value=session_id),
                 goal=task,
                 metadata={
                     "created_by": "architect",
@@ -227,10 +227,10 @@ class ArchitectAgent(BaseAgent):
                         )
                 
                 subtask = Subtask(
-                    id=SubtaskId(subtask_ids[i]),
+                    id=SubtaskId(value=subtask_ids[i]),
                     description=subtask_data["description"],
-                    agent_id=AgentId(subtask_data["agent"]),
-                    dependencies=[SubtaskId(dep_id) for dep_id in dep_ids],
+                    agent_id=AgentId(value=subtask_data["agent"]),
+                    dependencies=[SubtaskId(value=dep_id) for dep_id in dep_ids],
                     estimated_time=subtask_data.get("estimated_time", "5 min"),
                     metadata={
                         "index": i,

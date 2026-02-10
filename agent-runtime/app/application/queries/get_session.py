@@ -77,7 +77,7 @@ class GetSessionHandler(QueryHandler[Optional[SessionDTO]]):
         """
         # Получить conversation из репозитория
         conversation = await self._repository.find_by_id(
-            ConversationId(query.session_id),
+            ConversationId(value=query.session_id),
             load_messages=query.include_messages
         )
         

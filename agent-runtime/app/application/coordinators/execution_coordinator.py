@@ -116,7 +116,7 @@ class ExecutionCoordinator:
             await self._validate_plan_ready(plan_id)
             
             # 2. Convert string ID to typed PlanId
-            typed_plan_id = PlanId(plan_id)
+            typed_plan_id = PlanId(value=plan_id)
             
             # 3. Execute through PlanExecutionService and forward all chunks
             execution_result_metadata = None
@@ -179,7 +179,7 @@ class ExecutionCoordinator:
             ExecutionCoordinatorError: If plan is not ready
         """
         # Convert to typed ID for repository
-        typed_plan_id = PlanId(plan_id)
+        typed_plan_id = PlanId(value=plan_id)
         plan = await self._plan_repository.find_by_id(typed_plan_id)
         
         if not plan:
@@ -223,7 +223,7 @@ class ExecutionCoordinator:
             ExecutionCoordinatorError: If plan not found
         """
         try:
-            typed_plan_id = PlanId(plan_id)
+            typed_plan_id = PlanId(value=plan_id)
             return await self._plan_execution_service.get_plan_status(typed_plan_id)
         except PlanExecutionError as e:
             raise ExecutionCoordinatorError(
@@ -248,7 +248,7 @@ class ExecutionCoordinator:
         logger.info(f"Cancelling execution of plan {plan_id}: {reason}")
         
         try:
-            typed_plan_id = PlanId(plan_id)
+            typed_plan_id = PlanId(value=plan_id)
             await self._plan_execution_service.cancel_plan_execution(
                 plan_id=typed_plan_id,
                 reason=reason
@@ -271,7 +271,7 @@ class ExecutionCoordinator:
         Raises:
             ExecutionCoordinatorError: If plan not found
         """
-        typed_plan_id = PlanId(plan_id)
+        typed_plan_id = PlanId(value=plan_id)
         plan = await self._plan_repository.find_by_id(typed_plan_id)
         
         if not plan:

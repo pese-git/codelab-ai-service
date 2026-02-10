@@ -631,8 +631,8 @@ class StreamLLMResponseHandler(IStreamHandler):
             # Создаем ExecutionPlan entity
             plan_id = str(uuid.uuid4())
             plan = ExecutionPlan(
-                id=PlanId(plan_id),
-                conversation_id=ConversationId(session_id),
+                id=PlanId(value=plan_id),
+                conversation_id=ConversationId(value=session_id),
                 goal=f"{title}\n\n{description}" if description else title,
                 metadata={
                     "created_by": "architect",
@@ -650,14 +650,14 @@ class StreamLLMResponseHandler(IStreamHandler):
                 dep_ids = []
                 for dep_idx in dep_indices:
                     if isinstance(dep_idx, int) and 0 <= dep_idx < len(subtask_ids):
-                        dep_ids.append(SubtaskId(subtask_ids[dep_idx]))
+                        dep_ids.append(SubtaskId(value=subtask_ids[dep_idx]))
                 
                 # Определяем agent_id из agent name
                 agent_name = subtask_data["agent"]
                 agent_id = AgentId(value=agent_name)
                 
                 subtask = Subtask(
-                    id=SubtaskId(subtask_ids[i]),
+                    id=SubtaskId(value=subtask_ids[i]),
                     description=subtask_data.get("description", subtask_data.get("title", "")),
                     agent_id=agent_id,
                     dependencies=dep_ids,
