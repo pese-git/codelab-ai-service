@@ -62,11 +62,17 @@ class DIContainer:
             lock_manager=self._get_lock_manager()
         )
     
-    def get_process_tool_result_use_case(self, db: AsyncSession) -> ProcessToolResultUseCase:
-        """Получить Use Case для обработки результатов инструментов."""
+    def get_process_tool_result_use_case(self, uow) -> ProcessToolResultUseCase:
+        """
+        Получить Use Case для обработки результатов инструментов.
+        
+        Args:
+            uow: Unit of Work для доступа к session и явного commit
+        """
         return ProcessToolResultUseCase(
-            tool_result_handler=self._create_tool_result_handler(db),
-            lock_manager=self._get_lock_manager()
+            tool_result_handler=self._create_tool_result_handler(uow.session),
+            lock_manager=self._get_lock_manager(),
+            uow=uow
         )
     
     def get_handle_approval_use_case(self, db: AsyncSession) -> HandleApprovalUseCase:

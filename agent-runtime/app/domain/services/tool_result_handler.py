@@ -175,8 +175,8 @@ class ToolResultHandler:
         
         # ✅ КРИТИЧЕСКОЕ: Проверить активный план перед вызовом agent.process()
         # Если есть IN_PROGRESS план, НЕ вызываем agent.process(), так как
-        # MessageOrchestrationService продолжит execution через ExecutionCoordinator
-        # Это предотвращает переключение агента и дублирование обработки
+        # ProcessToolResultUseCase продолжит execution через ExecutionCoordinator
+        # Это предотвращает дублирование обработки
         if self._plan_repository:
             active_plan = await self._get_active_plan_for_session(session_id)
             if active_plan:
@@ -184,8 +184,10 @@ class ToolResultHandler:
                     f"⚠️ Найден активный план {active_plan.id} для сессии {session_id}. "
                     f"Пропускаем agent.process() - execution продолжится через ExecutionCoordinator"
                 )
-                # Возвращаем пустой генератор - обработка продолжится в MessageOrchestrationService
+                # ИСПРАВЛЕНИЕ: Используем return без yield для корректного завершения генератора
+                # Это предотвращает дублирование ответов от агента
                 return
+                # Альтернатива: можно использовать StopAsyncIteration, но return проще
         
         # Получить текущего агента и продолжить обработку
         current_agent = self._agent_router.get_agent(agent.current_type)

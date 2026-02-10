@@ -168,9 +168,9 @@ async def message_stream_sse(
             from ....infrastructure.persistence.database import async_session_maker
             
             async with SSEUnitOfWork(session_factory=async_session_maker) as uow:
-                # Получить use case с сессией из UoW
+                # Получить use case с UoW для явного commit
                 container = get_container()
-                process_tool_result_use_case = container.get_process_tool_result_use_case(uow.session)
+                process_tool_result_use_case = container.get_process_tool_result_use_case(uow=uow)
                 
                 try:
                     use_case_request = ProcessToolResultRequest(

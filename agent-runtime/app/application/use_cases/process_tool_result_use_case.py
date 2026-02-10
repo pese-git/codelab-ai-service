@@ -75,7 +75,8 @@ class ProcessToolResultUseCase(StreamingUseCase[ProcessToolResultRequest, Stream
         plan_repository=None,  # PlanRepository (optional)
         execution_coordinator=None,  # ExecutionCoordinator (optional)
         session_service=None,  # SessionManagementService (optional)
-        stream_handler=None  # IStreamHandler (optional)
+        stream_handler=None,  # IStreamHandler (optional)
+        uow=None  # SSEUnitOfWork (optional) - для явного commit после add_tool_result
     ):
         """
         Инициализация Use Case.
@@ -87,6 +88,7 @@ class ProcessToolResultUseCase(StreamingUseCase[ProcessToolResultRequest, Stream
             execution_coordinator: Coordinator для продолжения execution (опционально)
             session_service: Session service для execution (опционально)
             stream_handler: Stream handler для execution (опционально)
+            uow: Unit of Work для явного commit (опционально)
         """
         self._tool_result_handler = tool_result_handler
         self._lock_manager = lock_manager
@@ -94,6 +96,7 @@ class ProcessToolResultUseCase(StreamingUseCase[ProcessToolResultRequest, Stream
         self._execution_coordinator = execution_coordinator
         self._session_service = session_service
         self._stream_handler = stream_handler
+        self._uow = uow
         
         logger.debug(
             f"ProcessToolResultUseCase инициализирован "
@@ -147,6 +150,23 @@ class ProcessToolResultUseCase(StreamingUseCase[ProcessToolResultRequest, Stream
                             f"Новый tool call: {tool_name} "
                             f"(call_id: {call_id})"
                         )
+                
+                # ✅ КРИТИЧЕСКОЕ: Явный commit после обработки tool_result
+                # Это гарантирует, что tool_result сохранится в БД даже если
+                # последующий стрим прервется или произойдет ошибка
+                if self._uow:
+                    try:
+                        await self._uow.commit(operation="process_tool_result")
+                        logger.info(
+                            f"✅ Tool result committed to DB for session {request.session_id}, "
+                            f"call_id={request.call_id}"
+                        )
+                    except Exception as commit_error:
+                        logger.error(
+                            f"❌ Failed to commit tool_result: {commit_error}",
+                            exc_info=True
+                        )
+                        # Не прерываем обработку, но логируем ошибку
                 
                 # Проверить активный план и продолжить execution если нужно
                 if self._should_resume_execution():
