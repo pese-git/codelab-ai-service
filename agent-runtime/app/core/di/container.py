@@ -210,8 +210,8 @@ class DIContainer:
         # Создать зависимости для PlanExecutionService
         plan_repository = ExecutionPlanRepositoryImpl(db)
         subtask_executor = self.execution_module.provide_subtask_executor(
-            agent_registry=agent_registry,
-            session_service=session_service
+            plan_repository=plan_repository,
+            max_retries=3
         )
         dependency_resolver = self.execution_module.provide_dependency_resolver()
         

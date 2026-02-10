@@ -81,26 +81,23 @@ class ExecutionModule:
     
     def provide_subtask_executor(
         self,
-        agent_registry,
-        session_service,
-        stream_handler=None
+        plan_repository: ExecutionPlanRepository,
+        max_retries: int = 3
     ) -> SubtaskExecutor:
         """
         Предоставить executor subtasks.
         
         Args:
-            agent_registry: Реестр агентов
-            session_service: Сервис управления сессиями
-            stream_handler: Handler для streaming (опционально)
+            plan_repository: Репозиторий для работы с планами
+            max_retries: Максимальное количество попыток при ошибке
             
         Returns:
             SubtaskExecutor: Executor subtasks
         """
         if self._subtask_executor is None:
             self._subtask_executor = SubtaskExecutor(
-                agent_registry=agent_registry,
-                session_service=session_service,
-                stream_handler=stream_handler
+                plan_repository=plan_repository,
+                max_retries=max_retries
             )
         return self._subtask_executor
     

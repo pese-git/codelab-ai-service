@@ -141,9 +141,11 @@ class ProcessToolResultUseCase(StreamingUseCase[ProcessToolResultRequest, Stream
                     
                     # Логирование важных событий
                     if chunk.type == "tool_call":
+                        tool_name = chunk.metadata.get('tool_name') if chunk.metadata else 'unknown'
+                        call_id = chunk.metadata.get('call_id') if chunk.metadata else 'unknown'
                         logger.debug(
-                            f"Новый tool call: {chunk.metadata.get('tool_name')} "
-                            f"(call_id: {chunk.metadata.get('call_id')})"
+                            f"Новый tool call: {tool_name} "
+                            f"(call_id: {call_id})"
                         )
                 
                 # Проверить активный план и продолжить execution если нужно
