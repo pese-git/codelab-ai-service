@@ -167,12 +167,19 @@ class DIContainer:
         stream_handler = self._create_stream_handler(db, session_service, llm_client)
         switch_helper = self._create_switch_helper(db)
         
+        # Create ApprovalManager for updating pending approval status
+        from app.domain.services.approval_management import ApprovalManager
+        from app.infrastructure.persistence.repositories.approval_repository_impl import ApprovalRepositoryImpl
+        approval_repository = ApprovalRepositoryImpl(db)
+        approval_manager = ApprovalManager(repository=approval_repository)
+        
         return ToolResultHandler(
             session_service=session_service,
             agent_service=agent_coordination_service,
             agent_router=agent_registry,
             stream_handler=stream_handler,
-            switch_helper=switch_helper
+            switch_helper=switch_helper,
+            approval_manager=approval_manager
         )
     
     def _create_hitl_handler(self, db: AsyncSession) -> HITLDecisionHandler:
