@@ -1,0 +1,6 @@
+[submodule "codelab-auth-service"]
+	path = codelab-auth-service
+	url = git@github.com:pese-git/codelab-auth-service.git
+[submodule "codelab-core-service"]
+	path = codelab-core-service
+	url = git@github.com:pese-git/codelab-core-service.git
