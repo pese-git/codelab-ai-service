@@ -21,6 +21,15 @@ services:
     networks:
       - codelab-ai-service-network
 
+  mailhog:
+    image: mailhog/mailhog:latest
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - codelab-ai-service-network
+    restart: unless-stopped
+  
   # Redis Cache
   redis:
     image: redis:8.6.1
@@ -452,11 +461,27 @@ services:
       - AUTH_SERVICE__REFRESH_TOKEN_LIFETIME=2592000
       - AUTH_SERVICE__PRIVATE_KEY_PATH=/app/keys/private_key.pem
       - AUTH_SERVICE__PUBLIC_KEY_PATH=/app/keys/public_key.pem
+
+      # SMTP Configuration for MailHog
+      - AUTH_SERVICE__SMTP_HOST=${AUTH_SERVICE__SMTP_HOST:-mailhog}
+      - AUTH_SERVICE__SMTP_PORT=${AUTH_SERVICE__SMTP_PORT:-1025}
+      - AUTH_SERVICE__SMTP_USERNAME=${AUTH_SERVICE__SMTP_USERNAME:-}
+      - AUTH_SERVICE__SMTP_PASSWORD=${AUTH_SERVICE__SMTP_PASSWORD:-}
+      - AUTH_SERVICE__SMTP_FROM_EMAIL=${AUTH_SERVICE__SMTP_FROM_EMAIL:-noreply@codelab.local}
+      - AUTH_SERVICE__SMTP_USE_TLS=${AUTH_SERVICE__SMTP_USE_TLS:-false}
+      - AUTH_SERVICE__SEND_WELCOME_EMAIL=${AUTH_SERVICE__SEND_WELCOME_EMAIL:-true}
+      - AUTH_SERVICE__SEND_PASSWORD_RESET_EMAIL=${AUTH_SERVICE__SEND_PASSWORD_RESET_EMAIL:-true}
+      - AUTH_SERVICE__REQUIRE_EMAIL_CONFIRMATION=${AUTH_SERVICE__REQUIRE_EMAIL_CONFIRMATION:-true}
     depends_on:
       redis:
         condition: service_healthy
       postgres:
         condition: service_healthy
+    command: >
+      sh -c "
+        python scripts/init_database.py '${AUTH_SERVICE__DB_URL:-sqlite:///data/auth.db}' &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8003
+      "
     networks:
       - codelab-ai-service-network
     healthcheck:
@@ -490,6 +515,12 @@ services:
       PYTHONUNBUFFERED: 1
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       GATEWAY__AUTH_SERVICE_URL: http://codelab-auth-service:8003
+      # JWT RS256 Configuration
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-RS256}
+      JWT_ISSUER: ${JWT_ISSUER:-https://auth.codelab.local}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-codelab-api}
+      AUTH_SERVICE_JWKS_URL: ${AUTH_SERVICE_JWKS_URL:-http://codelab-auth-service:8003/.well-known/jwks.json}
+      JWKS_CACHE_TTL: ${JWKS_CACHE_TTL:-3600}
     env_file:
       - .env
     depends_on:
@@ -503,6 +534,8 @@ services:
         condition: service_started
       langfuse-web:
         condition: service_started
+      codelab-auth-service:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]
       interval: 30s
@@ -513,6 +546,8 @@ services:
       sh -c "
         echo 'Waiting for services to be ready...' &&
         sleep 5 &&
+        echo 'Initializing database...' &&
+        python scripts/init_database.py '${APP_DATABASE_URL:-postgresql+asyncpg://postgres:postgres@postgres:5432/codelab-core-db}' &&
         echo 'Running database migrations...' &&
         alembic upgrade head &&
         echo 'Starting application...' &&
