@@ -127,6 +127,86 @@ Email тестирование и отладка:
 
 ---
 
+## 🔐 Services Integration
+
+### JWT RS256 Authentication
+
+Сервисы используют **RS256 асимметричную криптографию** для безопасной аутентификации между микросервисами:
+
+```
+┌─────────────────────────────┐
+│   auth-service              │
+│   🔒 PRIVATE KEY            │ ← Создает и подписывает JWT токены
+│   RS256 Algorithm           │
+└──────────────┬──────────────┘
+               │ JWT Token (RS256 подпись)
+               │
+               ▼
+┌─────────────────────────────┐
+│   core-service              │
+│   🔓 PUBLIC KEY (JWKS)      │ ← Валидирует токены
+│   RS256 Validation          │
+└─────────────────────────────┘
+```
+
+### Как это работает
+
+1. **Auth Service** генерирует JWT токен с RS256 подписью, используя приватный ключ
+2. **JWKS Endpoint** публикует публичный ключ: `GET /.well-known/jwks.json`
+3. **Core Service** получает публичный ключ и кеширует его (TTL 1 час)
+4. **Валидация** - Core Service проверяет подпись токена, issuer, audience и expiration
+
+### Преимущества
+
+- ✅ **Безопасность** - только auth-service может создавать токены (приватный ключ)
+- ✅ **Масштабируемость** - легко добавлять новые сервисы для валидации
+- ✅ **Стандарты** - совместимость с OAuth 2.0, OpenID Connect, RFC 7517
+- ✅ **Без хранения** - access токены stateless, не нужна синхронизация между инстансами
+
+### Quick Start
+
+```bash
+# 1. Запустить сервисы
+docker compose up -d
+
+# 2. Получить JWT токен
+TOKEN=$(curl -s -X POST 'http://localhost:8003/oauth/token' \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d 'grant_type=password&client_id=codelab-flutter-app&username=user&password=pass' \
+  | jq -r '.access_token')
+
+# 3. Использовать токен в запросе
+curl -X GET 'http://localhost:8000/my/projects/' \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Конфигурация
+
+**Auth Service:**
+```env
+AUTH_SERVICE__JWT_ISSUER=https://auth.codelab.local
+AUTH_SERVICE__JWT_AUDIENCE=codelab-api
+AUTH_SERVICE__PRIVATE_KEY_PATH=/app/keys/private_key.pem
+AUTH_SERVICE__PUBLIC_KEY_PATH=/app/keys/public_key.pem
+```
+
+**Core Service:**
+```env
+JWT_ALGORITHM=RS256
+JWT_ISSUER=https://auth.codelab.local
+JWT_AUDIENCE=codelab-api
+AUTH_SERVICE_JWKS_URL=http://codelab-auth-service:8003/.well-known/jwks.json
+JWKS_CACHE_TTL=3600
+```
+
+### Документация
+
+- 📖 [Auth Service JWT RS256](codelab-auth-service/README.md#jwt-rs256-authentication) - генерация токенов
+- 🔒 [Core Service JWT Validation](codelab-core-service/README.md#authentication) - валидация токенов
+- 📋 [Integration Summary](OPENSPEC_JWT_RS256_INTEGRATION_SUMMARY.md) - полное резюме интеграции
+
+---
+
 ## 📋 Требования
 
 - Python 3.12+
