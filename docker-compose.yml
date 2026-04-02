@@ -451,7 +451,7 @@ services:
       - ENVIRONMENT=${ENVIRONMENT}
       - PORT=8003
       - AUTH_SERVICE__DB_URL=${AUTH_SERVICE__DB_URL:-sqlite:///data/auth.db}
-      - AUTH_SERVICE__REDIS_URL=redis://redis:6379/1
+      - AUTH_SERVICE__REDIS_URL=redis://:${REDIS_PASSWORD:-redis-secure-password-change-in-production}@redis:6379/0
       - AUTH_SERVICE__LOG_LEVEL=${AUTH_SERVICE__LOG_LEVEL:-DEBUG}
       - AUTH_SERVICE__MASTER_KEY=${AUTH_SERVICE__MASTER_KEY}
       - AUTH_SERVICE__ENABLE_RATE_LIMITING=${AUTH_SERVICE__ENABLE_RATE_LIMITING:-false}
