@@ -7,3 +7,6 @@
 [submodule "codelab-admin-frontend"]
 	path = codelab-admin-frontend
 	url = git@github.com:pese-git/codelab-admin-frontend.git
+[submodule "codelab-user-frontend"]
+	path = codelab-user-frontend
+	url = git@github.com:pese-git/codelab-user-frontend.git
