@@ -130,7 +130,7 @@ curl -s http://localhost:8000/health | jq .
 #### Шаг 1: Создать пользователя в Auth Service
 
 ```bash
-curl -X POST http://localhost:8001/api/v1/register \
+curl -X POST http://localhost:8001/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "username": "testuser",

@@ -14,9 +14,9 @@ Nginx выступает в качестве reverse proxy для auth-service �
 ## Маршрутизация
 
 ### Auth Service
-- **`/oauth/*`** → `http://auth-service:8003/oauth/*`
+- **`/api/v1/auth/oauth/*`** → `http://auth-service:8003/api/v1/auth/oauth/*`
   - OAuth2 endpoints (login, token, refresh и т.д.)
-  - Пример: `http://localhost/oauth/token`
+  - Пример: `http://localhost/api/v1/auth/oauth/token`
 - **`/.well-known/*`** → `http://auth-service:8003/.well-known/*`
   - JWKS endpoints для публичных ключей
   - Пример: `http://localhost/.well-known/jwks.json`
@@ -76,8 +76,8 @@ docker-compose logs -f nginx
 #### Аутентификация (Auth Service)
 
 ```bash
-# Получение токена (обратите внимание - без префикса /auth)
-curl -X POST http://localhost/oauth/token \
+# Получение токена
+curl -X POST http://localhost/api/v1/auth/oauth/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=password&username=user&password=pass"
 
@@ -285,9 +285,9 @@ http {
         }
         
         # Более строгое ограничение для аутентификации
-        location /oauth/ {
+        location /api/v1/auth/oauth/ {
             limit_req zone=auth_limit burst=10 nodelay;
-            proxy_pass http://auth_backend/oauth/;
+            proxy_pass http://auth_backend/api/v1/auth/oauth/;
         }
     }
 }

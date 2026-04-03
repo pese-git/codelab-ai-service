@@ -170,13 +170,13 @@ Email тестирование и отладка:
 docker compose up -d
 
 # 2. Получить JWT токен
-TOKEN=$(curl -s -X POST 'http://localhost:8003/oauth/token' \
+TOKEN=$(curl -s -X POST 'http://localhost:8003/api/v1/auth/oauth/token' \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d 'grant_type=password&client_id=codelab-flutter-app&username=user&password=pass' \
   | jq -r '.access_token')
 
 # 3. Использовать токен в запросе
-curl -X GET 'http://localhost:8000/my/projects/' \
+curl -X GET 'http://localhost:8000/api/v1/core/my/projects/' \
   -H "Authorization: Bearer $TOKEN"
 ```
 
