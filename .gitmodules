@@ -4,3 +4,6 @@
 [submodule "codelab-core-service"]
 	path = codelab-core-service
 	url = git@github.com:pese-git/codelab-core-service.git
+[submodule "codelab-admin-frontend"]
+	path = codelab-admin-frontend
+	url = git@github.com:pese-git/codelab-admin-frontend.git
