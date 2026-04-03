@@ -503,24 +503,24 @@ services:
     volumes:
       - ./codelab-core-service:/app
     environment:
-      DATABASE_URL: ${APP_DATABASE_URL:-postgresql+asyncpg://postgres:postgres@postgres:5432/codelab}
-      REDIS_URL: ${APP_REDIS_URL:-redis://redis:6379/0}
-      QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
-      OTLP_EXPORTER_URL: ${OTLP_EXPORTER_URL:-http://jaeger:4318}
-      LITELLM_URL: ${LITELLM_URL:-http://litellm:4000}
-      LANGFUSE_ENABLED: ${LANGFUSE_ENABLED:-true}
-      LANGFUSE_HOST: ${LANGFUSE_HOST:-http://langfuse-web:3000}
-      LANGFUSE_PUBLIC_KEY: ${APP_LANGFUSE_PUBLIC_KEY:-pk_defaultkey}
-      LANGFUSE_SECRET_KEY: ${APP_LANGFUSE_SECRET_KEY:-sk_defaultsecret}
-      PYTHONUNBUFFERED: 1
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      GATEWAY__AUTH_SERVICE_URL: http://codelab-auth-service:8003
+      CORE_SERVICE_DATABASE_URL: ${CORE_SERVICE_DATABASE_URL:-postgresql+asyncpg://postgres:postgres@postgres:5432/codelab}
+      CORE_SERVICE_REDIS_URL: ${CORE_SERVICE_REDIS_URL:-redis://redis:6379/0}
+      CORE_SERVICE_QDRANT_URL: ${CORE_SERVICE_QDRANT_URL:-http://qdrant:6333}
+      CORE_SERVICE_OTLP_EXPORTER_URL: ${CORE_SERVICE_OTLP_EXPORTER_URL:-http://jaeger:4318}
+      CORE_SERVICE_LITELLM_URL: ${CORE_SERVICE_LITELLM_URL:-http://litellm:4000}
+      CORE_SERVICE_LANGFUSE_ENABLED: ${CORE_SERVICE_LANGFUSE_ENABLED:-true}
+      CORE_SERVICE_LANGFUSE_HOST: ${CORE_SERVICE_LANGFUSE_HOST:-http://langfuse-web:3000}
+      CORE_SERVICE_LANGFUSE_PUBLIC_KEY: ${CORE_SERVICE_LANGFUSE_PUBLIC_KEY:-pk_defaultkey}
+      CORE_SERVICE_LANGFUSE_SECRET_KEY: ${CORE_SERVICE_LANGFUSE_SECRET_KEY:-sk_defaultsecret}
+      CORE_SERVICE_PYTHONUNBUFFERED: 1
+      CORE_SERVICE_LOG_LEVEL: ${CORE_SERVICE_LOG_LEVEL:-INFO}
+      CORE_SERVICE_GATEWAY__AUTH_SERVICE_URL: http://codelab-auth-service:8003
       # JWT RS256 Configuration
-      JWT_ALGORITHM: ${JWT_ALGORITHM:-RS256}
-      JWT_ISSUER: ${JWT_ISSUER:-https://auth.codelab.local}
-      JWT_AUDIENCE: ${JWT_AUDIENCE:-codelab-api}
-      AUTH_SERVICE_JWKS_URL: ${AUTH_SERVICE_JWKS_URL:-http://codelab-auth-service:8003/.well-known/jwks.json}
-      JWKS_CACHE_TTL: ${JWKS_CACHE_TTL:-3600}
+      CORE_SERVICE_JWT_ALGORITHM: ${CORE_SERVICE_JWT_ALGORITHM:-RS256}
+      CORE_SERVICE_JWT_ISSUER: ${CORE_SERVICE_JWT_ISSUER:-https://auth.codelab.local}
+      CORE_SERVICE_JWT_AUDIENCE: ${CORE_SERVICE_JWT_AUDIENCE:-codelab-api}
+      CORE_SERVICE_AUTH_SERVICE_JWKS_URL: ${CORE_SERVICE_AUTH_SERVICE_JWKS_URL:-http://codelab-auth-service:8003/.well-known/jwks.json}
+      CORE_SERVICE_JWKS_CACHE_TTL: ${CORE_SERVICE_JWKS_CACHE_TTL:-3600}
     env_file:
       - .env
     depends_on:
@@ -547,7 +547,7 @@ services:
         echo 'Waiting for services to be ready...' &&
         sleep 5 &&
         echo 'Initializing database...' &&
-        python scripts/init_database.py '${APP_DATABASE_URL:-postgresql+asyncpg://postgres:postgres@postgres:5432/codelab-core-db}' &&
+        python scripts/init_database.py '${CORE_SERVICE_DATABASE_URL:-postgresql+asyncpg://postgres:postgres@postgres:5432/codelab-core-db}' &&
         echo 'Running database migrations...' &&
         alembic upgrade head &&
         echo 'Starting application...' &&

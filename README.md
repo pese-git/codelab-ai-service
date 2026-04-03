@@ -434,20 +434,21 @@ uv run python scripts/init_database.py
 
 ```bash
 # codelab-core-service (.env)
-DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/codelab
-REDIS_URL=redis://localhost:6379/0
-QDRANT_URL=http://localhost:6333
-LITELLM_URL=http://localhost:4000
-LANGFUSE_ENABLED=true
-LANGFUSE_HOST=http://localhost:3001
-LANGFUSE_PUBLIC_KEY=pk_defaultkey
-LANGFUSE_SECRET_KEY=sk_defaultsecret
-GATEWAY__AUTH_SERVICE_URL=http://localhost:8003
-JWT_ALGORITHM=RS256
-JWT_ISSUER=https://auth.codelab.local
-JWT_AUDIENCE=codelab-api
-AUTH_SERVICE_JWKS_URL=http://localhost:8003/.well-known/jwks.json
-JWKS_CACHE_TTL=3600
+CORE_SERVICE_DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/codelab
+CORE_SERVICE_REDIS_URL=redis://localhost:6379/0
+CORE_SERVICE_QDRANT_URL=http://localhost:6333
+CORE_SERVICE_LITELLM_URL=http://localhost:4000
+CORE_SERVICE_LITELLM_MASTER_KEY=super-secret-key-change-in-production
+CORE_SERVICE_LANGFUSE_ENABLED=true
+CORE_SERVICE_LANGFUSE_HOST=http://localhost:3001
+CORE_SERVICE_LANGFUSE_PUBLIC_KEY=pk_defaultkey
+CORE_SERVICE_LANGFUSE_SECRET_KEY=sk_defaultsecret
+CORE_SERVICE_GATEWAY__AUTH_SERVICE_URL=http://localhost:8003
+CORE_SERVICE_JWT_ALGORITHM=RS256
+CORE_SERVICE_JWT_ISSUER=https://auth.codelab.local
+CORE_SERVICE_JWT_AUDIENCE=codelab-api
+CORE_SERVICE_AUTH_SERVICE_JWKS_URL=http://localhost:8003/.well-known/jwks.json
+CORE_SERVICE_JWKS_CACHE_TTL=3600
 
 # codelab-auth-service (.env)
 PORT=8003
