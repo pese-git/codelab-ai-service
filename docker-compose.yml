@@ -1,206 +1,215 @@
 services:
-  # PostgreSQL Database
   postgres:
     image: postgres:16-alpine
-    #container_name: codelab-ai-service-postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-codelab}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+    - ${POSTGRES_PORT:-5432}:5432
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+    - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      test:
+      - CMD-SHELL
+      - pg_isready -U ${POSTGRES_USER:-postgres}
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
     restart: unless-stopped
     networks:
-      - codelab-ai-service-network
-
+    - codelab-ai-service-network
   mailhog:
     image: mailhog/mailhog:latest
     ports:
-      - "1025:1025"  # SMTP
-      - "8025:8025"  # Web UI
+    - 1025:1025
+    - 8025:8025
     networks:
-      - codelab-ai-service-network
+    - codelab-ai-service-network
     restart: unless-stopped
-  
-  # Redis Cache
   redis:
     image: redis:8.6.1
-    #container_name: codelab-ai-service-redis
-    command: redis-server --appendonly yes --requirepass "${REDIS_PASSWORD:-}" --bind 0.0.0.0
+    command: redis-server --appendonly yes --requirepass "${REDIS_PASSWORD:-}" --bind
+      0.0.0.0
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+    - ${REDIS_PORT:-6379}:6379
     volumes:
-      - redis_data:/data
+    - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-}", "ping"]
+      test:
+      - CMD
+      - redis-cli
+      - -a
+      - ${REDIS_PASSWORD:-}
+      - ping
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
     restart: unless-stopped
     networks:
-      - codelab-ai-service-network
-
-  # Qdrant Vector Database
+    - codelab-ai-service-network
   qdrant:
     image: qdrant/qdrant:v1.17
-    #container_name: codelab-ai-service-qdrant
     ports:
-      - "${QDRANT_PORT:-6333}:6333"
-      - "${QDRANT_GRPC_PORT:-6334}:6334"
+    - ${QDRANT_PORT:-6333}:6333
+    - ${QDRANT_GRPC_PORT:-6334}:6334
     volumes:
-      - qdrant_data:/qdrant/storage
+    - qdrant_data:/qdrant/storage
     environment:
       QDRANT__SERVICE__GRPC_PORT: ${QDRANT_GRPC_PORT:-6334}
     healthcheck:
-      test: ["CMD", "timeout", "1", "bash", "-c", "cat < /dev/null > /dev/tcp/localhost/6333"]
+      test:
+      - CMD
+      - timeout
+      - '1'
+      - bash
+      - -c
+      - cat < /dev/null > /dev/tcp/localhost/6333
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
     restart: unless-stopped
     networks:
-      - codelab-ai-service-network
-
-  # Prometheus Monitoring
+    - codelab-ai-service-network
   prometheus:
     image: prom/prometheus:v3.10.0
-    #container_name: codelab-ai-service-prometheus
     ports:
-      - "${PROMETHEUS_PORT:-9090}:9090"
+    - ${PROMETHEUS_PORT:-9090}:9090
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
+    - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    - prometheus_data:/prometheus
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=30d'
-      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
-      - '--web.console.templates=/usr/share/prometheus/consoles'
-      - '--web.listen-address=0.0.0.0:9090'
+    - --config.file=/etc/prometheus/prometheus.yml
+    - --storage.tsdb.path=/prometheus
+    - --storage.tsdb.retention.time=30d
+    - --web.console.libraries=/usr/share/prometheus/console_libraries
+    - --web.console.templates=/usr/share/prometheus/consoles
+    - --web.listen-address=0.0.0.0:9090
     healthcheck:
-      test: ["CMD", "sh", "-c", "test -f /prometheus/wal/checkpoint.*.tmp || test -d /prometheus"]
+      test:
+      - CMD
+      - sh
+      - -c
+      - test -f /prometheus/wal/checkpoint.*.tmp || test -d /prometheus
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
     restart: unless-stopped
     networks:
-      - codelab-ai-service-network
-
-  # Grafana Dashboards
+    - codelab-ai-service-network
   grafana:
     image: grafana/grafana:12.3.5
-    #container_name: codelab-ai-service-grafana
     ports:
-      - "${GRAFANA_PORT:-3000}:3000"
+    - ${GRAFANA_PORT:-3000}:3000
     volumes:
-      - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    - grafana_data:/var/lib/grafana
+    - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+    - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
-      GF_USERS_ALLOW_SIGN_UP: "${GF_USERS_ALLOW_SIGN_UP:-false}"
-      GF_AUTH_ANONYMOUS_ENABLED: "${GF_AUTH_ANONYMOUS_ENABLED:-false}"
-      GF_SECURITY_COOKIE_SECURE: "false"
-      GF_SECURITY_COOKIE_SAMESITE: "Lax"
+      GF_USERS_ALLOW_SIGN_UP: ${GF_USERS_ALLOW_SIGN_UP:-false}
+      GF_AUTH_ANONYMOUS_ENABLED: ${GF_AUTH_ANONYMOUS_ENABLED:-false}
+      GF_SECURITY_COOKIE_SECURE: 'false'
+      GF_SECURITY_COOKIE_SAMESITE: Lax
     depends_on:
       prometheus:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/api/health"]
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://127.0.0.1:3000/api/health
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
     restart: unless-stopped
     networks:
-      - codelab-ai-service-network
-
-  # Jaeger Tracing (OpenTelemetry)
+    - codelab-ai-service-network
   jaeger:
     image: jaegertracing/all-in-one:1.76.0
-    #container_name: codelab-ai-service-jaeger
     ports:
-      - "${JAEGER_UI_PORT:-16686}:16686"
-      - "${JAEGER_OTLP_HTTP_PORT:-14268}:14268"
-      - "6831:6831/udp"
+    - ${JAEGER_UI_PORT:-16686}:16686
+    - ${JAEGER_OTLP_HTTP_PORT:-14268}:14268
+    - 6831:6831/udp
     environment:
-      COLLECTOR_ZIPKIN_HOST_PORT: ":9411"
-      MEMORY_MAX_TRACES: "10000"
+      COLLECTOR_ZIPKIN_HOST_PORT: :9411
+      MEMORY_MAX_TRACES: '10000'
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:16686/"]
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://127.0.0.1:16686/
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
     restart: unless-stopped
     networks:
-      - codelab-ai-service-network
-
-  # ClickHouse для Langfuse V3
+    - codelab-ai-service-network
   clickhouse:
     image: clickhouse/clickhouse-server:26.2-alpine
-    #container_name: codelab-ai-service-clickhouse
     environment:
       CLICKHOUSE_DB: ${CLICKHOUSE_DB:-langfuse}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-clickhouse}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhouse}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
     ports:
-      - "${CLICKHOUSE_PORT:-8123}:8123"
-      - "${CLICKHOUSE_NATIVE_PORT:-9000}:9000"
+    - ${CLICKHOUSE_PORT:-8123}:8123
+    - ${CLICKHOUSE_NATIVE_PORT:-9000}:9000
     volumes:
-      - clickhouse_data:/var/lib/clickhouse
-      - ./clickhouse/config.d/listen.xml:/etc/clickhouse-server/config.d/listen.xml:ro
+    - clickhouse_data:/var/lib/clickhouse
+    - ./clickhouse/config.d/listen.xml:/etc/clickhouse-server/config.d/listen.xml:ro
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8123/ping"]
+      test:
+      - CMD
+      - wget
+      - --no-verbose
+      - --tries=1
+      - --spider
+      - http://127.0.0.1:8123/ping
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 60s
     restart: unless-stopped
     networks:
-      - codelab-ai-service-network
-
-  # MinIO S3 Storage для Langfuse
+    - codelab-ai-service-network
   minio:
     image: minio/minio:RELEASE.2025-04-22T22-12-26Z
-    #container_name: codelab-ai-service-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-miniosecret}
-      MINIO_BROWSER: "on"
+      MINIO_BROWSER: 'on'
     ports:
-      - "${MINIO_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    - ${MINIO_PORT:-9000}:9000
+    - ${MINIO_CONSOLE_PORT:-9001}:9001
     volumes:
-      - minio_data:/data
+    - minio_data:/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test:
+      - CMD
+      - mc
+      - ready
+      - local
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
     networks:
-      - codelab-ai-service-network
-
-  # MinIO Init Container - создает buckets
+    - codelab-ai-service-network
   minio-init:
     image: minio/mc:RELEASE.2025-04-16T18-13-26Z
-    #container_name: codelab-ai-service-minio-init
-    restart: no
+    restart: "no"
     depends_on:
       minio:
         condition: service_healthy
@@ -211,15 +220,12 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-miniosecret}
       MINIO_BUCKET: ${MINIO_BUCKET:-langfuse}
     volumes:
-      - ./scripts/init-minio.sh:/scripts/init-minio.sh
+    - ./scripts/init-minio.sh:/scripts/init-minio.sh
     entrypoint: sh /scripts/init-minio.sh
     networks:
-      - codelab-ai-service-network
-
-  # Langfuse Worker
+    - codelab-ai-service-network
   langfuse-worker:
     image: docker.io/langfuse/langfuse-worker:3.158.0
-    #container_name: codelab-ai-service-langfuse-worker
     restart: unless-stopped
     depends_on:
       postgres:
@@ -231,68 +237,61 @@ services:
       clickhouse:
         condition: service_healthy
     ports:
-      - "${LANGFUSE_WORKER_PORT:-3030}:3030"
+    - ${LANGFUSE_WORKER_PORT:-3030}:3030
     environment:
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3001}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-langfuse-secret-change-me}
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${CLICKHOUSE_DB:-langfuse}
       SALT: ${SALT:-langfuse-salt-change-me}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-bf5672b1950e122c1b797146af33a32cd3c794615c8bb27ef5315cf38101aa1b}
-      TELEMETRY_ENABLED: "false"
-      LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: "false"
-      
-      # ClickHouse
+      TELEMETRY_ENABLED: 'false'
+      LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: 'false'
       CLICKHOUSE_MIGRATION_URL: clickhouse://${CLICKHOUSE_USER:-clickhouse}:${CLICKHOUSE_PASSWORD:-clickhouse}@clickhouse:9000
       CLICKHOUSE_URL: http://clickhouse:8123
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-clickhouse}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhouse}
-      CLICKHOUSE_CLUSTER_ENABLED: "false"
-      
-      # S3 / MinIO
-      LANGFUSE_USE_AZURE_BLOB: "false"
+      CLICKHOUSE_CLUSTER_ENABLED: 'false'
+      LANGFUSE_USE_AZURE_BLOB: 'false'
       LANGFUSE_S3_EVENT_UPLOAD_BUCKET: ${MINIO_BUCKET:-langfuse}
       LANGFUSE_S3_EVENT_UPLOAD_REGION: ${MINIO_REGION:-auto}
       LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
       LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-miniosecret}
       LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
-      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: 'true'
       LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
-      
       LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: ${MINIO_BUCKET:-langfuse}
       LANGFUSE_S3_MEDIA_UPLOAD_REGION: ${MINIO_REGION:-auto}
       LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
       LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-miniosecret}
       LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://minio:9000
-      LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: 'true'
       LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
-      
-      LANGFUSE_S3_BATCH_EXPORT_ENABLED: "false"
+      LANGFUSE_S3_BATCH_EXPORT_ENABLED: 'false'
       LANGFUSE_S3_BATCH_EXPORT_BUCKET: ${MINIO_BUCKET:-langfuse}
       LANGFUSE_S3_BATCH_EXPORT_PREFIX: exports/
       LANGFUSE_S3_BATCH_EXPORT_REGION: ${MINIO_REGION:-auto}
       LANGFUSE_S3_BATCH_EXPORT_ENDPOINT: http://minio:9000
       LANGFUSE_S3_BATCH_EXPORT_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
       LANGFUSE_S3_BATCH_EXPORT_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-miniosecret}
-      LANGFUSE_S3_BATCH_EXPORT_FORCE_PATH_STYLE: "true"
-      
-      # Redis
+      LANGFUSE_S3_BATCH_EXPORT_FORCE_PATH_STYLE: 'true'
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
       REDIS_AUTH: ${REDIS_PASSWORD:-}
-      REDIS_TLS_ENABLED: "false"
+      REDIS_TLS_ENABLED: 'false'
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:3030/health"]
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://127.0.0.1:3030/health
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
     networks:
-      - codelab-ai-service-network
-
-  # Langfuse Web UI
+    - codelab-ai-service-network
   langfuse-web:
     image: docker.io/langfuse/langfuse:3.158.0
-    #container_name: codelab-ai-service-langfuse-web
     restart: unless-stopped
     depends_on:
       postgres:
@@ -304,57 +303,47 @@ services:
       clickhouse:
         condition: service_healthy
     ports:
-      - "${LANGFUSE_WEB_PORT:-3001}:3000"
+    - ${LANGFUSE_WEB_PORT:-3001}:3000
     environment:
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3001}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-langfuse-secret-change-me}
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${CLICKHOUSE_DB:-langfuse}
       SALT: ${SALT:-langfuse-salt-change-me}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-bf5672b1950e122c1b797146af33a32cd3c794615c8bb27ef5315cf38101aa1b}
-      TELEMETRY_ENABLED: "false"
-      LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: "false"
-      
-      # ClickHouse
+      TELEMETRY_ENABLED: 'false'
+      LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: 'false'
       CLICKHOUSE_MIGRATION_URL: clickhouse://${CLICKHOUSE_USER:-clickhouse}:${CLICKHOUSE_PASSWORD:-clickhouse}@clickhouse:9000
       CLICKHOUSE_URL: http://clickhouse:8123
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-clickhouse}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhouse}
-      CLICKHOUSE_CLUSTER_ENABLED: "false"
-      
-      # S3 / MinIO
-      LANGFUSE_USE_AZURE_BLOB: "false"
+      CLICKHOUSE_CLUSTER_ENABLED: 'false'
+      LANGFUSE_USE_AZURE_BLOB: 'false'
       LANGFUSE_S3_EVENT_UPLOAD_BUCKET: ${MINIO_BUCKET:-langfuse}
       LANGFUSE_S3_EVENT_UPLOAD_REGION: ${MINIO_REGION:-auto}
       LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
       LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-miniosecret}
       LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
-      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: 'true'
       LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
-      
       LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: ${MINIO_BUCKET:-langfuse}
       LANGFUSE_S3_MEDIA_UPLOAD_REGION: ${MINIO_REGION:-auto}
       LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
       LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-miniosecret}
       LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://minio:9000
-      LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: 'true'
       LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
-      
-      LANGFUSE_S3_BATCH_EXPORT_ENABLED: "false"
+      LANGFUSE_S3_BATCH_EXPORT_ENABLED: 'false'
       LANGFUSE_S3_BATCH_EXPORT_BUCKET: ${MINIO_BUCKET:-langfuse}
       LANGFUSE_S3_BATCH_EXPORT_PREFIX: exports/
       LANGFUSE_S3_BATCH_EXPORT_REGION: ${MINIO_REGION:-auto}
       LANGFUSE_S3_BATCH_EXPORT_ENDPOINT: http://minio:9000
       LANGFUSE_S3_BATCH_EXPORT_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
       LANGFUSE_S3_BATCH_EXPORT_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-miniosecret}
-      LANGFUSE_S3_BATCH_EXPORT_FORCE_PATH_STYLE: "true"
-      
-      # Redis
+      LANGFUSE_S3_BATCH_EXPORT_FORCE_PATH_STYLE: 'true'
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
       REDIS_AUTH: ${REDIS_PASSWORD:-}
-      REDIS_TLS_ENABLED: "false"
-      
-      # Initialization
+      REDIS_TLS_ENABLED: 'false'
       LANGFUSE_INIT_ORG_ID: ${LANGFUSE_INIT_ORG_ID:-default-org}
       LANGFUSE_INIT_ORG_NAME: ${LANGFUSE_INIT_ORG_NAME:-Default Organization}
       LANGFUSE_INIT_PROJECT_ID: ${LANGFUSE_INIT_PROJECT_ID:-default-project}
@@ -365,36 +354,37 @@ services:
       LANGFUSE_INIT_USER_NAME: ${LANGFUSE_INIT_USER_NAME:-Admin User}
       LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:-langfuse123}
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/"]
+      test:
+      - CMD
+      - wget
+      - --no-verbose
+      - --tries=1
+      - --spider
+      - http://127.0.0.1:3000/
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 60s
     networks:
-      - codelab-ai-service-network
-
-  # LiteLLM Proxy
+    - codelab-ai-service-network
   litellm:
     image: ghcr.io/berriai/litellm:v1.82.0-stable.patch5
-    #container_name: codelab-ai-service-litellm
     restart: unless-stopped
     ports:
-      - "${LITELLM_PORT:-4000}:4000"
+    - ${LITELLM_PORT:-4000}:4000
     environment:
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-super-secret-key-change-in-production}
       LITELLM_URL: http://0.0.0.0:4000
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/litellm
-      STORE_MODEL_IN_DB: "True"
+      STORE_MODEL_IN_DB: 'True'
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
       REDIS_DB: 1
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       REDIS_URL: redis://:${REDIS_PASSWORD:-}@redis:6379/1
       LITELLM_LOG: INFO
-      CACHE: "true"
-      
-      # Langfuse Integration Callbacks
-      LITELLM_CALLBACKS: "langfuse"
+      CACHE: 'true'
+      LITELLM_CALLBACKS: langfuse
       LANGFUSE_BASE_URL: http://langfuse-web:3000
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk_defaultkey}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk_defaultsecret}
@@ -405,101 +395,108 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:4000/health/readiness"]
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://127.0.0.1:4000/health/readiness
       interval: 30s
       timeout: 10s
       retries: 10
       start_period: 45s
-    command: >
-      --port 4000
-      --telemetry false
-    networks:
-      - codelab-ai-service-network
+    command: '--port 4000 --telemetry false
 
+      '
+    networks:
+    - codelab-ai-service-network
   nginx:
     image: nginx:alpine
     ports:
-      - "${NGINX_PORT:-80}:80"
+    - ${NGINX_PORT:-80}:80
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       codelab-auth-service:
         condition: service_healthy
       codelab-core-service:
         condition: service_healthy
     networks:
-      - codelab-ai-service-network
+    - codelab-ai-service-network
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/nginx-health"]
+      test:
+      - CMD
+      - wget
+      - --quiet
+      - --tries=1
+      - --spider
+      - http://localhost/nginx-health
       interval: 10s
       timeout: 5s
       retries: 3
       start_period: 10s
-
-  # Auth Service (Development)
   codelab-auth-service:
     build:
       context: ./codelab-auth-service
       dockerfile: Dockerfile
-    # Убираем внешний порт - доступ только через nginx
     ports:
-      - "8003:8003"
+    - 8003:8003
     volumes:
-      - ./codelab-auth-service/data:/app/data
-      - ./codelab-auth-service/keys:/app/keys
+    - ./codelab-auth-service/data:/app/data
+    - ./codelab-auth-service/keys:/app/keys
     environment:
-      - ENVIRONMENT=${ENVIRONMENT}
-      - PORT=8003
-      - AUTH_SERVICE__DB_URL=${AUTH_SERVICE__DB_URL:-sqlite:///data/auth.db}
-      - AUTH_SERVICE__REDIS_URL=redis://:${REDIS_PASSWORD:-redis-secure-password-change-in-production}@redis:6379/0
-      - AUTH_SERVICE__LOG_LEVEL=${AUTH_SERVICE__LOG_LEVEL:-DEBUG}
-      - AUTH_SERVICE__MASTER_KEY=${AUTH_SERVICE__MASTER_KEY}
-      - AUTH_SERVICE__ENABLE_RATE_LIMITING=${AUTH_SERVICE__ENABLE_RATE_LIMITING:-false}
-      - AUTH_SERVICE__JWT_ISSUER=https://auth.codelab.local
-      - AUTH_SERVICE__JWT_AUDIENCE=codelab-api
-      - AUTH_SERVICE__ACCESS_TOKEN_LIFETIME=900
-      - AUTH_SERVICE__REFRESH_TOKEN_LIFETIME=2592000
-      - AUTH_SERVICE__PRIVATE_KEY_PATH=/app/keys/private_key.pem
-      - AUTH_SERVICE__PUBLIC_KEY_PATH=/app/keys/public_key.pem
-
-      # SMTP Configuration for MailHog
-      - AUTH_SERVICE__SMTP_HOST=${AUTH_SERVICE__SMTP_HOST:-mailhog}
-      - AUTH_SERVICE__SMTP_PORT=${AUTH_SERVICE__SMTP_PORT:-1025}
-      - AUTH_SERVICE__SMTP_USERNAME=${AUTH_SERVICE__SMTP_USERNAME:-}
-      - AUTH_SERVICE__SMTP_PASSWORD=${AUTH_SERVICE__SMTP_PASSWORD:-}
-      - AUTH_SERVICE__SMTP_FROM_EMAIL=${AUTH_SERVICE__SMTP_FROM_EMAIL:-noreply@codelab.local}
-      - AUTH_SERVICE__SMTP_USE_TLS=${AUTH_SERVICE__SMTP_USE_TLS:-false}
-      - AUTH_SERVICE__SEND_WELCOME_EMAIL=${AUTH_SERVICE__SEND_WELCOME_EMAIL:-true}
-      - AUTH_SERVICE__SEND_PASSWORD_RESET_EMAIL=${AUTH_SERVICE__SEND_PASSWORD_RESET_EMAIL:-true}
-      - AUTH_SERVICE__REQUIRE_EMAIL_CONFIRMATION=${AUTH_SERVICE__REQUIRE_EMAIL_CONFIRMATION:-true}
+    - ENVIRONMENT=${ENVIRONMENT}
+    - PORT=8003
+    - AUTH_SERVICE__DB_URL=${AUTH_SERVICE__DB_URL:-sqlite:///data/auth.db}
+    - AUTH_SERVICE__REDIS_URL=redis://:${REDIS_PASSWORD:-redis-secure-password-change-in-production}@redis:6379/0
+    - AUTH_SERVICE__LOG_LEVEL=${AUTH_SERVICE__LOG_LEVEL:-DEBUG}
+    - AUTH_SERVICE__MASTER_PASSWORD=${AUTH_SERVICE__MASTER_PASSWORD}
+    - AUTH_SERVICE__MASTER_USERNAME=${AUTH_SERVICE__MASTER_USERNAME:-admin}
+    - AUTH_SERVICE__MASTER_EMAIL=${AUTH_SERVICE__MASTER_EMAIL:-admin@codelab.local}
+    - AUTH_SERVICE__DEFAULT_CLIENT_ID_FLUTTER=${AUTH_SERVICE__DEFAULT_CLIENT_ID_FLUTTER:-codelab-flutter-app}
+    - AUTH_SERVICE__DEFAULT_CLIENT_ID_INTERNAL=${AUTH_SERVICE__DEFAULT_CLIENT_ID_INTERNAL:-codelab-internal}
+    - AUTH_SERVICE__DEFAULT_INTERNAL_CLIENT_SECRET=${AUTH_SERVICE__DEFAULT_INTERNAL_CLIENT_SECRET:-internal-secret-123}
+    - AUTH_SERVICE__ENABLE_RATE_LIMITING=${AUTH_SERVICE__ENABLE_RATE_LIMITING:-false}
+    - AUTH_SERVICE__JWT_ISSUER=https://auth.codelab.local
+    - AUTH_SERVICE__JWT_AUDIENCE=codelab-api
+    - AUTH_SERVICE__ACCESS_TOKEN_LIFETIME=900
+    - AUTH_SERVICE__REFRESH_TOKEN_LIFETIME=2592000
+    - AUTH_SERVICE__PRIVATE_KEY_PATH=/app/keys/private_key.pem
+    - AUTH_SERVICE__PUBLIC_KEY_PATH=/app/keys/public_key.pem
+    - AUTH_SERVICE__SMTP_HOST=${AUTH_SERVICE__SMTP_HOST:-mailhog}
+    - AUTH_SERVICE__SMTP_PORT=${AUTH_SERVICE__SMTP_PORT:-1025}
+    - AUTH_SERVICE__SMTP_USERNAME=${AUTH_SERVICE__SMTP_USERNAME:-}
+    - AUTH_SERVICE__SMTP_PASSWORD=${AUTH_SERVICE__SMTP_PASSWORD:-}
+    - AUTH_SERVICE__SMTP_FROM_EMAIL=${AUTH_SERVICE__SMTP_FROM_EMAIL:-noreply@codelab.local}
+    - AUTH_SERVICE__SMTP_USE_TLS=${AUTH_SERVICE__SMTP_USE_TLS:-false}
+    - AUTH_SERVICE__SEND_WELCOME_EMAIL=${AUTH_SERVICE__SEND_WELCOME_EMAIL:-true}
+    - AUTH_SERVICE__SEND_PASSWORD_RESET_EMAIL=${AUTH_SERVICE__SEND_PASSWORD_RESET_EMAIL:-true}
+    - AUTH_SERVICE__REQUIRE_EMAIL_CONFIRMATION=${AUTH_SERVICE__REQUIRE_EMAIL_CONFIRMATION:-true}
     depends_on:
       redis:
         condition: service_healthy
       postgres:
         condition: service_healthy
-    command: >
-      sh -c "
-        python scripts/init_database.py '${AUTH_SERVICE__DB_URL:-sqlite:///data/auth.db}' &&
-        uvicorn app.main:app --host 0.0.0.0 --port 8003
-      "
+    command: "sh -c \"\n  python scripts/init_database.py '${AUTH_SERVICE__DB_URL:-sqlite:///data/auth.db}'\
+      \ &&\n  uvicorn app.main:app --host 0.0.0.0 --port 8003\n\"\n"
     networks:
-      - codelab-ai-service-network
+    - codelab-ai-service-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:8003/health
       interval: ${HEALTHCHECK_INTERVAL}
       timeout: ${HEALTHCHECK_TIMEOUT}
       retries: ${HEALTHCHECK_RETRIES}
       start_period: ${HEALTHCHECK_START_PERIOD}
-
-  # Core Service (Development)
   codelab-core-service:
     build:
       context: ./codelab-core-service
       dockerfile: Dockerfile
-    #container_name: codelab-core-service
     restart: unless-stopped
     ports:
-      - "${APP_PORT:-8000}:8000"
+      - ${APP_PORT:-8000}:8000
     volumes:
       - ./codelab-core-service:/app
     environment:
@@ -515,14 +512,13 @@ services:
       CORE_SERVICE_PYTHONUNBUFFERED: 1
       CORE_SERVICE_LOG_LEVEL: ${CORE_SERVICE_LOG_LEVEL:-INFO}
       CORE_SERVICE_GATEWAY__AUTH_SERVICE_URL: http://codelab-auth-service:8003
-      # JWT RS256 Configuration
       CORE_SERVICE_JWT_ALGORITHM: ${CORE_SERVICE_JWT_ALGORITHM:-RS256}
       CORE_SERVICE_JWT_ISSUER: ${CORE_SERVICE_JWT_ISSUER:-https://auth.codelab.local}
       CORE_SERVICE_JWT_AUDIENCE: ${CORE_SERVICE_JWT_AUDIENCE:-codelab-api}
       CORE_SERVICE_AUTH_SERVICE_JWKS_URL: ${CORE_SERVICE_AUTH_SERVICE_JWKS_URL:-http://codelab-auth-service:8003/.well-known/jwks.json}
       CORE_SERVICE_JWKS_CACHE_TTL: ${CORE_SERVICE_JWKS_CACHE_TTL:-3600}
     env_file:
-      - .env
+    - .env
     depends_on:
       postgres:
         condition: service_healthy
@@ -537,79 +533,90 @@ services:
       codelab-auth-service:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://127.0.0.1:8000/health
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-    command: >
-      sh -c "
-        echo 'Waiting for services to be ready...' &&
-        sleep 5 &&
-        echo 'Initializing database...' &&
-        python scripts/init_database.py '${CORE_SERVICE_DATABASE_URL:-postgresql+asyncpg://postgres:postgres@postgres:5432/codelab-core-db}' &&
-        echo 'Running database migrations...' &&
-        alembic upgrade head &&
-        echo 'Starting application...' &&
-        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-      "
+    command: "sh -c \"\n  echo 'Waiting for services to be ready...' &&\n  sleep 5\
+      \ &&\n  echo 'Initializing database...' &&\n  python scripts/init_database.py\
+      \ '${CORE_SERVICE_DATABASE_URL:-postgresql+asyncpg://postgres:postgres@postgres:5432/codelab-core-db}'\
+      \ &&\n  echo 'Running database migrations...' &&\n  alembic upgrade head &&\n\
+      \  echo 'Starting application...' &&\n  uvicorn app.main:app --host 0.0.0.0\
+      \ --port 8000 --reload\n\"\n"
     networks:
-      - codelab-ai-service-network
-
-  # Admin Frontend (Next.js)
+    - codelab-ai-service-network
   codelab-admin-frontend:
     build:
       context: ./codelab-admin-frontend
       dockerfile: Dockerfile
     restart: unless-stopped
-    ports:
-      - "${ADMIN_FRONTEND_PORT:-3010}:3010"
     environment:
+      # Next.js Runtime Environment
       - NODE_ENV=production
-      # API Configuration
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost/api}
-      - NEXT_PUBLIC_AUTH_SERVICE_URL=${NEXT_PUBLIC_AUTH_SERVICE_URL:-http://localhost:8003}
+      # Base path and asset prefix for serving behind nginx /admin route
+      - NEXT_PUBLIC_BASE_PATH=/admin
+      - NEXT_PUBLIC_ASSET_PREFIX=/admin
+      # API Endpoints (relative paths work through nginx proxy)
+      - NEXT_PUBLIC_AUTH_SERVICE_URL=/api/v1/auth
+      - NEXT_PUBLIC_ADMIN_API_URL=/api/v1
+      # Enable/disable mock data (false = use real API)
+      - NEXT_PUBLIC_USE_MOCKS=${NEXT_PUBLIC_USE_MOCKS:-false}
     depends_on:
       codelab-auth-service:
         condition: service_healthy
       codelab-core-service:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3010/"]
+      test:
+      - CMD
+      - wget
+      - --no-verbose
+      - --tries=1
+      - --spider
+      - http://127.0.0.1:3010/admin/
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
     networks:
-      - codelab-ai-service-network
-
-  # User Frontend (Next.js)
+    - codelab-ai-service-network
+    expose:
+    - '3010'
   codelab-user-frontend:
     build:
       context: ./codelab-user-frontend
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "${USER_FRONTEND_PORT:-3020}:3020"
+    - ${USER_FRONTEND_PORT:-3020}:3020
     environment:
-      - NODE_ENV=production
-      # API Configuration
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost/api}
-      - NEXT_PUBLIC_AUTH_SERVICE_URL=${NEXT_PUBLIC_AUTH_SERVICE_URL:-http://localhost:8003}
+    - NODE_ENV=production
+    - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost/api}
+    - NEXT_PUBLIC_AUTH_SERVICE_URL=${NEXT_PUBLIC_AUTH_SERVICE_URL:-http://localhost:8003}
     depends_on:
       codelab-auth-service:
         condition: service_healthy
       codelab-core-service:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3020/"]
+      test:
+      - CMD
+      - wget
+      - --no-verbose
+      - --tries=1
+      - --spider
+      - http://127.0.0.1:3020/
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
     networks:
-      - codelab-ai-service-network
-
+    - codelab-ai-service-network
 volumes:
   postgres_data:
     driver: local
@@ -625,7 +632,6 @@ volumes:
     driver: local
   minio_data:
     driver: local
-
 networks:
   codelab-ai-service-network:
     driver: bridge
